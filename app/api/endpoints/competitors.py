@@ -1,20 +1,19 @@
+from enum import StrEnum
 from typing import Any
-from pydantic import BaseModel, Field, HttpUrl, validator
-from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, Security
+from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import verify_api_key
 from app.api.dependencies import get_session
-from app.database.models import CollectionFrequency
-from app.database.models import Competitor
+from app.database.models import CollectionFrequency, Competitor
 from app.database.repositories.competitor_repository import CompetitorRepository
 
 router = APIRouter(prefix="/competitors", tags=["competitors"])
 
 
-class CollectionModule(str, Enum):
+class CollectionModule(StrEnum):
     DISCOVERY = "discovery"
     COMPANY = "company"
     SERVICES = "services"

@@ -1,12 +1,13 @@
 import asyncio
 import contextlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 
 from app.configuration.settings import get_settings
 from app.database.connection import db_manager
-from app.database.models import CollectionFrequency
+from app.database.models import CollectionFrequency, CollectionLog
 from app.database.repositories.competitor_repository import CompetitorRepository
 from app.services.collection_service import collection_service
 
@@ -56,7 +57,7 @@ class CollectionScheduler:
             async with db_manager.session() as session:
                 comp_repo = CompetitorRepository(session)
 
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 for freq in CollectionFrequency:
                     competitors = await comp_repo.get_by_frequency(freq)
                     for comp in competitors:
@@ -94,8 +95,8 @@ class CollectionScheduler:
         log_repo = CollectionLogRepository(session)
         return await log_repo.get_latest_by_competitor(competitor_id)
 
-    def _should_collect(self, last_log: Any, frequency: CollectionFrequency, now: datetime) -> bool:
-        if not last_log.start_time:
+    def _should_collect(self, last_log: CollectionLog | None, frequency: CollectionFrequency, now: datetime) -> bool:
+        if not last_log or not last_log.start_time:
             return True
 
         interval_map = {

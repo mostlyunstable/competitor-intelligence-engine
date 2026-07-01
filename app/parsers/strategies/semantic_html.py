@@ -44,6 +44,22 @@ class SemanticHtmlStrategy(ParsingStrategy):
                 if src:
                     result.logo = urljoin(url, src)
 
+    def _extract_from_nav(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+        nav = soup.select_one("nav")
+        if not nav:
+            return
+        if not result.company_name:
+            brand = nav.select_one("[class*='brand'], [class*='logo'], .company-name")
+            if brand:
+                result.company_name = brand.get_text(strip=True)
+        for a_tag in nav.select("a[href]"):
+            href = str(a_tag.get("href", ""))
+            text = a_tag.get_text(strip=True).lower()
+            if any(kw in text for kw in ["service", "services", "pricing", "about", "contact"]) and (
+                href.startswith("/") or href.startswith(".")
+            ):
+                pass
+
     def _extract_from_main(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         main = soup.select_one("main")
         if not main:

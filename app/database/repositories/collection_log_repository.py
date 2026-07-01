@@ -21,6 +21,10 @@ class CollectionLogRepository(BaseRepository):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_latest_by_competitor(self, competitor_id: int) -> CollectionLog | None:
+        logs = await self.get_by_competitor(competitor_id, limit=1)
+        return logs[0] if logs else None
+
     async def get_recent(self, limit: int = 100) -> list[CollectionLog]:
         stmt = select(CollectionLog).order_by(CollectionLog.created_at.desc()).limit(limit)
         result = await self._session.execute(stmt)

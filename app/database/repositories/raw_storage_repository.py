@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import RawStorage
+from app.database.models import CollectionStatus, RawStorage
 from app.database.repositories.base import BaseRepository
 
 
@@ -43,9 +44,9 @@ class RawStorageRepository(BaseRepository):
         source_url: str,
         content_hash: str,
         raw_html: str | None = None,
-        raw_json: dict[str, object] | None = None,
-        metadata: dict[str, object] | None = None,
-        collection_status: str = "success",
+        raw_json: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        collection_status: CollectionStatus = CollectionStatus.SUCCESS,
     ) -> RawStorage:
         """Insert or update raw storage based on URL.
 

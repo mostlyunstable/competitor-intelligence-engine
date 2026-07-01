@@ -1,3 +1,29 @@
+import asyncio
+import logging
+import re
+from dataclasses import dataclass
+from typing import Any, ClassVar
+
+import httpx
+from bs4 import BeautifulSoup
+
+from app.configuration.settings import get_settings
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class FetchResult:
+    """Result of a fetch operation."""
+
+    html: str
+    url: str
+    method: str  # "httpx" or "playwright"
+    status_code: int | None = None
+    content_length: int = 0
+    js_rendered: bool = False
+
+
 class PageAnalyzer:
     """Analyzes HTML to detect JavaScript-heavy pages requiring rendering."""
 

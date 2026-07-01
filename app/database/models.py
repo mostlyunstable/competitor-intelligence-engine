@@ -312,8 +312,8 @@ class RawStorage(Base):
     source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
-    raw_json: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
-    metadata_: Mapped[list[str] | None] = mapped_column("metadata", JSON, nullable=True)
+    raw_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
