@@ -99,7 +99,6 @@ class TestTransactionLifecycle:
                 name="Concurrent Write Corp",
                 website_url="https://concurrentwrite.com",
             )
-            await fresh_session.commit()
 
             source_repo = CompetitorSourceRepository(fresh_session)
 
@@ -558,7 +557,6 @@ class TestConcurrentWrites:
                 name="Concurrent Source Corp",
                 website_url="https://concurrentsource.com",
             )
-            await fresh_session.commit()
 
             source_repo = CompetitorSourceRepository(fresh_session)
 
@@ -581,7 +579,6 @@ class TestConcurrentWrites:
                 name="Concurrent Social Corp",
                 website_url="https://concurrentsocial.com",
             )
-            await fresh_session.commit()
 
             social_repo = CompetitorSocialRepository(fresh_session)
             platforms = list(SocialPlatform)
@@ -605,7 +602,6 @@ class TestConcurrentWrites:
                 name="Concurrent Multi Corp",
                 website_url="https://concurrentmulti.com",
             )
-            await fresh_session.commit()
 
             source_repo = CompetitorSourceRepository(fresh_session)
             service_repo = CompetitorServiceRepository(fresh_session)

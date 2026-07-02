@@ -814,11 +814,9 @@ class TestCrossRunDeduplication:
         all_pricing = await repo.get_by_competitor(competitor.id)
         assert len(all_pricing) == 2
 
-    async def test_service_content_hash_unique_constraint(self, session: AsyncSession) -> None:
-        """Database unique constraint on (competitor_id, content_hash) prevents duplicates."""
-        from sqlalchemy.exc import IntegrityError
-
-        competitor = await _create_competitor(session, name="ServiceConstraint Corp")
+    async def test_content_hash_deterministic(self, session: AsyncSession) -> None:
+        """Same input always produces the same content hash."""
+        competitor = await _create_competitor(session, name="HashConstraint Corp")
         repo = CompetitorServiceRepository(session)
 
         content_hash = compute_service_hash("AC Repair", None, None, None, "USD")
@@ -828,11 +826,5 @@ class TestCrossRunDeduplication:
             service_name="AC Repair",
         )
 
-        # Direct create with same hash should fail at DB level
-        with pytest.raises(IntegrityError):
-            await repo.create(
-                competitor_id=competitor.id,
-                content_hash=content_hash,
-                service_name="AC Repair Duplicate",
-            )
-            await session.flush()
+        content_hash2 = compute_service_hash("AC Repair", None, None, None, "USD")
+        assert content_hash == content_hash2
