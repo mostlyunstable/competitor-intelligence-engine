@@ -149,8 +149,7 @@ class CompetitorPage(Base):
         UniqueConstraint(
             "competitor_id",
             "source_id",
-            "content_hash",
-            name="uq_competitor_page_source_hash",
+            name="uq_competitor_page_source",
         ),
         {"comment": "Raw page snapshots collected from competitors"},
     )
@@ -181,14 +180,7 @@ class CompetitorService(Base):
     # Relationships
     competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="services")
 
-    __table_args__ = (
-        UniqueConstraint(
-            "competitor_id",
-            "content_hash",
-            name="uq_competitor_service_content_hash",
-        ),
-        {"comment": "Service listings collected from competitors"},
-    )
+    __table_args__ = ({"comment": "Service listings collected from competitors"},)
 
 
 class CompetitorPricing(Base):
@@ -214,14 +206,7 @@ class CompetitorPricing(Base):
     # Relationships
     competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="pricing")
 
-    __table_args__ = (
-        UniqueConstraint(
-            "competitor_id",
-            "content_hash",
-            name="uq_competitor_pricing_content_hash",
-        ),
-        {"comment": "Pricing data collected from competitors"},
-    )
+    __table_args__ = ({"comment": "Pricing data collected from competitors"},)
 
 
 class CompetitorContent(Base):
