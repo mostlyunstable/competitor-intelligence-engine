@@ -11,22 +11,19 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql+asyncpg://utservio_test:test_password@localhost:5433/utservio_ci_test",
 )
 
-_tables_created = False
 
-
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def engine():
-    global _tables_created
-
     eng = create_async_engine(TEST_DATABASE_URL, echo=False)
 
-    if not _tables_created:
-        async with eng.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
-        _tables_created = True
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
 
     yield eng
+
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
     await eng.dispose()
 
