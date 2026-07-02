@@ -10,7 +10,7 @@ name = "utservio-competitor-intelligence"
 version = "0.1.0"
 description = "Data collection engine for Utservio's competitor intelligence platform"
 readme = "README.md"
-license = "Proprietary"
+license = "LicenseRef-Proprietary"
 requires-python = ">=3.12"
 authors = [
     { name = "Utservio Engineering", email = "engineering@utservio.com" },

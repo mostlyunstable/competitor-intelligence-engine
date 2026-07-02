@@ -35,7 +35,7 @@ jobs:
         ports:
           - 5433:5432
         options: >-
-          --health-cmd pg_isready -U utservio_test -d utservio_ci_test
+          --health-cmd "pg_isready -U utservio_test -d utservio_ci_test"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 10
