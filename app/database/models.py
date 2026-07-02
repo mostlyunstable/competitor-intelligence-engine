@@ -126,7 +126,7 @@ class CompetitorPage(Base):
     source_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("competitor_sources.id", ondelete="SET NULL"), nullable=True
     )
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
@@ -173,7 +173,7 @@ class CompetitorService(Base):
     membership_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     offers: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     discounts: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -206,7 +206,7 @@ class CompetitorPricing(Base):
     discount: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     membership_pricing: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     subscription_plans: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -238,7 +238,7 @@ class CompetitorContent(Base):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -310,7 +310,7 @@ class RawStorage(Base):
         Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False
     )
     source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)

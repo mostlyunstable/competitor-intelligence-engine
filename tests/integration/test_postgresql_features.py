@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.database.models import (
     CollectionLog,
@@ -29,7 +29,7 @@ from app.database.repositories.raw_storage_repository import RawStorageRepositor
 
 @pytest.mark.integration
 class TestTransactionLifecycle:
-    async def test_commit_persists_data(self, session: AsyncSession) -> None:
+    async def test_commit_persists_data(self, session: AsyncSession, engine: AsyncEngine) -> None:
         repo = CompetitorRepository(session)
         competitor = await repo.create(
             name="Commit Test Corp",
@@ -37,15 +37,12 @@ class TestTransactionLifecycle:
         )
         await session.commit()
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(Competitor, competitor.id)
             assert fetched is not None
             assert fetched.name == "Commit Test Corp"
-        finally:
-            await new_session.close()
 
-    async def test_rollback_discards_data(self, session: AsyncSession) -> None:
+    async def test_rollback_discards_data(self, session: AsyncSession, engine: AsyncEngine) -> None:
         repo = CompetitorRepository(session)
         competitor = await repo.create(
             name="Rollback Test Corp",
@@ -54,14 +51,13 @@ class TestTransactionLifecycle:
         await session.flush()
         await session.rollback()
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(Competitor, competitor.id)
             assert fetched is None
-        finally:
-            await new_session.close()
 
-    async def test_nested_transaction_savepoint(self, session: AsyncSession) -> None:
+    async def test_nested_transaction_savepoint(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
         repo = CompetitorRepository(session)
         competitor = await repo.create(
             name="Savepoint Test Corp",
@@ -78,57 +74,60 @@ class TestTransactionLifecycle:
 
         await session.commit()
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(Competitor, competitor.id)
             assert fetched is not None
-        finally:
-            await new_session.close()
 
-    async def test_concurrent_writes_different_competitors(self, session: AsyncSession) -> None:
-        repo = CompetitorRepository(session)
+    async def test_concurrent_writes_different_competitors(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
+        async with async_sessionmaker(engine)() as fresh_session:
+            repo = CompetitorRepository(fresh_session)
 
-        async def create_competitor(name: str) -> Competitor:
-            return await repo.create(
-                name=name,
-                website_url=f"https://{name.lower().replace(' ', '')}.com",
+            async def create_competitor(name: str) -> Competitor:
+                return await repo.create(
+                    name=name,
+                    website_url=f"https://{name.lower().replace(' ', '')}.com",
+                )
+
+            tasks = [create_competitor(f"Concurrent Corp {i}") for i in range(10)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            successful = [r for r in results if isinstance(r, Competitor)]
+            assert len(successful) == 10
+
+            all_competitors = await repo.get_all()
+            concurrent = [c for c in all_competitors if c.name.startswith("Concurrent Corp")]
+            assert len(concurrent) == 10
+
+    async def test_concurrent_writes_same_table(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
+        async with async_sessionmaker(engine)() as fresh_session:
+            repo = CompetitorRepository(fresh_session)
+            competitor = await repo.create(
+                name="Concurrent Write Corp",
+                website_url="https://concurrentwrite.com",
             )
+            await fresh_session.commit()
 
-        tasks = [create_competitor(f"Concurrent Corp {i}") for i in range(10)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            source_repo = CompetitorSourceRepository(fresh_session)
 
-        successful = [r for r in results if isinstance(r, Competitor)]
-        assert len(successful) == 10
+            async def create_source(url: str) -> CompetitorSource:
+                return await source_repo.create(
+                    competitor_id=competitor.id,
+                    url=url,
+                    page_type="general",
+                )
 
-        all_competitors = await repo.get_all()
-        concurrent = [c for c in all_competitors if c.name.startswith("Concurrent Corp")]
-        assert len(concurrent) == 10
+            tasks = [create_source(f"https://concurrentwrite.com/page{i}") for i in range(20)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def test_concurrent_writes_same_table(self, session: AsyncSession) -> None:
-        repo = CompetitorRepository(session)
-        competitor = await repo.create(
-            name="Concurrent Write Corp",
-            website_url="https://concurrentwrite.com",
-        )
-        await session.commit()
+            successful = [r for r in results if isinstance(r, CompetitorSource)]
+            assert len(successful) == 20
 
-        source_repo = CompetitorSourceRepository(session)
-
-        async def create_source(url: str) -> CompetitorSource:
-            return await source_repo.create(
-                competitor_id=competitor.id,
-                url=url,
-                page_type="general",
-            )
-
-        tasks = [create_source(f"https://concurrentwrite.com/page{i}") for i in range(20)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        successful = [r for r in results if isinstance(r, CompetitorSource)]
-        assert len(successful) == 20
-
-        sources = await source_repo.get_by_competitor(competitor.id)
-        assert len(sources) == 20
+            sources = await source_repo.get_by_competitor(competitor.id)
+            assert len(sources) == 20
 
 
 @pytest.mark.integration
@@ -426,7 +425,9 @@ class TestCascadeDeletes:
 
 @pytest.mark.integration
 class TestJsonFields:
-    async def test_competitor_modules_json(self, session: AsyncSession) -> None:
+    async def test_competitor_modules_json(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
         repo = CompetitorRepository(session)
         competitor = await repo.create(
             name="JSON Modules Corp",
@@ -434,15 +435,12 @@ class TestJsonFields:
             modules=["discovery", "company", "services"],
         )
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(Competitor, competitor.id)
             assert fetched is not None
             assert fetched.modules == ["discovery", "company", "services"]
-        finally:
-            await new_session.close()
 
-    async def test_competitor_tags_json(self, session: AsyncSession) -> None:
+    async def test_competitor_tags_json(self, session: AsyncSession, engine: AsyncEngine) -> None:
         repo = CompetitorRepository(session)
         competitor = await repo.create(
             name="JSON Tags Corp",
@@ -450,15 +448,12 @@ class TestJsonFields:
             tags=["home-services", "warranty"],
         )
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(Competitor, competitor.id)
             assert fetched is not None
             assert fetched.tags == ["home-services", "warranty"]
-        finally:
-            await new_session.close()
 
-    async def test_service_add_ons_json(self, session: AsyncSession) -> None:
+    async def test_service_add_ons_json(self, session: AsyncSession, engine: AsyncEngine) -> None:
         comp_repo = CompetitorRepository(session)
         competitor = await comp_repo.create(
             name="JSON Service Corp",
@@ -472,15 +467,14 @@ class TestJsonFields:
             available_add_ons=["filter_replacement", "duct_cleaning"],
         )
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(CompetitorService, service.id)
             assert fetched is not None
             assert fetched.available_add_ons == ["filter_replacement", "duct_cleaning"]
-        finally:
-            await new_session.close()
 
-    async def test_pricing_subscription_plans_json(self, session: AsyncSession) -> None:
+    async def test_pricing_subscription_plans_json(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
         comp_repo = CompetitorRepository(session)
         competitor = await comp_repo.create(
             name="JSON Pricing Corp",
@@ -494,16 +488,15 @@ class TestJsonFields:
             subscription_plans={"monthly": 29.99, "annual": 299.99},
         )
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(CompetitorPricing, pricing.id)
             assert fetched is not None
             assert fetched.subscription_plans["monthly"] == 29.99
             assert fetched.subscription_plans["annual"] == 299.99
-        finally:
-            await new_session.close()
 
-    async def test_collection_log_errors_json(self, session: AsyncSession) -> None:
+    async def test_collection_log_errors_json(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
         comp_repo = CompetitorRepository(session)
         competitor = await comp_repo.create(
             name="JSON Log Corp",
@@ -518,15 +511,14 @@ class TestJsonFields:
             errors=["Connection timeout", "HTTP 500 error"],
         )
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(CollectionLog, log.id)
             assert fetched is not None
             assert fetched.errors == ["Connection timeout", "HTTP 500 error"]
-        finally:
-            await new_session.close()
 
-    async def test_raw_storage_json_fields(self, session: AsyncSession) -> None:
+    async def test_raw_storage_json_fields(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
         comp_repo = CompetitorRepository(session)
         competitor = await comp_repo.create(
             name="JSON Raw Corp",
@@ -542,124 +534,133 @@ class TestJsonFields:
             metadata_={"collector": "discovery", "version": "1.0"},
         )
 
-        new_session = AsyncSession(bind=session.get_bind(), expire_on_commit=False)
-        try:
+        async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(RawStorage, raw.id)
             assert fetched is not None
             assert fetched.raw_json["title"] == "Test"
             assert fetched.metadata_["collector"] == "discovery"
-        finally:
-            await new_session.close()
 
 
 @pytest.mark.integration
 class TestConcurrentWrites:
-    async def test_concurrent_competitor_creation(self, session: AsyncSession) -> None:
-        repo = CompetitorRepository(session)
+    async def test_concurrent_competitor_creation(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
+        async with async_sessionmaker(engine)() as fresh_session:
+            repo = CompetitorRepository(fresh_session)
 
-        async def create_competitor(index: int) -> Competitor:
-            return await repo.create(
-                name=f"Concurrent Corp {index}",
-                website_url=f"https://concurrent{index}.com",
+            async def create_competitor(index: int) -> Competitor:
+                return await repo.create(
+                    name=f"Concurrent Corp {index}",
+                    website_url=f"https://concurrent{index}.com",
+                )
+
+            tasks = [create_competitor(i) for i in range(50)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            successful = [r for r in results if isinstance(r, Competitor)]
+            assert len(successful) == 50
+
+            all_competitors = await repo.get_all()
+            concurrent = [c for c in all_competitors if c.name.startswith("Concurrent Corp")]
+            assert len(concurrent) == 50
+
+    async def test_concurrent_source_creation(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
+        async with async_sessionmaker(engine)() as fresh_session:
+            comp_repo = CompetitorRepository(fresh_session)
+            competitor = await comp_repo.create(
+                name="Concurrent Source Corp",
+                website_url="https://concurrentsource.com",
             )
+            await fresh_session.commit()
 
-        tasks = [create_competitor(i) for i in range(50)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            source_repo = CompetitorSourceRepository(fresh_session)
 
-        successful = [r for r in results if isinstance(r, Competitor)]
-        assert len(successful) == 50
+            async def create_source(page_num: int) -> CompetitorSource:
+                return await source_repo.create(
+                    competitor_id=competitor.id,
+                    url=f"https://concurrentsource.com/page{page_num}",
+                    page_type="general",
+                )
 
-        all_competitors = await repo.get_all()
-        concurrent = [c for c in all_competitors if c.name.startswith("Concurrent Corp")]
-        assert len(concurrent) == 50
+            tasks = [create_source(i) for i in range(50)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def test_concurrent_source_creation(self, session: AsyncSession) -> None:
-        comp_repo = CompetitorRepository(session)
-        competitor = await comp_repo.create(
-            name="Concurrent Source Corp",
-            website_url="https://concurrentsource.com",
-        )
-        await session.commit()
+            successful = [r for r in results if isinstance(r, CompetitorSource)]
+            assert len(successful) == 50
 
-        source_repo = CompetitorSourceRepository(session)
+            sources = await source_repo.get_by_competitor(competitor.id)
+            assert len(sources) == 50
 
-        async def create_source(page_num: int) -> CompetitorSource:
-            return await source_repo.create(
-                competitor_id=competitor.id,
-                url=f"https://concurrentsource.com/page{page_num}",
-                page_type="general",
+    async def test_concurrent_social_creation(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
+        async with async_sessionmaker(engine)() as fresh_session:
+            comp_repo = CompetitorRepository(fresh_session)
+            competitor = await comp_repo.create(
+                name="Concurrent Social Corp",
+                website_url="https://concurrentsocial.com",
             )
+            await fresh_session.commit()
 
-        tasks = [create_source(i) for i in range(50)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            social_repo = CompetitorSocialRepository(fresh_session)
+            platforms = list(SocialPlatform)
 
-        successful = [r for r in results if isinstance(r, CompetitorSource)]
-        assert len(successful) == 50
+            async def create_social(platform: SocialPlatform) -> CompetitorSocial:
+                return await social_repo.create(
+                    competitor_id=competitor.id,
+                    platform=platform,
+                    profile_url=f"https://{platform.value}.com/concurrentsocial",
+                )
 
-        sources = await source_repo.get_by_competitor(competitor.id)
-        assert len(sources) == 50
+            tasks = [create_social(p) for p in platforms]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def test_concurrent_social_creation(self, session: AsyncSession) -> None:
-        comp_repo = CompetitorRepository(session)
-        competitor = await comp_repo.create(
-            name="Concurrent Social Corp",
-            website_url="https://concurrentsocial.com",
-        )
-        await session.commit()
+            successful = [r for r in results if isinstance(r, CompetitorSocial)]
+            assert len(successful) == len(platforms)
 
-        social_repo = CompetitorSocialRepository(session)
-        platforms = list(SocialPlatform)
-
-        async def create_social(platform: SocialPlatform) -> CompetitorSocial:
-            return await social_repo.create(
-                competitor_id=competitor.id,
-                platform=platform,
-                profile_url=f"https://{platform.value}.com/concurrentsocial",
+    async def test_concurrent_different_tables(
+        self, session: AsyncSession, engine: AsyncEngine
+    ) -> None:
+        async with async_sessionmaker(engine)() as fresh_session:
+            comp_repo = CompetitorRepository(fresh_session)
+            competitor = await comp_repo.create(
+                name="Concurrent Multi Corp",
+                website_url="https://concurrentmulti.com",
             )
+            await fresh_session.commit()
 
-        tasks = [create_social(p) for p in platforms]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            source_repo = CompetitorSourceRepository(fresh_session)
+            service_repo = CompetitorServiceRepository(fresh_session)
+            content_repo = CompetitorContentRepository(fresh_session)
 
-        successful = [r for r in results if isinstance(r, CompetitorSocial)]
-        assert len(successful) == len(platforms)
+            async def create_source() -> CompetitorSource:
+                return await source_repo.create(
+                    competitor_id=competitor.id,
+                    url="https://concurrentmulti.com/source",
+                )
 
-    async def test_concurrent_different_tables(self, session: AsyncSession) -> None:
-        comp_repo = CompetitorRepository(session)
-        competitor = await comp_repo.create(
-            name="Concurrent Multi Corp",
-            website_url="https://concurrentmulti.com",
-        )
-        await session.commit()
+            async def create_service() -> CompetitorService:
+                return await service_repo.create(
+                    competitor_id=competitor.id,
+                    service_name="Concurrent Service",
+                )
 
-        source_repo = CompetitorSourceRepository(session)
-        service_repo = CompetitorServiceRepository(session)
-        content_repo = CompetitorContentRepository(session)
+            async def create_content() -> CompetitorContent:
+                return await content_repo.create(
+                    competitor_id=competitor.id,
+                    title="Concurrent Content",
+                    url="https://concurrentmulti.com/content",
+                )
 
-        async def create_source() -> CompetitorSource:
-            return await source_repo.create(
-                competitor_id=competitor.id,
-                url="https://concurrentmulti.com/source",
-            )
+            tasks = [
+                create_source(),
+                create_service(),
+                create_content(),
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        async def create_service() -> CompetitorService:
-            return await service_repo.create(
-                competitor_id=competitor.id,
-                service_name="Concurrent Service",
-            )
-
-        async def create_content() -> CompetitorContent:
-            return await content_repo.create(
-                competitor_id=competitor.id,
-                title="Concurrent Content",
-                url="https://concurrentmulti.com/content",
-            )
-
-        tasks = [
-            create_source(),
-            create_service(),
-            create_content(),
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for r in results:
-            assert not isinstance(r, Exception)
+            for r in results:
+                assert not isinstance(r, Exception)

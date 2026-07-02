@@ -5,6 +5,7 @@ detect identical data regardless of collection timing or ordering.
 """
 
 import hashlib
+import re
 from typing import Any
 
 
@@ -17,7 +18,7 @@ def _canonicalize_value(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, str):
-        return value.strip().lower()
+        return re.sub(r"\s+", " ", value.strip().lower())
     if isinstance(value, list):
         items = [_canonicalize_value(item) for item in value]
         return "[" + ",".join(items) + "]"
@@ -26,7 +27,7 @@ def _canonicalize_value(value: Any) -> str:
         for key in sorted(value.keys()):
             items.append(f"{key}:{_canonicalize_value(value[key])}")
         return "{" + ",".join(items) + "}"
-    return str(value).strip().lower()
+    return re.sub(r"\s+", " ", str(value).strip().lower())
 
 
 def compute_content_hash(*fields: Any) -> str:
