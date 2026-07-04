@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from app.parsers.base import BaseParser
@@ -30,16 +31,33 @@ class ContentParser(BaseParser):
         return articles
 
     def _parse_article_card(self, card: Any, base_url: str) -> dict[str, Any]:
+        from urllib.parse import urljoin
+
         title_el = card.select_one("h1, h2, h3, h4, .title, .headline")
         title = title_el.get_text(strip=True) if title_el else None
 
         link_el = card.select_one("a[href]")
         link = link_el.get("href", "") if link_el else None
+        if link:
+            link = urljoin(base_url, str(link))
 
-        author = self._text(card, ".author, .byline, [data-author]")
-        date = self._text(card, "time, .date, .publish-date, [data-date]")
+        # Prefer rel="author" link, then .author selector, then meta
+        author_el = card.select_one("a[rel='author'], .author, .byline, [data-author]")
+        author = author_el.get_text(strip=True) if author_el else None
+        if not author:
+            meta_author = card.select_one("meta[name='author']")
+            if meta_author:
+                author = meta_author.get("content", "")
+
+        # Prefer <time datetime> attribute for accurate publish date
+        time_el = card.select_one("time[datetime]")
+        if time_el:
+            raw_date: str | None = str(time_el.get("datetime", ""))
+        else:
+            raw_date = self._text(card, "time, .date, .publish-date, [data-date]")
+        date = self._normalize_date(raw_date)
+
         summary = self._text(card, ".summary, .excerpt, .teaser, p")
-
         content_type = self._detect_content_type(card, title or "")
 
         return {
@@ -89,3 +107,22 @@ class ContentParser(BaseParser):
         if any(kw in text for kw in ["update", "feature", "release"]):
             return "update"
         return "article"
+
+    def _normalize_date(self, raw: str | None) -> str | None:
+        """Normalize a date string to YYYY-MM-DD, trying common formats."""
+        if not raw:
+            return None
+        raw = raw.strip()
+        # Already ISO format
+        iso = re.match(r"(\d{4}-\d{2}-\d{2})", raw)
+        if iso:
+            return iso.group(1)
+        # Try to parse common date formats
+        from datetime import datetime
+        for fmt in ("%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%d %b %Y", "%Y/%m/%d", "%m/%d/%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(raw[:20], fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        # Fallback: return first 10 chars if long enough
+        return raw[:10] if len(raw) >= 10 else raw

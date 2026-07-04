@@ -19,6 +19,14 @@ class CompanyCollector(BaseCollector):
 
         try:
             result = await self.fetch(url)
+            if result.not_modified:
+                return {
+                    "status": "skipped",
+                    "reason": "not_modified",
+                    "company_data": {},
+                    "elapsed_seconds": self._elapsed(start_time),
+                }
+
             html = result.html
 
             await self.store_raw(competitor_id, url, html, session)

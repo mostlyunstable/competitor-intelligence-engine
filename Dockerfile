@@ -11,6 +11,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         tini \
         curl \
+        postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
@@ -23,7 +24,10 @@ FROM base AS runtime
 COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 
-RUN playwright install --with-deps chromium 2>/dev/null || true
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN mkdir -p /ms-playwright && \
+    playwright install --with-deps chromium 2>/dev/null || true && \
+    chmod -R 755 /ms-playwright
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

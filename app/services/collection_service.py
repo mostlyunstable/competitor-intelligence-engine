@@ -1,3 +1,4 @@
+import asyncio
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -29,6 +30,8 @@ MODULE_COLLECTORS: dict[str, Any] = {
 class CollectionService:
     def __init__(self) -> None:
         self._collectors: dict[str, Any] = {}
+        self._active_crawls: set[int] = set()
+        self._crawls_lock = asyncio.Lock()
 
     def _get_collector(self, module: str) -> Any:
         if module not in self._collectors:
@@ -38,6 +41,15 @@ class CollectionService:
         return self._collectors.get(module)
 
     async def collect_competitor(self, competitor_id: int) -> dict[str, Any]:
+        async with self._crawls_lock:
+            if competitor_id in self._active_crawls:
+                logger.warning("collection_already_running", competitor_id=competitor_id)
+                return {
+                    "status": "failed",
+                    "error": f"Collection is already running for competitor {competitor_id}",
+                }
+            self._active_crawls.add(competitor_id)
+
         start_time = time.time()
         log = logger.bind(competitor_id=competitor_id)
 
@@ -171,6 +183,9 @@ class CollectionService:
                 "error": str(e),
                 "elapsed_seconds": elapsed,
             }
+        finally:
+            async with self._crawls_lock:
+                self._active_crawls.discard(competitor_id)
 
     def _select_urls_for_module(
         self, module: str, discovered_urls: list[str], base_url: str

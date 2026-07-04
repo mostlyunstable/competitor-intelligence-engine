@@ -22,6 +22,16 @@ class ContentCollector(BaseCollector):
 
         try:
             result = await self.fetch(url)
+            if result.not_modified:
+                return {
+                    "status": "skipped",
+                    "reason": "not_modified",
+                    "content_found": 0,
+                    "content_created": 0,
+                    "content_updated": 0,
+                    "elapsed_seconds": self._elapsed(start_time),
+                }
+
             html = result.html
 
             await self.store_raw(competitor_id, url, html, session)

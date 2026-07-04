@@ -1,6 +1,15 @@
 {
   "competitors": [
     {
+      "name": "Utservio",
+      "website_url": "https://utservio.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["home-services", "platform"],
+      "notes": "Our own platform - testing self-scraping"
+    },
+    {
       "name": "HomeServe",
       "website_url": "https://www.homeserve.com",
       "enabled": true,
@@ -47,7 +56,7 @@
     },
     {
       "name": "Urban Company",
-      "website_url": "https://www.urbancompany.com",
+      "website_url": "https://www.urbancompany.com/delhi-ncr",
       "enabled": true,
       "collection_frequency": "daily",
       "modules": ["discovery", "company", "services", "pricing", "content", "social"],
@@ -62,6 +71,15 @@
       "modules": ["discovery", "company", "services", "pricing", "content", "social"],
       "tags": ["real-estate", "property", "india"],
       "notes": "Real estate platform, no brokerage model"
+    },
+    {
+      "name": "OLX India",
+      "website_url": "https://www.olx.in",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["classifieds", "marketplace", "india"],
+      "notes": "Classifieds and marketplace platform"
     }
   ]
 }

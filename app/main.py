@@ -14,7 +14,10 @@ from app.database.connection import db_manager
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await db_manager.connect()
-    await db_manager.create_tables()
+
+    settings = get_settings()
+    if settings.environment == "development" or settings.debug:
+        await db_manager.create_tables()
 
     from app.services.config_sync_service import config_sync_service
 

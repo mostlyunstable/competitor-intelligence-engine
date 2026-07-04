@@ -6,6 +6,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from app.configuration.settings import get_settings
 from app.database.connection import Base
 from app.database.models import (  # noqa: F401
     CollectionLog,
@@ -22,6 +23,9 @@ from app.database.models import (  # noqa: F401
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Dynamically override the DB URL from the application settings (.env)
+config.set_main_option("sqlalchemy.url", get_settings().database.url)
 
 target_metadata = Base.metadata
 

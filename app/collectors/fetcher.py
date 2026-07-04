@@ -159,6 +159,7 @@ class PlaywrightRenderer:
                     "--disable-setuid-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-gpu",
+                    "--disable-http2",
                 ],
             )
             self._context = await self._browser.new_context(
@@ -467,7 +468,12 @@ class HybridFetcher:
             static_result.page_type_confidence = class_result.confidence
 
             from app.utilities.metrics import metrics
-            metrics.inc_counter("pages_analyzed_total", language=lang_result.language, page_type=class_result.page_type)
+
+            metrics.inc_counter(
+                "pages_analyzed_total",
+                language=lang_result.language,
+                page_type=class_result.page_type,
+            )
 
         analysis = self._analyzer.analyze(static_result.html)
         logger.debug(
@@ -485,6 +491,7 @@ class HybridFetcher:
         logger.info("playwright_fallback_triggered", url=url, score=analysis["score"])
 
         from app.utilities.metrics import metrics
+
         metrics.inc_counter("playwright_fallback_total")
 
         try:

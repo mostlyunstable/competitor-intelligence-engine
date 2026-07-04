@@ -129,9 +129,7 @@ class AdaptiveStrategyOrderer:
     def save_stats(self) -> None:
         """Persist statistics to disk."""
         try:
-            data = {
-                "strategies": [s.to_dict() for s in self._stats.values()]
-            }
+            data = {"strategies": [s.to_dict() for s in self._stats.values()]}
             self._stats_file.write_text(json.dumps(data, indent=2))
             logger.debug("strategy_stats_saved", count=len(self._stats))
         except Exception as e:
@@ -143,9 +141,7 @@ class AdaptiveStrategyOrderer:
             self._stats[strategy_name] = StrategyStats(name=strategy_name)
         return self._stats[strategy_name]
 
-    def record_success(
-        self, strategy_name: str, confidence: float, time_ms: float
-    ) -> None:
+    def record_success(self, strategy_name: str, confidence: float, time_ms: float) -> None:
         """Record a successful parse for a strategy."""
         stats = self.get_stats(strategy_name)
         stats.record_success(confidence, time_ms)

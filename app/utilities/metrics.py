@@ -8,74 +8,137 @@ Exposes metrics for:
 - Crawl, parse, and discovery durations
 """
 
+import os
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
+from collections import deque
 from typing import Any
 
 import structlog
+from prometheus_client import (
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
 logger = structlog.get_logger(__name__)
-
-
-@dataclass
-class MetricValue:
-    """A single metric value with labels."""
-
-    value: float
-    labels: dict[str, str] = field(default_factory=dict)
-    timestamp: float = field(default_factory=time.time)
 
 
 class MetricsCollector:
     """Collects and stores Prometheus-compatible metrics.
 
     Thread-safe metric collection for concurrent crawling operations.
-    Supports counters, gauges, and histograms.
+    Supports counters, gauges, and histograms. Uses prometheus-client under the hood.
     """
 
     def __init__(self) -> None:
-        self._counters: dict[str, list[MetricValue]] = defaultdict(list)
-        self._gauges: dict[str, float] = {}
-        self._histograms: dict[str, list[float]] = defaultdict(list)
+        self._registry = CollectorRegistry()
+        if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
+            multiprocess.MultiProcessCollector(self._registry)  # type: ignore[no-untyped-call]
+
+        self._counters: dict[str, Counter] = {}
+        self._gauges: dict[str, Gauge] = {}
+        self._histograms: dict[str, Histogram] = {}
         self._start_time = time.time()
+
+        # Bounded sliding window for stats (e.g. tests, summaries) to prevent memory leak
+        self._histogram_windows: dict[str, deque[float]] = {}
+        self._max_window_size = 1000
+
+    def _get_or_create_counter(self, name: str, label_names: list[str]) -> Counter:
+        if name not in self._counters:
+            self._counters[name] = Counter(
+                name, f"Counter {name}", labelnames=label_names, registry=self._registry
+            )
+        return self._counters[name]
+
+    def _get_or_create_gauge(self, name: str, label_names: list[str]) -> Gauge:
+        if name not in self._gauges:
+            self._gauges[name] = Gauge(
+                name, f"Gauge {name}", labelnames=label_names, registry=self._registry
+            )
+        return self._gauges[name]
+
+    def _get_or_create_histogram(self, name: str, label_names: list[str]) -> Histogram:
+        if name not in self._histograms:
+            self._histograms[name] = Histogram(
+                name, f"Histogram {name}", labelnames=label_names, registry=self._registry
+            )
+        return self._histograms[name]
 
     def inc_counter(self, name: str, value: float = 1.0, **labels: str) -> None:
         """Increment a counter metric."""
-        self._counters[name].append(MetricValue(value=value, labels=labels))
+        label_names = sorted(labels.keys())
+        counter = self._get_or_create_counter(name, label_names)
+        if labels:
+            counter.labels(**{k: labels[k] for k in label_names}).inc(value)
+        else:
+            counter.inc(value)
 
     def set_gauge(self, name: str, value: float, **labels: str) -> None:
         """Set a gauge metric."""
-        key = f"{name}:{':'.join(f'{k}={v}' for k, v in sorted(labels.items()))}"
-        self._gauges[key] = value
+        label_names = sorted(labels.keys())
+        gauge = self._get_or_create_gauge(name, label_names)
+        if labels:
+            gauge.labels(**{k: labels[k] for k in label_names}).set(value)
+        else:
+            gauge.set(value)
 
     def observe_histogram(self, name: str, value: float, **labels: str) -> None:
         """Record a histogram observation."""
-        self._histograms[name].append(value)
+        label_names = sorted(labels.keys())
+        histogram = self._get_or_create_histogram(name, label_names)
+        if labels:
+            histogram.labels(**{k: labels[k] for k in label_names}).observe(value)
+        else:
+            histogram.observe(value)
+
+        # Record to bounded window for local statistics
+        if name not in self._histogram_windows:
+            self._histogram_windows[name] = deque(maxlen=self._max_window_size)
+        self._histogram_windows[name].append(value)
 
     def get_counter_total(self, name: str, **labels: str) -> float:
         """Get total value of a counter."""
-        total = 0.0
-        for mv in self._counters.get(name, []):
-            if not labels or all(mv.labels.get(k) == v for k, v in labels.items()):
-                total += mv.value
-        return total
+        counter = self._counters.get(name)
+        if not counter:
+            return 0.0
+        if labels:
+            return float(
+                counter.labels(**{k: labels[k] for k in sorted(labels.keys())})._value.get()
+            )
+        return float(counter._value.get())
 
     def get_gauge(self, name: str, **labels: str) -> float | None:
         """Get gauge value."""
-        key = f"{name}:{':'.join(f'{k}={v}' for k, v in sorted(labels.items()))}"
-        return self._gauges.get(key)
+        gauge = self._gauges.get(name)
+        if not gauge:
+            return None
+        if labels:
+            return float(gauge.labels(**{k: labels[k] for k in sorted(labels.keys())})._value.get())
+        return float(gauge._value.get())
 
     def get_histogram_stats(self, name: str) -> dict[str, float]:
-        """Get histogram statistics."""
-        values = self._histograms.get(name, [])
+        """Get histogram statistics from the sliding window."""
+        values = list(self._histogram_windows.get(name, []))
         if not values:
-            return {"count": 0.0, "sum": 0.0, "avg": 0.0, "min": 0.0, "max": 0.0, "p50": 0.0, "p95": 0.0, "p99": 0.0}
+            return {
+                "count": 0.0,
+                "sum": 0.0,
+                "avg": 0.0,
+                "min": 0.0,
+                "max": 0.0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0,
+            }
 
         sorted_vals = sorted(values)
         count = len(sorted_vals)
         return {
-            "count": count,
+            "count": float(count),
             "sum": sum(sorted_vals),
             "avg": sum(sorted_vals) / count,
             "min": sorted_vals[0],
@@ -87,62 +150,28 @@ class MetricsCollector:
 
     def render_prometheus(self) -> str:
         """Render all metrics in Prometheus exposition format."""
-        lines: list[str] = []
-        lines.append("# Utservio Competitor Intelligence Engine Metrics")
-        lines.append("")
-
-        for name, values in self._counters.items():
-            lines.append(f"# TYPE {name} counter")
-            label_totals: dict[str, float] = defaultdict(float)
-            for mv in values:
-                label_key = ",".join(f'{k}="{v}"' for k, v in sorted(mv.labels.items()))
-                label_totals[label_key] += mv.value
-            for label_key, total in label_totals.items():
-                suffix = f"{{{label_key}}}" if label_key else ""
-                lines.append(f"{name}{suffix} {total}")
-            lines.append("")
-
-        for key, value in self._gauges.items():
-            parts = key.rsplit(":", 1)
-            name = parts[0]
-            label_str = parts[1] if len(parts) > 1 else ""
-            lines.append(f"# TYPE {name} gauge")
-            suffix = f"{{{label_str}}}" if label_str else ""
-            lines.append(f"{name}{suffix} {value}")
-            lines.append("")
-
-        for name, values in self._histograms.items():  # type: ignore[assignment]
-            values_: list[float] = values  # type: ignore[assignment]
-            if not values_:
-                continue
-            stats = self.get_histogram_stats(name)
-            lines.append(f"# TYPE {name} histogram")
-            lines.append(f'{name}_count {stats["count"]}')
-            lines.append(f'{name}_sum {stats["sum"]}')
-            for bucket_name in ["min", "p50", "p95", "p99", "max"]:
-                lines.append(f'{name}_{bucket_name} {stats[bucket_name]}')
-            lines.append("")
-
         uptime = time.time() - self._start_time
-        lines.append("# TYPE process_uptime_seconds gauge")
-        lines.append(f"process_uptime_seconds {uptime:.2f}")
-        lines.append("")
+        # Ensure process_uptime_seconds gauge exists
+        self.set_gauge("process_uptime_seconds", uptime)
 
-        return "\n".join(lines)
+        # generate_latest returns bytes, decode to string
+        return generate_latest(self._registry).decode("utf-8")
 
     def get_summary(self) -> dict[str, Any]:
         """Get a summary of all metrics."""
         summary: dict[str, Any] = {
             "counters": {},
-            "gauges": dict(self._gauges),
+            "gauges": {},
             "histograms": {},
         }
 
-        for name, values in self._counters.items():
-            total = sum(mv.value for mv in values)
-            summary["counters"][name] = total
+        for name, counter in self._counters.items():
+            summary["counters"][name] = counter._value.get()
 
-        for name in self._histograms:
+        for name, gauge in self._gauges.items():
+            summary["gauges"][name] = gauge._value.get()
+
+        for name in self._histogram_windows:
             summary["histograms"][name] = self.get_histogram_stats(name)
 
         return summary

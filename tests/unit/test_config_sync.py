@@ -56,16 +56,20 @@ class TestConfigSyncService:
             Path(config_path).unlink()
 
     @pytest.mark.asyncio
-    async def test_sync_skips_existing_competitors(self) -> None:
+    async def test_sync_updates_existing_competitors(self) -> None:
         config_data = {
             "competitors": [
                 {
                     "name": "Existing Corp",
                     "website_url": "https://existing.com",
+                    "enabled": True,
+                    "collection_frequency": "daily",
+                    "modules": ["company"],
+                    "tags": ["tag1"],
+                    "notes": "some notes",
                 }
             ]
         }
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f)
             config_path = f.name
@@ -87,8 +91,9 @@ class TestConfigSyncService:
                     result = await self.service.sync_competitors()
 
                     assert result["status"] == "success"
-                    assert result["synced"] == 0
-                    assert result["skipped"] == 1
+                    assert result["synced"] == 1
+                    assert result["skipped"] == 0
+                    mock_repo.update.assert_called_once()
                     mock_repo.create.assert_not_called()
         finally:
             Path(config_path).unlink()

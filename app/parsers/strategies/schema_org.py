@@ -13,8 +13,10 @@ SCHEMA_ORG_TYPES = {
     "http://schema.org/Service",
     "http://schema.org/Product",
     "http://schema.org/Offer",
+    "http://schema.org/AggregateOffer",
     "http://schema.org/Article",
     "http://schema.org/BlogPosting",
+    "http://schema.org/NewsArticle",
     "http://schema.org/WebPage",
     "http://schema.org/ContactPage",
     "https://schema.org/LocalBusiness",
@@ -24,8 +26,10 @@ SCHEMA_ORG_TYPES = {
     "https://schema.org/Service",
     "https://schema.org/Product",
     "https://schema.org/Offer",
+    "https://schema.org/AggregateOffer",
     "https://schema.org/Article",
     "https://schema.org/BlogPosting",
+    "https://schema.org/NewsArticle",
     "https://schema.org/WebPage",
     "https://schema.org/ContactPage",
 }
@@ -48,6 +52,28 @@ class SchemaOrgStrategy(ParsingStrategy):
                 self._extract_item(element, itemtype, result, url)
         return result
 
+    def _extract_article_item(
+        self, props: dict[str, list[str]], result: ParsedResult, url: str
+    ) -> None:
+        from urllib.parse import urljoin as _urljoin
+
+        headline = (props.get("headline") or props.get("name") or [None])[0]
+        if not headline:
+            return
+        author_raw = (props.get("author") or [None])[0]
+        date_raw = (props.get("datePublished") or [None])[0]
+        article_url = (props.get("url") or [None])[0]
+        result.content.append(
+            {
+                "title": headline,
+                "author": author_raw,
+                "publish_date": date_raw[:10] if date_raw and len(date_raw) >= 10 else date_raw,
+                "url": _urljoin(url, article_url) if article_url else url,
+                "summary": (props.get("description") or [None])[0],
+                "content_type": "article",
+            }
+        )
+
     def _extract_item(self, element: Any, itemtype: str, result: ParsedResult, url: str) -> None:
         props = self._get_properties(element)
         if (
@@ -59,6 +85,15 @@ class SchemaOrgStrategy(ParsingStrategy):
             self._extract_organization(props, result, url)
         elif "Service" in itemtype:
             name = props.get("name", [""])[0] if props.get("name") else ""
+            # Extract price range if present
+            min_price_text = props.get("minPrice", [None])[0] if props.get("minPrice") else None
+            max_price_text = props.get("maxPrice", [None])[0] if props.get("maxPrice") else None
+            price_text = (
+                props.get("price", [None])[0] if props.get("price") else min_price_text
+            )
+            # Extract AggregateRating if present
+            rating_value = props.get("ratingValue", [None])[0] if props.get("ratingValue") else None
+            review_count = props.get("reviewCount", [None])[0] if props.get("reviewCount") else None
             result.services.append(
                 {
                     "name": name,
@@ -66,20 +101,27 @@ class SchemaOrgStrategy(ParsingStrategy):
                         props.get("description", [None])[0] if props.get("description") else None
                     ),
                     "category": props.get("category", [None])[0] if props.get("category") else None,
-                    "starting_price": None,
-                    "currency": "USD",
+                    "starting_price": self._parse_price(price_text),
+                    "currency": (
+                        props.get("priceCurrency", ["USD"])[0]
+                        if props.get("priceCurrency")
+                        else "USD"
+                    ),
                     "estimated_duration": None,
+                    "rating": float(rating_value) if rating_value else None,
+                    "review_count": int(review_count) if review_count else None,
                 }
             )
-        elif "Product" in itemtype or "Offer" in itemtype:
-            name = props.get("name", [""])[0] if props.get("name") else ""
-            price_text = props.get("price", [None])[0] if props.get("price") else None
+        elif "AggregateOffer" in itemtype:
+            name = props.get("name", [""])[0] if props.get("name") else "Service"
+            low = props.get("lowPrice", [None])[0] if props.get("lowPrice") else None
+            high = props.get("highPrice", [None])[0] if props.get("highPrice") else None
             result.pricing.append(
                 {
                     "service_name": name,
                     "category": props.get("category", [None])[0] if props.get("category") else None,
-                    "base_price": self._parse_price(price_text),
-                    "promotional_price": None,
+                    "base_price": self._parse_price(low),
+                    "promotional_price": self._parse_price(high),
                     "currency": (
                         props.get("priceCurrency", ["USD"])[0]
                         if props.get("priceCurrency")
@@ -90,6 +132,29 @@ class SchemaOrgStrategy(ParsingStrategy):
                     "membership_pricing": None,
                 }
             )
+        elif "Product" in itemtype or "Offer" in itemtype:
+            name = props.get("name", [""])[0] if props.get("name") else ""
+            price_text = props.get("price", [None])[0] if props.get("price") else None
+            min_price = props.get("minPrice", [None])[0] if props.get("minPrice") else None
+            max_price = props.get("maxPrice", [None])[0] if props.get("maxPrice") else None
+            result.pricing.append(
+                {
+                    "service_name": name,
+                    "category": props.get("category", [None])[0] if props.get("category") else None,
+                    "base_price": self._parse_price(price_text or min_price),
+                    "promotional_price": self._parse_price(max_price),
+                    "currency": (
+                        props.get("priceCurrency", ["USD"])[0]
+                        if props.get("priceCurrency")
+                        else "USD"
+                    ),
+                    "discount": None,
+                    "subscription_plans": {},
+                    "membership_pricing": None,
+                }
+            )
+        elif "Article" in itemtype or "BlogPosting" in itemtype or "NewsArticle" in itemtype:
+            self._extract_article_item(props, result, url)
 
     def _get_properties(self, element: Any) -> dict[str, list[str]]:
         props: dict[str, list[str]] = {}

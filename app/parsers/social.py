@@ -28,16 +28,26 @@ class SocialParser(BaseParser):
         profiles = []
         seen_platforms = set()
 
+        # 1. Prefer <link rel="me"> — canonical social identity declarations
+        rel_me_profiles = self._extract_rel_me_links(soup, base_url)
+        for profile in rel_me_profiles:
+            if profile["platform"] not in seen_platforms:
+                profiles.append(profile)
+                seen_platforms.add(profile["platform"])
+
+        # 2. Fall back to scanning anchor tags
         for a_tag in soup.select("a[href]"):
-            href = a_tag.get("href", "")
+            href = str(a_tag.get("href", ""))
             for domain, platform in self.PLATFORMS.items():
                 if domain in href and platform not in seen_platforms:
-                    profile_url = urljoin(base_url, href)
+                    full_url = urljoin(base_url, href)
+                    if not self._is_valid_profile_url(full_url, domain):
+                        continue
                     username = self._extract_username(href, domain)
                     profiles.append(
                         {
                             "platform": platform,
-                            "profile_url": profile_url,
+                            "profile_url": full_url,
                             "username": username,
                         }
                     )
@@ -50,6 +60,42 @@ class SocialParser(BaseParser):
                 seen_platforms.add(profile["platform"])
 
         return profiles
+
+    def _extract_rel_me_links(self, soup: Any, base_url: str) -> list[dict[str, str]]:
+        """Extract social profiles from <link rel="me"> tags (canonical identity)."""
+        profiles = []
+        for link_el in soup.select("link[rel='me'], a[rel='me']"):
+            href = str(link_el.get("href", ""))
+            for domain, platform in self.PLATFORMS.items():
+                if domain in href:
+                    full_url = urljoin(base_url, href)
+                    username = self._extract_username(href, domain)
+                    profiles.append(
+                        {
+                            "platform": platform,
+                            "profile_url": full_url,
+                            "username": username,
+                        }
+                    )
+                    break
+        return profiles
+
+    def _is_valid_profile_url(self, url: str, domain: str) -> bool:
+        """Return False if the URL is a bare root social domain (share button, not a profile)."""
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        path = parsed.path.strip("/")
+
+        # Must have a meaningful path segment
+        if not path:
+            return False
+
+        # LinkedIn: must have /company/ or /in/ in path
+        if "linkedin.com" in domain:
+            return "/company/" in url or "/in/" in url or "/school/" in url
+
+        return True
 
     def _extract_username(self, href: str, domain: str) -> str | None:
         from urllib.parse import urlparse

@@ -24,6 +24,9 @@ class SemanticHtmlStrategy(ParsingStrategy):
         self._extract_from_footer(soup, result, url)
         self._extract_from_articles(soup, result, url)
         self._extract_from_sections(soup, result, url)
+        self._extract_from_data_attrs(soup, result)
+        self._extract_from_definition_lists(soup, result)
+        self._extract_from_figures(soup, result)
         self._extract_emails(soup, result)
         self._extract_phones(soup, result)
         self._extract_social_links(soup, result, url)
@@ -127,17 +130,88 @@ class SemanticHtmlStrategy(ParsingStrategy):
             link = str(link_el.get("href", "")) if link_el else None
             summary_el = article.select_one("p, .summary, .excerpt")
             summary = summary_el.get_text(strip=True) if summary_el else None
-            author_el = article.select_one(".author, .byline, [data-author]")
+            author_el = article.select_one(".author, .byline, [data-author], a[rel='author']")
             author = author_el.get_text(strip=True) if author_el else None
+            # Prefer <time datetime> attribute for accurate date
+            time_el = article.select_one("time[datetime]")
+            if time_el:
+                publish_date: str | None = str(time_el.get("datetime", ""))[:10] or time_el.get_text(strip=True)
+            else:
+                date_el = article.select_one(".date, .publish-date, [data-date], time")
+                publish_date = date_el.get_text(strip=True) if date_el else None
             if title:
                 result.content.append(
                     {
                         "title": title,
                         "author": author,
-                        "publish_date": None,
+                        "publish_date": publish_date,
                         "url": urljoin(url, link) if link else None,
                         "summary": summary,
                         "content_type": "article",
+                    }
+                )
+
+    def _extract_from_data_attrs(self, soup: BeautifulSoup, result: ParsedResult) -> None:
+        """Extract services from elements with data-service-name / data-category / data-price."""
+        for el in soup.select("[data-service-name], [data-service]"):
+            name = str(el.get("data-service-name") or el.get("data-service") or "")
+            if not name:
+                name = el.get_text(strip=True)[:100]
+            if not name:
+                continue
+            price_raw = el.get("data-price")
+            category = el.get("data-category")
+            result.services.append(
+                {
+                    "name": name,
+                    "description": el.get("data-description") or el.get_text(strip=True)[:200],
+                    "category": category,
+                    "starting_price": self._parse_price(str(price_raw)) if price_raw else None,
+                    "currency": self._detect_currency(str(price_raw)) if price_raw else "USD",
+                    "estimated_duration": el.get("data-duration"),
+                }
+            )
+
+    def _extract_from_definition_lists(self, soup: BeautifulSoup, result: ParsedResult) -> None:
+        """Extract service name/description pairs from <dl> definition lists."""
+        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plan"]
+        for dl in soup.select("dl"):
+            terms = dl.select("dt")
+            defs = dl.select("dd")
+            for dt, dd in zip(terms, defs):
+                term_text = dt.get_text(strip=True)
+                def_text = dd.get_text(strip=True)
+                if any(kw in term_text.lower() for kw in service_keywords):
+                    result.services.append(
+                        {
+                            "name": term_text,
+                            "description": def_text,
+                            "category": None,
+                            "starting_price": self._parse_price(def_text),
+                            "currency": self._detect_currency(def_text),
+                            "estimated_duration": None,
+                        }
+                    )
+
+    def _extract_from_figures(self, soup: BeautifulSoup, result: ParsedResult) -> None:
+        """Extract service items from <figure>/<figcaption> cards."""
+        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plumb"]
+        for figure in soup.select("figure"):
+            caption_el = figure.select_one("figcaption")
+            if not caption_el:
+                continue
+            caption = caption_el.get_text(strip=True)
+            if any(kw in caption.lower() for kw in service_keywords):
+                img = figure.select_one("img")
+                alt = str(img.get("alt", "")) if img else ""
+                result.services.append(
+                    {
+                        "name": caption,
+                        "description": alt if alt else None,
+                        "category": None,
+                        "starting_price": None,
+                        "currency": "USD",
+                        "estimated_duration": None,
                     }
                 )
 

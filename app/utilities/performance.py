@@ -9,6 +9,7 @@ Reduces unnecessary work:
 
 import functools
 import hashlib
+import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
@@ -31,28 +32,31 @@ class LRUCache:
         self._max_size = max_size
         self._ttl_seconds = ttl_seconds
         self._cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+        self._lock = threading.Lock()
 
     def get(self, key: str) -> Any | None:
         """Get a value from cache. Returns None if missing or expired."""
-        if key not in self._cache:
-            return None
+        with self._lock:
+            if key not in self._cache:
+                return None
 
-        value, timestamp = self._cache[key]
-        if time.time() - timestamp > self._ttl_seconds:
-            del self._cache[key]
-            return None
+            value, timestamp = self._cache[key]
+            if time.time() - timestamp > self._ttl_seconds:
+                del self._cache[key]
+                return None
 
-        self._cache.move_to_end(key)
-        return value
+            self._cache.move_to_end(key)
+            return value
 
     def put(self, key: str, value: Any) -> None:
         """Put a value in cache. Evicts oldest if at capacity."""
-        if key in self._cache:
-            del self._cache[key]
-        elif len(self._cache) >= self._max_size:
-            self._cache.popitem(last=False)
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+            elif len(self._cache) >= self._max_size:
+                self._cache.popitem(last=False)
 
-        self._cache[key] = (value, time.time())
+            self._cache[key] = (value, time.time())
 
     def contains(self, key: str) -> bool:
         """Check if key exists and is not expired."""
@@ -60,11 +64,13 @@ class LRUCache:
 
     def clear(self) -> None:
         """Clear all cache entries."""
-        self._cache.clear()
+        with self._lock:
+            self._cache.clear()
 
     @property
     def size(self) -> int:
-        return len(self._cache)
+        with self._lock:
+            return len(self._cache)
 
 
 class URLDeduplicator:
@@ -178,7 +184,7 @@ def cached_parse(max_size: int = 500, ttl_seconds: int = 1800) -> Callable[[Any]
             if self_obj and hasattr(self_obj, "_strategies"):
                 strategy_sig = ",".join(s.name for s in self_obj._strategies)
 
-            content_key = hashlib.sha256(f"{url}:{len(html)}:{strategy_sig}".encode()).hexdigest()[:32]
+            content_key = hashlib.sha256(f"{url}:{html}:{strategy_sig}".encode()).hexdigest()[:32]
             cached = cache.get(content_key)
             if cached is not None:
                 logger.debug("parse_cache_hit", url=url)

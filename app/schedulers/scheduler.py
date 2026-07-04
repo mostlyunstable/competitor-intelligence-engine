@@ -53,6 +53,7 @@ class CollectionScheduler:
             await asyncio.sleep(self._interval_seconds)
 
     async def _check_and_collect(self) -> None:
+        due_competitor_ids: list[tuple[int, str, str]] = []
         try:
             async with db_manager.session() as session:
                 comp_repo = CompetitorRepository(session)
@@ -74,21 +75,25 @@ class CollectionScheduler:
                             )
                             continue
 
-                        logger.info(
-                            "scheduling_collection",
-                            competitor_id=comp.id,
-                            name=comp.name,
-                            frequency=freq.value,
-                        )
-                        try:
-                            await collection_service.collect_competitor(comp.id)
-                        except Exception:
-                            logger.exception(
-                                "scheduled_collection_failed",
-                                competitor_id=comp.id,
-                            )
+                        due_competitor_ids.append((comp.id, comp.name, freq.value))
         except Exception:
             logger.exception("scheduler_check_cycle_failed")
+            return
+
+        for comp_id, comp_name, freq_val in due_competitor_ids:
+            logger.info(
+                "scheduling_collection",
+                competitor_id=comp_id,
+                name=comp_name,
+                frequency=freq_val,
+            )
+            try:
+                await collection_service.collect_competitor(comp_id)
+            except Exception:
+                logger.exception(
+                    "scheduled_collection_failed",
+                    competitor_id=comp_id,
+                )
 
     async def _get_last_collection_log(self, session: Any, competitor_id: int) -> Any:
         from app.database.repositories.collection_log_repository import CollectionLogRepository

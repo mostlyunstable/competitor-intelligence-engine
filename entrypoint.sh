@@ -12,6 +12,11 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     alembic upgrade head || echo "Warning: Migrations failed (database may not be initialized yet)"
 fi
 
+if [ -n "$PROMETHEUS_MULTIPROC_DIR" ]; then
+    echo "Creating multiprocess directory: $PROMETHEUS_MULTIPROC_DIR"
+    mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
+fi
+
 echo "Starting application..."
 exec uvicorn app.main:app \
     --host 0.0.0.0 \

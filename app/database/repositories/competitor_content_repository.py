@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CompetitorContent
@@ -94,7 +94,6 @@ class CompetitorContentRepository(BaseRepository):
         )
 
     async def delete_by_competitor(self, competitor_id: int) -> None:
-        content = await self.get_by_competitor(competitor_id)
-        for item in content:
-            await self._session.delete(item)
+        stmt = delete(CompetitorContent).where(CompetitorContent.competitor_id == competitor_id)
+        await self._session.execute(stmt)
         await self._session.flush()

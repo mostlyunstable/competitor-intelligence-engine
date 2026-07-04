@@ -28,6 +28,7 @@ dependencies = [
     "playwright>=1.49,<2",
     "apscheduler>=3.10,<4",
     "structlog>=24.4,<25",
+    "prometheus-client>=0.21,<1",
 ]
 
 [project.optional-dependencies]

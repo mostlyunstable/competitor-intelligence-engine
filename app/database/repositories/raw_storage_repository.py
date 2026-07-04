@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CollectionStatus, RawStorage
@@ -74,7 +74,6 @@ class RawStorageRepository(BaseRepository):
         )
 
     async def delete_by_competitor(self, competitor_id: int) -> None:
-        items = await self.get_by_competitor(competitor_id)
-        for item in items:
-            await self._session.delete(item)
+        stmt = delete(RawStorage).where(RawStorage.competitor_id == competitor_id)
+        await self._session.execute(stmt)
         await self._session.flush()

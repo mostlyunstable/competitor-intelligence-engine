@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CompetitorSocial, SocialPlatform
@@ -49,7 +49,6 @@ class CompetitorSocialRepository(BaseRepository):
         )
 
     async def delete_by_competitor(self, competitor_id: int) -> None:
-        profiles = await self.get_by_competitor(competitor_id)
-        for profile in profiles:
-            await self._session.delete(profile)
+        stmt = delete(CompetitorSocial).where(CompetitorSocial.competitor_id == competitor_id)
+        await self._session.execute(stmt)
         await self._session.flush()

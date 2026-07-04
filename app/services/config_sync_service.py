@@ -37,7 +37,17 @@ class ConfigSyncService:
                 for config in configs:
                     existing = await comp_repo.get_by_name(config.name)
                     if existing:
-                        skipped += 1
+                        await comp_repo.update(
+                            existing.id,
+                            website_url=config.website_url,
+                            enabled=config.enabled,
+                            collection_frequency=config.collection_frequency,
+                            modules=[m.value for m in config.modules],
+                            tags=config.tags,
+                            notes=config.notes,
+                        )
+                        synced += 1
+                        logger.info("competitor_updated", name=config.name)
                         continue
 
                     await comp_repo.create(

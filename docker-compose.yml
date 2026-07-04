@@ -39,25 +39,8 @@ services:
     networks:
       - ci-network
 
-  redis:
-    image: redis:7-alpine
-    container_name: utservio-ci-redis
-    restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ci-network
-
 volumes:
   postgres-data:
-  redis-data:
   app-data:
 
 networks:

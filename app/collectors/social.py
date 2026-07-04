@@ -22,6 +22,16 @@ class SocialCollector(BaseCollector):
 
         try:
             result = await self.fetch(url)
+            if result.not_modified:
+                return {
+                    "status": "skipped",
+                    "reason": "not_modified",
+                    "profiles_found": 0,
+                    "profiles_created": 0,
+                    "profiles_updated": 0,
+                    "elapsed_seconds": self._elapsed(start_time),
+                }
+
             html = result.html
 
             await self.store_raw(competitor_id, url, html, session)

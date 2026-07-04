@@ -17,6 +17,12 @@ async def verify_api_key(
     settings = get_settings()
     expected_key = settings.api_key
     if not expected_key:
+        if settings.environment != "development":
+            logger.critical("API key is not configured in non-development environment!")
+            raise HTTPException(
+                status_code=500,
+                detail="Security configuration error: API key is required in production.",
+            )
         logger.warning(
             "No API key configured. All requests are unauthenticated. "
             "Set CI_API_KEY in your .env file to secure the API."

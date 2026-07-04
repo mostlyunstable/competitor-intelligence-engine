@@ -1,10 +1,11 @@
 import re
+import warnings
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
 import httpx
 import structlog
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 from app.configuration.settings import get_settings
 from app.utilities.performance import URLDeduplicator
@@ -136,11 +137,22 @@ class DiscoveryEngine:
         return urls
 
     async def _fetch_sitemaps(
-        self, client: httpx.AsyncClient, base_url: str
+        self, client: httpx.AsyncClient, url: str, visited: set[str] | None = None
     ) -> list[DiscoveredURL]:
         """Fetch sitemap.xml and extract page URLs."""
-        parsed = urlparse(base_url)
-        sitemap_url = f"{parsed.scheme}://{parsed.netloc}/sitemap.xml"
+        if visited is None:
+            visited = set()
+
+        if url.endswith(".xml") or "sitemap" in url.lower():
+            sitemap_url = url
+        else:
+            parsed = urlparse(url)
+            sitemap_url = f"{parsed.scheme}://{parsed.netloc}/sitemap.xml"
+
+        if sitemap_url in visited:
+            return []
+        visited.add(sitemap_url)
+
         urls: list[DiscoveredURL] = []
 
         try:
@@ -149,13 +161,18 @@ class DiscoveryEngine:
                 logger.debug("sitemap_not_found", url=sitemap_url, status=response.status_code)
                 return urls
 
-            soup = BeautifulSoup(response.text, "xml")
+            try:
+                soup = BeautifulSoup(response.text, "xml")
+            except Exception:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+                    soup = BeautifulSoup(response.text, "html.parser")
 
             for loc in soup.find_all("loc"):
                 if loc.string:
                     urls.append(
                         DiscoveredURL(
-                            url=normalize_url(loc.string.strip(), base_url=base_url),
+                            url=normalize_url(loc.string.strip(), base_url=url),
                             source="sitemap",
                         )
                     )
@@ -163,7 +180,7 @@ class DiscoveryEngine:
             for sitemap in soup.find_all("sitemap"):
                 loc_tag = sitemap.find("loc")
                 if loc_tag and loc_tag.string:
-                    sub_urls = await self._fetch_sitemaps(client, loc_tag.string.strip())
+                    sub_urls = await self._fetch_sitemaps(client, loc_tag.string.strip(), visited)
                     urls.extend(sub_urls)
 
             logger.info("sitemap_parsed", url=sitemap_url, urls_found=len(urls))
@@ -298,6 +315,10 @@ class DiscoveryEngine:
         """Check if a URL belongs to the same domain."""
         parsed = urlparse(url)
         url_domain = parsed.netloc.lower()
+        if url_domain.startswith("www."):
+            url_domain = url_domain[4:]
+        if domain.startswith("www."):
+            domain = domain[4:]
         return url_domain == domain or url_domain.endswith(f".{domain}")
 
     def _deduplicate(self, urls: list[DiscoveredURL]) -> list[DiscoveredURL]:
