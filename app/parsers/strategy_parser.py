@@ -22,17 +22,16 @@ from app.utilities.performance import cached_parse
 # sequence and returns the richest possible merged result.  The remaining
 # single-concern strategies act as supplementary gap-fillers.
 DEFAULT_STRATEGIES: list[ParsingStrategy] = [
-    MultiPassStrategy(),        # Pass 1-6 combined (highest confidence)
-    JsonLdStrategy(),           # supplementary JSON-LD
-    SchemaOrgStrategy(),        # supplementary Schema.org
-    MicrodataStrategy(),        # supplementary microdata
-    SemanticHtmlStrategy(),     # supplementary semantic HTML
+    MultiPassStrategy(),  # Pass 1-6 combined (highest confidence)
+    JsonLdStrategy(),  # supplementary JSON-LD
+    SchemaOrgStrategy(),  # supplementary Schema.org
+    MicrodataStrategy(),  # supplementary microdata
+    SemanticHtmlStrategy(),  # supplementary semantic HTML
     GenericDomHeuristicStrategy(),
     GenericCssPatternStrategy(),
     RegexPatternStrategy(),
     MetadataStrategy(),
 ]
-
 
 
 class StrategyParser:

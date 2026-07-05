@@ -4,7 +4,6 @@ from typing import Any
 from app.parsers.base import BaseParser
 
 
-
 class PricingParser(BaseParser):
     def parse(self, html: str, url: str) -> dict[str, Any]:
         soup = self._soup(html)
@@ -89,10 +88,10 @@ class PricingParser(BaseParser):
             r"|\d[\d,]*(?:\.\d{1,2})?[\s]?(?:INR|USD|EUR|GBP|JPY)\b",
             re.IGNORECASE,
         )
-        # Price range pattern: e.g. "499 – 999" or "500 to 1500"
+        # Price range pattern: e.g. "499 - 999" or "500 to 1500"
         range_pattern = re.compile(
             r"([\u20B9$\u20AC\xA3]?\s*[\d,]+(?:\.\d{1,2})?)"
-            r"\s*(?:to|–|-|—)\s*"
+            r"\s*(?:to|\u2013|-|\u2014)\s*"
             r"([\u20B9$\u20AC\xA3]?\s*[\d,]+(?:\.\d{1,2})?)",
             re.IGNORECASE,
         )
@@ -141,7 +140,12 @@ class PricingParser(BaseParser):
         if not price_text:
             return None
         # Remove currency symbols and ISO codes before parsing
-        cleaned = re.sub(r"[\u20B9$\u20AC\xA3\xA5]|\b(?:INR|USD|EUR|GBP|JPY)\b", "", price_text, flags=re.IGNORECASE)
+        cleaned = re.sub(
+            r"[\u20B9$\u20AC\xA3\xA5]|\b(?:INR|USD|EUR|GBP|JPY)\b",
+            "",
+            price_text,
+            flags=re.IGNORECASE,
+        )
         numbers = re.findall(r"[\d,]+\.?\d*", cleaned.replace(",", ""))
         if numbers:
             try:

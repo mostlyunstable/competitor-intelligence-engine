@@ -57,19 +57,19 @@ class SchemaOrgStrategy(ParsingStrategy):
     ) -> None:
         from urllib.parse import urljoin as _urljoin
 
-        headline = (props.get("headline") or props.get("name") or [None])[0]
+        headline = (props.get("headline") or props.get("name") or [""])[0] or None
         if not headline:
             return
-        author_raw = (props.get("author") or [None])[0]
-        date_raw = (props.get("datePublished") or [None])[0]
-        article_url = (props.get("url") or [None])[0]
+        author_raw: str | None = (props.get("author") or [""])[0] or None
+        date_raw: str | None = (props.get("datePublished") or [""])[0] or None
+        article_url: str | None = (props.get("url") or [""])[0] or None
         result.content.append(
             {
-                "title": headline,
+                "title": str(headline),
                 "author": author_raw,
                 "publish_date": date_raw[:10] if date_raw and len(date_raw) >= 10 else date_raw,
                 "url": _urljoin(url, article_url) if article_url else url,
-                "summary": (props.get("description") or [None])[0],
+                "summary": (props.get("description") or [""])[0] or None,
                 "content_type": "article",
             }
         )
@@ -87,10 +87,7 @@ class SchemaOrgStrategy(ParsingStrategy):
             name = props.get("name", [""])[0] if props.get("name") else ""
             # Extract price range if present
             min_price_text = props.get("minPrice", [None])[0] if props.get("minPrice") else None
-            max_price_text = props.get("maxPrice", [None])[0] if props.get("maxPrice") else None
-            price_text = (
-                props.get("price", [None])[0] if props.get("price") else min_price_text
-            )
+            price_text = props.get("price", [None])[0] if props.get("price") else min_price_text
             # Extract AggregateRating if present
             rating_value = props.get("ratingValue", [None])[0] if props.get("ratingValue") else None
             review_count = props.get("reviewCount", [None])[0] if props.get("reviewCount") else None

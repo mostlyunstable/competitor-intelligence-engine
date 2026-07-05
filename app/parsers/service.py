@@ -48,9 +48,8 @@ class ServiceParser(BaseParser):
         description = self._text(card, "p, .description, .desc, .summary")
         price = self._text(card, ".price, .starting-price, [data-price]")
         duration = self._text(card, ".duration, .estimated-duration, [data-duration]")
-        category = (
-            self._text(card, ".category, .service-category, [data-category]")
-            or card.get("data-category")
+        category = self._text(card, ".category, .service-category, [data-category]") or card.get(
+            "data-category"
         )
 
         # Detect membership / addon offers as siblings of the price element
@@ -60,7 +59,10 @@ class ServiceParser(BaseParser):
             sibling = price_el.find_next_sibling()
             if sibling:
                 sibling_text = sibling.get_text(strip=True).lower()
-                if any(kw in sibling_text for kw in ["membership", "addon", "add-on", "offer", "discount"]):
+                if any(
+                    kw in sibling_text
+                    for kw in ["membership", "addon", "add-on", "offer", "discount"]
+                ):
                     membership = sibling.get_text(strip=True)
 
         return {
@@ -80,7 +82,7 @@ class ServiceParser(BaseParser):
         for dl in soup.select("dl"):
             terms = dl.select("dt")
             defs = dl.select("dd")
-            for dt, dd in zip(terms, defs):
+            for dt, dd in zip(terms, defs, strict=False):
                 term_text = dt.get_text(strip=True)
                 def_text = dd.get_text(strip=True)
                 if any(kw in term_text.lower() for kw in service_keywords):

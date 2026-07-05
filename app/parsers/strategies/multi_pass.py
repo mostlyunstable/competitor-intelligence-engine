@@ -22,9 +22,10 @@ Rules
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
@@ -73,23 +74,46 @@ _CURRENCY_MAP: dict[str, str] = {
 }
 
 _SERVICE_KW = frozenset(
-    ["service", "repair", "install", "maintenance", "plan", "cleaning",
-     "plumb", "hvac", "electric", "pest", "lawn", "paint", "handyman"]
+    [
+        "service",
+        "repair",
+        "install",
+        "maintenance",
+        "plan",
+        "cleaning",
+        "plumb",
+        "hvac",
+        "electric",
+        "pest",
+        "lawn",
+        "paint",
+        "handyman",
+    ]
 )
 
 _PRICE_KW = frozenset(
-    ["price", "pricing", "cost", "fee", "plan", "subscription", "package",
-     "rate", "charge", "tariff", "tier"]
+    [
+        "price",
+        "pricing",
+        "cost",
+        "fee",
+        "plan",
+        "subscription",
+        "package",
+        "rate",
+        "charge",
+        "tariff",
+        "tier",
+    ]
 )
 
-_BLOG_KW = frozenset(
-    ["article", "blog", "post", "news", "update", "guide", "tips", "story"]
-)
+_BLOG_KW = frozenset(["article", "blog", "post", "news", "update", "guide", "tips", "story"])
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _first_set(*values: Any) -> Any:
     """Return the first truthy value — used to keep higher-confidence data."""
@@ -134,14 +158,16 @@ def _add_service(result: ParsedResult, name: str, **kwargs: Any) -> None:
     name = name.strip()[:200]
     if any(s.get("name") == name for s in result.services):
         return
-    result.services.append({
-        "name": name,
-        "description": kwargs.get("description"),
-        "category": kwargs.get("category"),
-        "starting_price": kwargs.get("starting_price"),
-        "currency": kwargs.get("currency", "USD"),
-        "estimated_duration": kwargs.get("estimated_duration"),
-    })
+    result.services.append(
+        {
+            "name": name,
+            "description": kwargs.get("description"),
+            "category": kwargs.get("category"),
+            "starting_price": kwargs.get("starting_price"),
+            "currency": kwargs.get("currency", "USD"),
+            "estimated_duration": kwargs.get("estimated_duration"),
+        }
+    )
 
 
 def _add_pricing(result: ParsedResult, service_name: str, **kwargs: Any) -> None:
@@ -150,16 +176,18 @@ def _add_pricing(result: ParsedResult, service_name: str, **kwargs: Any) -> None
     service_name = service_name.strip()[:200]
     if any(p.get("service_name") == service_name for p in result.pricing):
         return
-    result.pricing.append({
-        "service_name": service_name,
-        "category": kwargs.get("category"),
-        "base_price": kwargs.get("base_price"),
-        "promotional_price": kwargs.get("promotional_price"),
-        "currency": kwargs.get("currency", "USD"),
-        "discount": kwargs.get("discount"),
-        "subscription_plans": kwargs.get("subscription_plans", {}),
-        "membership_pricing": kwargs.get("membership_pricing"),
-    })
+    result.pricing.append(
+        {
+            "service_name": service_name,
+            "category": kwargs.get("category"),
+            "base_price": kwargs.get("base_price"),
+            "promotional_price": kwargs.get("promotional_price"),
+            "currency": kwargs.get("currency", "USD"),
+            "discount": kwargs.get("discount"),
+            "subscription_plans": kwargs.get("subscription_plans", {}),
+            "membership_pricing": kwargs.get("membership_pricing"),
+        }
+    )
 
 
 def _add_content(result: ParsedResult, title: str, **kwargs: Any) -> None:
@@ -168,14 +196,16 @@ def _add_content(result: ParsedResult, title: str, **kwargs: Any) -> None:
     title = title.strip()[:300]
     if any(c.get("title") == title for c in result.content):
         return
-    result.content.append({
-        "title": title,
-        "author": kwargs.get("author"),
-        "publish_date": kwargs.get("publish_date"),
-        "url": kwargs.get("url"),
-        "summary": kwargs.get("summary"),
-        "content_type": kwargs.get("content_type", "article"),
-    })
+    result.content.append(
+        {
+            "title": title,
+            "author": kwargs.get("author"),
+            "publish_date": kwargs.get("publish_date"),
+            "url": kwargs.get("url"),
+            "summary": kwargs.get("summary"),
+            "content_type": kwargs.get("content_type", "article"),
+        }
+    )
 
 
 def _normalize_date(raw: str | None) -> str | None:
@@ -194,13 +224,14 @@ def _normalize_date(raw: str | None) -> str | None:
 # Pass 1: Structured data (JSON-LD, Schema.org microdata)
 # ---------------------------------------------------------------------------
 
+
 class _Pass1Structured:
     """Extract from <script type="application/ld+json"> and itemprop microdata."""
 
-    _ORG_TYPES = {"LocalBusiness", "Organization", "Corporation", "Company"}
-    _SVC_TYPES = {"Service", "ServiceList", "ItemList"}
-    _PRICE_TYPES = {"Offer", "AggregateOffer", "Product"}
-    _ARTICLE_TYPES = {"Article", "BlogPosting", "NewsArticle"}
+    _ORG_TYPES: ClassVar[set[str]] = {"LocalBusiness", "Organization", "Corporation", "Company"}
+    _SVC_TYPES: ClassVar[set[str]] = {"Service", "ServiceList", "ItemList"}
+    _PRICE_TYPES: ClassVar[set[str]] = {"Offer", "AggregateOffer", "Product"}
+    _ARTICLE_TYPES: ClassVar[set[str]] = {"Article", "BlogPosting", "NewsArticle"}
 
     def run(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         # ---- JSON-LD ----
@@ -219,7 +250,7 @@ class _Pass1Structured:
             item_type = str(scope.get("itemtype", ""))
             self._process_microdata(scope, item_type, result, url)
 
-    def _process(self, item: dict, result: ParsedResult, url: str) -> None:
+    def _process(self, item: dict[str, Any], result: ParsedResult, url: str) -> None:
         # Flatten @graph
         if "@graph" in item:
             for child in item["@graph"]:
@@ -242,7 +273,9 @@ class _Pass1Structured:
 
         # Recurse into nested offers
         offers = item.get("offers")
-        for offer in (offers if isinstance(offers, list) else ([offers] if isinstance(offers, dict) else [])):
+        for offer in (
+            offers if isinstance(offers, list) else ([offers] if isinstance(offers, dict) else [])
+        ):
             if isinstance(offer, dict):
                 self._product(offer, result)
 
@@ -256,7 +289,7 @@ class _Pass1Structured:
             if isinstance(child, dict):
                 self._process(child, result, url)
 
-    def _org(self, item: dict, result: ParsedResult, url: str) -> None:
+    def _org(self, item: dict[str, Any], result: ParsedResult, url: str) -> None:
         _safe_set(result, "company_name", item.get("name"))
         _safe_set(result, "description", item.get("description"))
         _safe_set(result, "industry", item.get("industry"))
@@ -268,18 +301,20 @@ class _Pass1Structured:
         addr = item.get("address", {})
         if addr and not result.headquarters:
             if isinstance(addr, dict):
-                parts = [addr.get(f, "") for f in ("streetAddress", "addressLocality",
-                                                     "addressRegion", "addressCountry")]
+                parts = [
+                    addr.get(f, "")
+                    for f in ("streetAddress", "addressLocality", "addressRegion", "addressCountry")
+                ]
                 result.headquarters = ", ".join(p for p in parts if p)
             else:
                 result.headquarters = str(addr)
-        for link in (item.get("sameAs") or []):
+        for link in item.get("sameAs") or []:
             if isinstance(link, str):
                 platform = _detect_social(link)
                 if platform and platform not in result.social_links:
                     result.social_links[platform] = link
 
-    def _service(self, item: dict, result: ParsedResult, url: str) -> None:
+    def _service(self, item: dict[str, Any], result: ParsedResult, url: str) -> None:
         name = item.get("name", "")
         if not name:
             return
@@ -289,32 +324,41 @@ class _Pass1Structured:
             p = offers.get("price") or offers.get("lowPrice")
             currency = offers.get("priceCurrency", "USD")
             if p:
-                try:
+                with contextlib.suppress(ValueError):
                     price = float(str(p).replace(",", ""))
-                except ValueError:
-                    pass
-        _add_service(result, name, description=item.get("description"),
-                     category=item.get("category"),
-                     starting_price=price, currency=currency)
+        _add_service(
+            result,
+            name,
+            description=item.get("description"),
+            category=item.get("category"),
+            starting_price=price,
+            currency=currency,
+        )
 
-    def _product(self, item: dict, result: ParsedResult) -> None:
+    def _product(self, item: dict[str, Any], result: ParsedResult) -> None:
         name = item.get("name", "Offer")
         currency = item.get("priceCurrency", "USD")
         raw_type = item.get("@type", "Offer")
         if raw_type == "AggregateOffer":
             low = item.get("lowPrice")
             high = item.get("highPrice")
-            _add_pricing(result, name,
-                         base_price=float(str(low).replace(",", "")) if low is not None else None,
-                         promotional_price=float(str(high).replace(",", "")) if high is not None else None,
-                         currency=currency)
+            _add_pricing(
+                result,
+                name,
+                base_price=float(str(low).replace(",", "")) if low is not None else None,
+                promotional_price=float(str(high).replace(",", "")) if high is not None else None,
+                currency=currency,
+            )
         else:
             price = item.get("price")
-            _add_pricing(result, name,
-                         base_price=float(str(price).replace(",", "")) if price is not None else None,
-                         currency=currency)
+            _add_pricing(
+                result,
+                name,
+                base_price=float(str(price).replace(",", "")) if price is not None else None,
+                currency=currency,
+            )
 
-    def _article(self, item: dict, result: ParsedResult, url: str) -> None:
+    def _article(self, item: dict[str, Any], result: ParsedResult, url: str) -> None:
         title = item.get("headline") or item.get("name")
         if not title:
             return
@@ -324,14 +368,17 @@ class _Pass1Structured:
         elif isinstance(author, list) and author:
             a0 = author[0]
             author = a0.get("name") if isinstance(a0, dict) else a0
-        _add_content(result, title,
-                     author=author,
-                     publish_date=_normalize_date(item.get("datePublished")),
-                     url=urljoin(url, item.get("url", "")),
-                     summary=item.get("description"),
-                     content_type="article")
+        _add_content(
+            result,
+            title,
+            author=author,
+            publish_date=_normalize_date(item.get("datePublished")),
+            url=urljoin(url, item.get("url", "")),
+            summary=item.get("description"),
+            content_type="article",
+        )
 
-    def _faq(self, item: dict, result: ParsedResult, url: str) -> None:
+    def _faq(self, item: dict[str, Any], result: ParsedResult, url: str) -> None:
         for entity in item.get("mainEntity", []):
             if not isinstance(entity, dict):
                 continue
@@ -339,16 +386,22 @@ class _Pass1Structured:
             answer_block = entity.get("acceptedAnswer", {})
             answer = answer_block.get("text", "") if isinstance(answer_block, dict) else ""
             if question:
-                _add_content(result, question,
-                             summary=answer[:500] if answer else None,
-                             url=url, content_type="faq")
+                _add_content(
+                    result,
+                    question,
+                    summary=answer[:500] if answer else None,
+                    url=url,
+                    content_type="faq",
+                )
 
-    def _process_microdata(self, scope: Tag, item_type: str, result: ParsedResult, url: str) -> None:
+    def _process_microdata(
+        self, scope: Tag, item_type: str, result: ParsedResult, url: str
+    ) -> None:
         def _prop(name: str) -> str | None:
             el = scope.select_one(f'[itemprop="{name}"]')
             if not el:
                 return None
-            return el.get("content") or el.get("href") or el.get_text(strip=True) or None
+            return str(el.get("content") or el.get("href") or el.get_text(strip=True)) or None
 
         if any(t in item_type for t in ("Organization", "LocalBusiness", "Corporation")):
             _safe_set(result, "company_name", _prop("name"))
@@ -361,16 +414,15 @@ class _Pass1Structured:
             currency = _prop("priceCurrency") or "USD"
             price_val = None
             if price_raw:
-                try:
+                with contextlib.suppress(ValueError):
                     price_val = float(price_raw.replace(",", ""))
-                except ValueError:
-                    pass
             _add_pricing(result, name, base_price=price_val, currency=currency)
 
 
 # ---------------------------------------------------------------------------
 # Pass 2: Semantic HTML
 # ---------------------------------------------------------------------------
+
 
 class _Pass2Semantic:
     """Scan structural HTML5 elements: main, article, section, table, dl, nav."""
@@ -449,9 +501,15 @@ class _Pass2Semantic:
             author = author_el.get_text(strip=True) if author_el else None
             time_el = article.select_one("time[datetime]")
             pub_date = _normalize_date(str(time_el.get("datetime"))) if time_el else None
-            _add_content(result, title, author=author, publish_date=pub_date,
-                         url=urljoin(url, link) if link else url,
-                         summary=summary, content_type="article")
+            _add_content(
+                result,
+                title,
+                author=author,
+                publish_date=pub_date,
+                url=urljoin(url, link) if link else url,
+                summary=summary,
+                content_type="article",
+            )
 
     def _sections(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         for section in soup.select("section"):
@@ -462,23 +520,28 @@ class _Pass2Semantic:
             lower = text.lower()
             if any(kw in lower for kw in _SERVICE_KW):
                 desc_el = section.select_one("p")
-                _add_service(result, text,
-                             description=desc_el.get_text(strip=True) if desc_el else None)
+                _add_service(
+                    result, text, description=desc_el.get_text(strip=True) if desc_el else None
+                )
 
     def _definition_lists(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         for dl in soup.select("dl"):
-            for dt, dd in zip(dl.select("dt"), dl.select("dd")):
+            for dt, dd in zip(dl.select("dt"), dl.select("dd"), strict=False):
                 term = dt.get_text(strip=True)
                 definition = dd.get_text(strip=True)
                 if any(kw in term.lower() for kw in _SERVICE_KW):
                     price, currency = _parse_price(definition)
-                    _add_service(result, term, description=definition,
-                                 starting_price=price, currency=currency)
+                    _add_service(
+                        result,
+                        term,
+                        description=definition,
+                        starting_price=price,
+                        currency=currency,
+                    )
 
     def _tables(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         for table in soup.select("table"):
             rows = table.select("tr")
-            headers = [th.get_text(strip=True).lower() for th in rows[0].select("th, td")] if rows else []
             for row in rows[1:]:
                 cells = [td.get_text(strip=True) for td in row.select("td")]
                 if len(cells) < 2:
@@ -487,13 +550,19 @@ class _Pass2Semantic:
                 price_text = cells[1] if len(cells) > 1 else ""
                 price, currency = _parse_price(price_text)
                 if price or any(kw in name.lower() for kw in _SERVICE_KW | _PRICE_KW):
-                    _add_pricing(result, name, base_price=price, currency=currency,
-                                 category=cells[2] if len(cells) > 2 else None)
+                    _add_pricing(
+                        result,
+                        name,
+                        base_price=price,
+                        currency=currency,
+                        category=cells[2] if len(cells) > 2 else None,
+                    )
 
 
 # ---------------------------------------------------------------------------
 # Pass 3: Visual content blocks (cards, grids, pricing blocks)
 # ---------------------------------------------------------------------------
+
 
 class _Pass3Visual:
     """
@@ -521,7 +590,7 @@ class _Pass3Visual:
             tags = {c.name for c in children}
             if len(tags) != 1:
                 continue
-            child_tag = list(tags)[0]
+            child_tag = next(iter(tags))
             if child_tag not in ("li", "div", "article", "section"):
                 continue
             for child in children:
@@ -532,9 +601,7 @@ class _Pass3Visual:
                 if not title:
                     continue
                 # Check if block has a price
-                price_el = child.select_one(
-                    "[data-price], [itemprop='price'], [itemprop='offers']"
-                )
+                price_el = child.select_one("[data-price], [itemprop='price'], [itemprop='offers']")
                 price_text = price_el.get_text(strip=True) if price_el else ""
                 # Also scan all text for price patterns
                 all_text = child.get_text(" ", strip=True)
@@ -543,11 +610,11 @@ class _Pass3Visual:
                 desc = desc_el.get_text(strip=True) if desc_el else None
 
                 if price is not None and any(kw in all_text.lower() for kw in _PRICE_KW):
-                    _add_pricing(result, title, base_price=price, currency=currency,
-                                 category=None)
+                    _add_pricing(result, title, base_price=price, currency=currency, category=None)
                 elif any(kw in title.lower() for kw in _SERVICE_KW | _PRICE_KW):
-                    _add_service(result, title, description=desc,
-                                 starting_price=price, currency=currency)
+                    _add_service(
+                        result, title, description=desc, starting_price=price, currency=currency
+                    )
 
                 # Blog-like blocks
                 link_el = child.select_one("a[href]")
@@ -555,8 +622,7 @@ class _Pass3Visual:
                 if time_el or any(kw in title.lower() for kw in _BLOG_KW):
                     pub_date = _normalize_date(str(time_el.get("datetime"))) if time_el else None
                     link = urljoin(url, str(link_el.get("href", ""))) if link_el else url
-                    _add_content(result, title, summary=desc,
-                                 publish_date=pub_date, url=link)
+                    _add_content(result, title, summary=desc, publish_date=pub_date, url=link)
 
     def _figure_cards(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         for figure in soup.select("figure"):
@@ -588,15 +654,21 @@ class _Pass3Visual:
             price_raw = el.get("data-price") or el.get("data-amount")
             price, currency = _parse_price(str(price_raw)) if price_raw else (None, "USD")
             category = el.get("data-category")
-            _add_service(result, str(name),
-                         description=el.get("data-description") or el.get_text(strip=True)[:200],
-                         category=category, starting_price=price, currency=currency,
-                         estimated_duration=el.get("data-duration"))
+            _add_service(
+                result,
+                str(name),
+                description=el.get("data-description") or el.get_text(strip=True)[:200],
+                category=category,
+                starting_price=price,
+                currency=currency,
+                estimated_duration=el.get("data-duration"),
+            )
 
 
 # ---------------------------------------------------------------------------
 # Pass 4: DOM relationship traversal (heading → paragraph → list → button → price)
 # ---------------------------------------------------------------------------
+
 
 class _Pass4DomRelationships:
     """
@@ -649,19 +721,21 @@ class _Pass4DomRelationships:
             if not paragraphs and not list_items:
                 continue
 
-            description = (paragraphs[0] if paragraphs else None)
+            description = paragraphs[0] if paragraphs else None
 
             lower = text.lower()
             if price is not None and any(kw in lower for kw in _PRICE_KW | _SERVICE_KW):
                 _add_pricing(result, text, base_price=price, currency=currency)
             elif any(kw in lower for kw in _SERVICE_KW | _PRICE_KW):
-                _add_service(result, text, description=description,
-                             starting_price=price, currency=currency)
+                _add_service(
+                    result, text, description=description, starting_price=price, currency=currency
+                )
 
 
 # ---------------------------------------------------------------------------
 # Pass 5: Metadata (OpenGraph, Twitter Card, canonical)
 # ---------------------------------------------------------------------------
+
 
 class _Pass5Metadata:
     """Extract OpenGraph, Twitter Card tags and <link> metadata."""
@@ -693,7 +767,7 @@ class _Pass5Metadata:
         if not result.description:
             tag = soup.select_one('meta[name="description"]')
             if tag:
-                result.description = tag.get("content")
+                result.description = str(tag.get("content"))
 
         # Social identity via <link rel="me">
         for link in soup.select('link[rel="me"]'):
@@ -706,6 +780,7 @@ class _Pass5Metadata:
 # ---------------------------------------------------------------------------
 # Pass 6: Regex fallback (raw text scan)
 # ---------------------------------------------------------------------------
+
 
 class _Pass6Regex:
     """
@@ -756,6 +831,7 @@ class _Pass6Regex:
 # ---------------------------------------------------------------------------
 # MultiPassStrategy — the public strategy class
 # ---------------------------------------------------------------------------
+
 
 class MultiPassStrategy(ParsingStrategy):
     """

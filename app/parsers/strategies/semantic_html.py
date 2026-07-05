@@ -135,7 +135,9 @@ class SemanticHtmlStrategy(ParsingStrategy):
             # Prefer <time datetime> attribute for accurate date
             time_el = article.select_one("time[datetime]")
             if time_el:
-                publish_date: str | None = str(time_el.get("datetime", ""))[:10] or time_el.get_text(strip=True)
+                publish_date: str | None = str(time_el.get("datetime", ""))[
+                    :10
+                ] or time_el.get_text(strip=True)
             else:
                 date_el = article.select_one(".date, .publish-date, [data-date], time")
                 publish_date = date_el.get_text(strip=True) if date_el else None
@@ -178,7 +180,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
         for dl in soup.select("dl"):
             terms = dl.select("dt")
             defs = dl.select("dd")
-            for dt, dd in zip(terms, defs):
+            for dt, dd in zip(terms, defs, strict=False):
                 term_text = dt.get_text(strip=True)
                 def_text = dd.get_text(strip=True)
                 if any(kw in term_text.lower() for kw in service_keywords):

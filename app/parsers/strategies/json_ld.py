@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import re
@@ -101,14 +102,16 @@ class JsonLdStrategy(ParsingStrategy):
         for child in item.get("subEvent", []):
             if isinstance(child, dict):
                 self._process_item(child, result, url)
-        # Recurse into top-level offers arrays
-        offers = item.get("offers")
-        if isinstance(offers, list):
-            for offer in offers:
-                if isinstance(offer, dict):
-                    self._extract_offer(offer, result)
-        elif isinstance(offers, dict):
-            self._extract_offer(offers, result)
+        # Recurse into top-level offers arrays — but skip if parent is a Product,
+        # because _extract_product already handles its own offers internally.
+        if item_type != "Product":
+            offers = item.get("offers")
+            if isinstance(offers, list):
+                for offer in offers:
+                    if isinstance(offer, dict):
+                        self._extract_offer(offer, result)
+            elif isinstance(offers, dict):
+                self._extract_offer(offers, result)
 
     def _extract_organization(self, item: dict[str, Any], result: ParsedResult, url: str) -> None:
         if not result.company_name:
@@ -166,19 +169,15 @@ class JsonLdStrategy(ParsingStrategy):
             price = offers.get("price") or offers.get("lowPrice")
             currency = offers.get("priceCurrency", "USD")
             if price:
-                try:
+                with contextlib.suppress(ValueError):
                     starting_price = float(str(price).replace(",", ""))
-                except ValueError:
-                    pass
         elif isinstance(offers, list) and offers:
             first = offers[0]
             price = first.get("price") or first.get("lowPrice")
             currency = first.get("priceCurrency", "USD")
             if price:
-                try:
+                with contextlib.suppress(ValueError):
                     starting_price = float(str(price).replace(",", ""))
-                except ValueError:
-                    pass
         result.services.append(
             {
                 "name": name,
@@ -271,9 +270,9 @@ class JsonLdStrategy(ParsingStrategy):
                     "service_name": name,
                     "category": category or item.get("category"),
                     "base_price": float(str(low).replace(",", "")) if low is not None else None,
-                    "promotional_price": float(str(high).replace(",", ""))
-                    if high is not None
-                    else None,
+                    "promotional_price": (
+                        float(str(high).replace(",", "")) if high is not None else None
+                    ),
                     "currency": currency,
                     "discount": None,
                     "subscription_plans": {},
@@ -286,9 +285,7 @@ class JsonLdStrategy(ParsingStrategy):
                 {
                     "service_name": name,
                     "category": category or item.get("category"),
-                    "base_price": float(str(price).replace(",", ""))
-                    if price is not None
-                    else None,
+                    "base_price": float(str(price).replace(",", "")) if price is not None else None,
                     "promotional_price": None,
                     "currency": currency,
                     "discount": None,
@@ -339,7 +336,7 @@ class JsonLdStrategy(ParsingStrategy):
         iso = re.match(r"(\d{4}-\d{2}-\d{2})", raw)
         if iso:
             return iso.group(1)
-        return raw[:10] if len(raw) >= 10 else raw
+        return str(raw[:10]) if len(raw) >= 10 else str(raw)
 
     def _detect_platform(self, url: str) -> str | None:
         for domain, platform in SOCIAL_PLATFORMS.items():

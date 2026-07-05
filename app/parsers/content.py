@@ -119,7 +119,16 @@ class ContentParser(BaseParser):
             return iso.group(1)
         # Try to parse common date formats
         from datetime import datetime
-        for fmt in ("%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%d %b %Y", "%Y/%m/%d", "%m/%d/%Y", "%d-%m-%Y"):
+
+        for fmt in (
+            "%B %d, %Y",
+            "%b %d, %Y",
+            "%d %B %Y",
+            "%d %b %Y",
+            "%Y/%m/%d",
+            "%m/%d/%Y",
+            "%d-%m-%Y",
+        ):
             try:
                 return datetime.strptime(raw[:20], fmt).strftime("%Y-%m-%d")
             except ValueError:

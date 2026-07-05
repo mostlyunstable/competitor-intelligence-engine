@@ -5,7 +5,6 @@ from urllib.parse import urljoin
 from app.parsers.base import BaseParser
 
 
-
 class CompanyParser(BaseParser):
     def parse(self, html: str, url: str) -> dict[str, Any]:
         soup = self._soup(html)
@@ -100,7 +99,7 @@ class CompanyParser(BaseParser):
         # Fall back to <address> element
         address_el = soup.select_one("address")
         if address_el:
-            return address_el.get_text(separator=", ", strip=True)
+            return str(address_el.get_text(separator=", ", strip=True))
         # Try geo meta tag
         geo = self._attr(soup, "meta[name='geo.placename']", "content")
         return geo

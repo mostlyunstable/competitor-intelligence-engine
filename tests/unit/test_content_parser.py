@@ -27,7 +27,7 @@ class TestContentParser:
         assert result["content"][0]["title"] == "How to Choose HVAC"
         assert result["content"][0]["author"] == "John Doe"
         assert result["content"][0]["publish_date"] == "2024-01-15"
-        assert result["content"][0]["url"] == "/blog/post1"
+        assert result["content"][0]["url"] == "https://example.com/blog/post1"
 
     def test_parse_blog_posts(self) -> None:
         html = """

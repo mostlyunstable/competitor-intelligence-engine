@@ -48,7 +48,7 @@ class SocialParser(BaseParser):
                         {
                             "platform": platform,
                             "profile_url": full_url,
-                            "username": username,
+                            "username": username or "",
                         }
                     )
                     seen_platforms.add(platform)
@@ -74,7 +74,7 @@ class SocialParser(BaseParser):
                         {
                             "platform": platform,
                             "profile_url": full_url,
-                            "username": username,
+                            "username": username or "",
                         }
                     )
                     break
