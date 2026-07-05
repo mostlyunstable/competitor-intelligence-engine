@@ -10,6 +10,7 @@ from app.parsers.strategies import (
     JsonLdStrategy,
     MetadataStrategy,
     MicrodataStrategy,
+    MultiPassStrategy,
     RegexPatternStrategy,
     SchemaOrgStrategy,
     SemanticHtmlStrategy,
@@ -17,16 +18,21 @@ from app.parsers.strategies import (
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 from app.utilities.performance import cached_parse
 
+# MultiPassStrategy runs first — it performs all 6 extraction passes in
+# sequence and returns the richest possible merged result.  The remaining
+# single-concern strategies act as supplementary gap-fillers.
 DEFAULT_STRATEGIES: list[ParsingStrategy] = [
-    JsonLdStrategy(),
-    SchemaOrgStrategy(),
-    MicrodataStrategy(),
-    SemanticHtmlStrategy(),
+    MultiPassStrategy(),        # Pass 1-6 combined (highest confidence)
+    JsonLdStrategy(),           # supplementary JSON-LD
+    SchemaOrgStrategy(),        # supplementary Schema.org
+    MicrodataStrategy(),        # supplementary microdata
+    SemanticHtmlStrategy(),     # supplementary semantic HTML
     GenericDomHeuristicStrategy(),
     GenericCssPatternStrategy(),
     RegexPatternStrategy(),
     MetadataStrategy(),
 ]
+
 
 
 class StrategyParser:
