@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import re
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
-from bs4 import BeautifulSoup
+if TYPE_CHECKING:
+    from bs4 import BeautifulSoup
 
+    from app.parsers.page_segmenter import PageSegment
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 
@@ -22,8 +26,8 @@ class RegexPatternStrategy(ParsingStrategy):
         r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
     )
     PRICE_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
-        re.compile(r"[\$€£₹]\s*\d+(?:,\d{3})*(?:\.\d{2})?"),
-        re.compile(r"\d+(?:,\d{3})*(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)"),
+        re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{2})?"),
+        re.compile(r"[\d,]+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)"),
     ]
     SOCIAL_PATTERNS: ClassVar[dict[str, re.Pattern[str]]] = {
         "linkedin": re.compile(r"https?://(?:www\.)?linkedin\.com/(?:company|in)/[a-zA-Z0-9\-]+"),
@@ -41,6 +45,17 @@ class RegexPatternStrategy(ParsingStrategy):
         self._extract_phones(text, result)
         self._extract_prices(text, result)
         self._extract_social_links(html, result)
+        return result
+
+    def parse_segments(self, segments: list[PageSegment], url: str) -> ParsedResult:
+        """Regex is text-based — extract from all segment text combined."""
+        result = ParsedResult()
+        all_text = " ".join(seg.text_content() for seg in segments)
+        all_html = "".join(str(seg.element) for seg in segments)
+        self._extract_emails(all_text, result)
+        self._extract_phones(all_text, result)
+        self._extract_prices(all_text, result)
+        self._extract_social_links(all_html, result)
         return result
 
     def _extract_emails(self, text: str, result: ParsedResult) -> None:
@@ -69,7 +84,7 @@ class RegexPatternStrategy(ParsingStrategy):
                 if price is not None and price > 0:
                     result.pricing.append(
                         {
-                            "service_name": "Detected Service",
+                            "service_name": f"Detected Price ({self._detect_currency(match)}{price})",
                             "category": None,
                             "base_price": price,
                             "promotional_price": None,

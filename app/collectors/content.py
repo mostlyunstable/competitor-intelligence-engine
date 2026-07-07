@@ -34,9 +34,8 @@ class ContentCollector(BaseCollector):
 
             html = result.html
 
-            await self.store_raw(competitor_id, url, html, session)
-
             parsed = self._parser.parse_for_type(html, url, "content")
+            await self.store_raw(competitor_id, url, html, session, extracted_data=parsed)
             content_items = parsed["content"]
 
             content_repo = CompetitorContentRepository(session)

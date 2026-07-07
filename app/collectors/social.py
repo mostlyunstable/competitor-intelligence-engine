@@ -34,9 +34,8 @@ class SocialCollector(BaseCollector):
 
             html = result.html
 
-            await self.store_raw(competitor_id, url, html, session)
-
             parsed = self._parser.parse_for_type(html, url, "social")
+            await self.store_raw(competitor_id, url, html, session, extracted_data=parsed)
             profiles = parsed["social_profiles"]
 
             social_repo = CompetitorSocialRepository(session)

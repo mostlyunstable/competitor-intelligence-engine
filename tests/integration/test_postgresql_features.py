@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -461,6 +462,7 @@ class TestJsonFields:
     async def test_pricing_subscription_plans_json(
         self, session: AsyncSession, engine: AsyncEngine
     ) -> None:
+        from typing import cast
         comp_repo = CompetitorRepository(session)
         competitor = await comp_repo.create(
             name="JSON Pricing Corp",
@@ -478,8 +480,9 @@ class TestJsonFields:
         async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(CompetitorPricing, pricing.id)
             assert fetched is not None
-            assert fetched.subscription_plans["monthly"] == 29.99
-            assert fetched.subscription_plans["annual"] == 299.99
+            plans = cast("dict[str, Any]", fetched.subscription_plans)
+            assert plans["monthly"] == 29.99
+            assert plans["annual"] == 299.99
 
     async def test_collection_log_errors_json(
         self, session: AsyncSession, engine: AsyncEngine
@@ -526,7 +529,9 @@ class TestJsonFields:
         async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(RawStorage, raw.id)
             assert fetched is not None
+            assert fetched.raw_json is not None
             assert fetched.raw_json["title"] == "Test"
+            assert fetched.metadata_ is not None
             assert fetched.metadata_["collector"] == "discovery"
 
 

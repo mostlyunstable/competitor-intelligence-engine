@@ -7,7 +7,7 @@ from app.database.models import CompetitorContent
 from app.database.repositories.base import BaseRepository
 
 
-class CompetitorContentRepository(BaseRepository):
+class CompetitorContentRepository(BaseRepository[CompetitorContent]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, CompetitorContent)
 
@@ -81,7 +81,7 @@ class CompetitorContentRepository(BaseRepository):
             await self._session.flush()
             return existing
 
-        return await self.create(  # type: ignore[no-any-return]
+        return await self.create(
             competitor_id=competitor_id,
             content_hash=content_hash,
             title=title,

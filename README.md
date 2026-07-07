@@ -1,52 +1,40 @@
-# Competitor Intelligence — Data Collection Engine
+# Competitor Intelligence Engine
 
-Periodically crawls competitor websites and stores structured data in PostgreSQL. Collects company info, services, pricing, blog content, and social profiles. Designed as the data collection layer for a larger competitive intelligence platform.
+An advanced, adaptive data collection engine that crawls competitor websites and stores structured data in PostgreSQL. Built for high-coverage extraction without the use of brittle CSS selectors.
 
-This system does not analyze data. It collects it.
+## 🚀 Key Features
 
-## Key Features
+*   **15+ Adaptive Extraction Strategies:** Uses DOM proximity, Schema.org/JSON-LD, NLP, semantic HTML, and multi-pass heuristic models to extract data gracefully even when sites change layouts.
+*   **Comprehensive Data Coverage:** Extracts Companies, Services, Pricing, Content, Social Profiles, Team Members, Physical Locations, FAQs, Reviews, Trust Signals, Contact Forms, Tables, Media Assets, and Breadcrumb structures.
+*   **Intelligent Crawl Budgeting:** Priority queue with URL scoring, canonical URL enforcement (50+ tracking params stripped), and duplicate detection via ETag/Last-Modified.
+*   **Robust Deduplication:** Dual-layer deduplication using fast normalized hash sets for URLs and SHA-256 content hashes for stored data.
+*   **Production-Ready Observability:** Built-in Prometheus metrics (`/metrics`) monitoring crawl duration, extraction yields, strategy success rates, and errors.
+*   **Self-Healing Database:** Uses upsert logic and transaction boundaries per collector to ensure database consistency.
 
-| Feature | Description |
-|---------|-------------|
-| **Incremental Crawling** | ETag/Last-Modified conditional GET, 304 skip, content-hash deduplication |
-| **Crawl Budget Engine** | Priority queue with URL scoring (source, depth, path patterns), max pages/depth limits |
-| **Canonical URL Handling** | 50+ tracking params stripped, duplicate slashes removed, `<link rel="canonical">` extraction |
-| **DOM Context Parser** | Proximity-based extraction: heading→paragraph→list→table→price, no CSS selectors |
-| **Adaptive Strategy Ordering** | Learns strategy success rates, reorders by confidence×speed, persists to JSON |
-| **HTTP Cache Layer** | ETag, Last-Modified, Cache-Control headers, conditional GET, TTL expiration |
-| **Language Detection** | HTML `lang` tag → meta tags → text word frequency (9 languages) |
-| **Intelligent Page Classification** | URL patterns + heading keywords + Schema.org + meta tags (12 page types) |
-| **Observability** | Prometheus `/metrics` and `/metrics/summary` endpoints, counters/gauges/histograms |
-| **Performance Utilities** | LRU cache, URL/Content deduplication, `@cached_parse` decorator |
+---
 
-## Quick Start — Native (No Docker)
+## 🛠 Prerequisites
 
+Before starting, ensure you have:
+*   **Python 3.12+**
+*   **PostgreSQL 14+** (Running locally or via Docker)
+*   **Git**
+
+---
+
+## 🖥 Step-by-Step Installation
+
+### Option 1: Native Installation (Mac / Linux / Windows)
+
+#### 1. Clone the Repository
 ```bash
-# 1. Clone and setup
-git clone <repo-url>
-cd utservio-competitor-intelligence
-python scripts/setup.py
-
-# 2. Edit .env with your PostgreSQL credentials
-nano .env
-
-# 3. Start the application
-python scripts/run.py
+git clone https://github.com/mostlyunstable/competitor-intelligence-engine.git
+cd competitor-intelligence-engine
 ```
 
-The API starts at `http://localhost:8000`. Interactive docs at `/docs` when `CI_DEBUG=true`.
+#### 2. Install PostgreSQL
 
-### Prerequisites
-
-- Python 3.12+
-- PostgreSQL 14+ (running locally)
-- pip
-
-### Native Installation (Step by Step)
-
-#### 1. Install PostgreSQL
-
-**macOS (Homebrew):**
+**macOS (via Homebrew):**
 ```bash
 brew install postgresql@16
 brew services start postgresql@16
@@ -61,333 +49,146 @@ sudo systemctl enable postgresql
 ```
 
 **Windows:**
-Download and install from https://www.postgresql.org/download/windows/
+Download the installer from [PostgreSQL Official Site](https://www.postgresql.org/download/windows/) and follow the installation wizard. Remember your `postgres` superuser password.
 
-#### 2. Create Database
+#### 3. Setup the Database
 
+Create a dedicated database and user.
+
+**Mac / Linux:**
 ```bash
-# Create the database user and database
 sudo -u postgres psql -c "CREATE USER utservio WITH PASSWORD 'changeme_in_production';"
 sudo -u postgres psql -c "CREATE DATABASE utservio_ci OWNER utservio;"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE utservio_ci TO utservio;"
 ```
 
-#### 3. Setup Python Environment
+**Windows (via psql command line):**
+Open `psql` (SQL Shell) from your Start Menu and run:
+```sql
+CREATE USER utservio WITH PASSWORD 'changeme_in_production';
+CREATE DATABASE utservio_ci OWNER utservio;
+GRANT ALL PRIVILEGES ON DATABASE utservio_ci TO utservio;
+```
 
+#### 4. Setup Python Environment
 ```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# .venv\Scripts\activate   # Windows
+# Create a virtual environment
+python -m venv .venv
 
-# Install dependencies
+# Activate the virtual environment
+# On macOS / Linux:
+source .venv/bin/activate
+# On Windows:
+.venv\Scripts\activate
+
+# Install all required dependencies
 pip install -e ".[dev]"
 
-# Install Playwright browsers (optional, for JS-heavy sites)
+# Install Playwright browsers (for scraping JS-heavy sites)
 python -m playwright install chromium
 ```
 
-#### 4. Configure Environment
-
+#### 5. Configure Environment Variables
+Copy the example environment configuration:
 ```bash
 cp .env.example .env
 ```
-
-Edit `.env` with your PostgreSQL credentials:
-
+Ensure your `.env` contains the correct database URLs:
 ```env
 DATABASE_URL=postgresql+asyncpg://utservio:changeme_in_production@localhost:5432/utservio_ci
 CI_DATABASE__URL=postgresql+asyncpg://utservio:changeme_in_production@localhost:5432/utservio_ci
 ```
 
-#### 5. Run Migrations
-
+#### 6. Run Database Migrations
+Create the database tables using Alembic:
 ```bash
 alembic upgrade head
 ```
 
-#### 6. Start the Application
-
+#### 7. Start the Engine
 ```bash
-# Production mode
+# Start the API server in production mode
 python scripts/run.py
 
-# Development mode (auto-reload)
+# OR start in development mode with auto-reload
 python scripts/dev.py
-
-# Or directly with uvicorn
-uvicorn app.main:app --reload
 ```
+
+The API will be available at `http://localhost:8000`. 
+Interactive API documentation can be accessed at `http://localhost:8000/docs`.
 
 ---
 
-## Quick Start — Docker
+### Option 2: Docker Installation
+
+If you prefer using Docker, the setup is heavily automated:
 
 ```bash
+# 1. Clone repository
+git clone https://github.com/mostlyunstable/competitor-intelligence-engine.git
+cd competitor-intelligence-engine
+
+# 2. Setup environment variables
 cp .env.example .env
+
+# 3. Start services via Docker Compose
 docker compose up -d
-alembic upgrade head
-```
 
-The API starts at `http://localhost:8000`. Interactive docs at `/docs` when `CI_DEBUG=true`.
+# 4. Run database migrations inside the container
+docker compose exec api alembic upgrade head
+```
 
 ---
 
-## Helper Scripts
+## 🎯 Collecting Competitor Data
 
-All scripts are in the `scripts/` directory:
+Competitors are managed via a `competitors.json` configuration file (copy the sample if needed: `cp sample-data/competitors.json competitors.json`). Do not track this file in Git to keep your competitor targets private.
 
-| Script | Description |
-|--------|-------------|
-| `python scripts/setup.py` | Full setup: venv, deps, PostgreSQL, migrations |
-| `python scripts/run.py` | Start in production mode |
-| `python scripts/dev.py` | Start with auto-reload and debug logging |
-| `python scripts/test.py` | Run pytest, ruff, black, mypy |
-| `python scripts/collect.py --all` | Manual collection from all competitors |
-| `python scripts/collect.py --competitor "Name"` | Collect from specific competitor |
-| `python scripts/collect.py --id 1` | Collect from competitor by ID |
+### Running a Collection Pipeline
 
----
-
-## Development Workflow
-
-### Native Development
+Use the bundled `scripts/collect.py` tool to trigger scraping pipelines manually:
 
 ```bash
-# Setup (first time only)
-python scripts/setup.py
+# Ensure your virtual environment is activated
+source .venv/bin/activate  # Or .venv\Scripts\activate on Windows
 
-# Start development server
-python scripts/dev.py
-
-# In another terminal, run tests
-python scripts/test.py
-
-# Or run individual tools
-pytest tests/unit/ -v
-ruff check .
-ruff format .
-mypy app/
-```
-
-### Docker Development
-
-```bash
-# Start PostgreSQL and Redis
-docker compose up -d postgres redis
-
-# Start application
-uvicorn app.main:app --reload
-
-# Run tests
-pytest tests/unit/ -v
-```
-
-### Testing
-
-```bash
-# Run all tests and linting
-python scripts/test.py
-
-# Or run individually
-pytest tests/unit/ -v           # Unit tests
-ruff check .                    # Linting
-ruff format --check .           # Format check
-mypy app/                       # Type checking
-```
-
-### Manual Collection
-
-```bash
-# Collect from all enabled competitors
+# Collect data from ALL enabled competitors in your configuration
 python scripts/collect.py --all
 
-# Collect from a specific competitor
-python scripts/collect.py --competitor "HomeServe"
+# Collect data from a specific competitor by name
+python scripts/collect.py --competitor "Example Corp"
 
-# Collect by ID
+# Collect data by competitor ID
 python scripts/collect.py --id 1
 ```
 
 ---
 
-## What Gets Collected
+## 🧪 Testing and Development
 
-Each competitor website is crawled by independent collector modules. You choose which modules to run per competitor.
-
-| Module | What It Extracts |
-|--------|-----------------|
-| discovery | Sitemap URLs, internal links, page classification |
-| company | Company name, description, contact info, about pages |
-| services | Service listings with descriptions, durations, pricing |
-| pricing | Price points, subscription plans, promotional offers |
-| content | Blog posts, articles, news with author/date detection |
-| social | Social media profile URLs across major platforms |
-
-All collected HTML is stored in `raw_storage` for audit and re-parsing.
-
----
-
-## Configuration
-
-### Adding Competitors
-
-Edit `competitors.json` (path configurable via `CI_COMPETITORS_CONFIG_PATH`):
-
-```json
-{
-  "competitors": [
-    {
-      "name": "Example Corp",
-      "website_url": "https://example.com",
-      "enabled": true,
-      "collection_frequency": "daily",
-      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
-      "tags": ["home-services"],
-      "notes": "Optional notes"
-    }
-  ]
-}
-```
-
-Competitors are synced to the database on startup. Existing competitors (matched by name) are skipped.
-
-### Environment Variables
-
-All settings use the `CI_` prefix. Nested settings use `__` as delimiter.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CI_DATABASE__URL` | `postgresql+asyncpg://...` | Database connection string |
-| `CI_API_KEY` | `""` | API key for authentication (bypass if empty) |
-| `CI_DEBUG` | `false` | Enable debug mode, OpenAPI docs |
-| `CI_LOG_LEVEL` | `info` | Logging level |
-| `CI_SCHEDULER__ENABLED` | `true` | Enable background scheduler |
-| `CI_SCHEDULER__CHECK_INTERVAL_SECONDS` | `60` | How often the scheduler checks |
-| `CI_COLLECTOR__RETRY_ATTEMPTS` | `3` | HTTP retry attempts per request |
-| `CI_COLLECTOR__RETRY_DELAY` | `1.0` | Base delay between retries (exponential backoff) |
-
-See `.env.example` for the full list.
-
----
-
-## API
-
-### Endpoints
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/health` | No | Health check |
-| GET | `/status` | Yes | Competitor and log counts |
-| GET | `/logs` | Yes | Collection logs (paginated) |
-| GET | `/competitors` | Yes | List all competitors |
-| GET | `/competitors/{id}` | Yes | Get competitor by ID |
-| POST | `/competitors` | Yes | Create competitor |
-| PUT | `/competitors/{id}` | Yes | Update competitor |
-| DELETE | `/competitors/{id}` | Yes | Delete competitor |
-| POST | `/collection/collect` | Yes | Trigger collection by request body |
-| POST | `/collection/collect/{id}` | Yes | Trigger collection for one competitor |
-| GET | `/metrics` | No | Prometheus metrics exposition |
-| GET | `/metrics/summary` | No | JSON summary of all metrics |
-
-### Authentication
-
-All endpoints except `/health`, `/metrics`, and `/metrics/summary` require an API key in the `X-API-Key` header:
+We maintain a high standard for code quality. Before submitting a PR or pushing code, ensure you run the testing suite:
 
 ```bash
-curl -H "X-API-Key: your-api-key" http://localhost:8000/competitors
-```
+# Run unit and integration tests
+pytest
 
-If no API key is configured, authentication is bypassed.
+# Run type checking
+mypy app tests
 
----
-
-## Architecture
-
-```
-API (FastAPI)
-  -> CollectionService (orchestration)
-    -> Collectors (one per module)
-      -> Parsers (HTML -> structured data)
-      -> Repositories (structured data -> PostgreSQL)
-    -> RawStorage (HTML snapshots)
-```
-
-Key design decisions:
-
-- **Collector-based**: Each data type has its own collector. Adding a new data type means adding a new collector, not modifying existing code.
-- **Configuration-driven**: Competitors are defined in `competitors.json`, not in code.
-- **Transactional writes**: Each collector writes within a single database transaction. Partial failures roll back cleanly.
-- **Content-hash deduplication**: Services, pricing, and content use SHA-256 content hashes to detect identical data across collection runs. No duplicate records.
-
-See [documentation/architecture.md](documentation/architecture.md) for the full schema and design rationale.
-
----
-
-## Features Implemented (v0.9 — Release Candidate)
-
-| # | Feature | Description |
-|---|---------|-------------|
-| 1 | **Incremental Crawling** | ETag/Last-Modified conditional GET, 304 skip, content-hash deduplication |
-| 2 | **Crawl Budget Engine** | Priority queue with URL scoring (source, depth, path patterns), max pages/depth limits |
-| 3 | **Canonical URL Handling** | 50+ tracking params stripped, duplicate slashes removed, `<link rel="canonical">` extraction |
-| 4 | **DOM Context Parser** | Proximity-based extraction: heading→paragraph→list→table→price (no CSS selectors) |
-| 5 | **Adaptive Strategy Ordering** | Historical success/confidence/speed scoring, JSON persistence, auto-reorder strategies |
-| 6 | **HTTP Cache Layer** | ETag, Last-Modified, Cache-Control headers, conditional GET, TTL expiration |
-| 7 | **Language Detection** | HTML lang → meta tags → word frequency (9 languages) |
-| 8 | **Intelligent Page Classification** | URL patterns + headings + Schema.org + meta tags → 12 page types |
-| 9 | **Observability** | Prometheus `/metrics` + `/metrics/summary`, counters/gauges/histograms |
-| 10 | **Performance Utilities** | LRU cache, URL/content deduplication, `@cached_parse` decorator |
-
----
-
-## Duplicate Prevention
-
-All data types use content hashing and canonical URL normalization to prevent duplicates across collection runs:
-
-- **URL Normalization**: Protocol lowercasing, `www.` stripping, trailing slash removal, query parameter sorting, tracking parameter stripping.
-- **Content Hashing**: SHA-256 hashes from canonical field values (case-insensitive, whitespace-insensitive).
-- **Services/Pricing**: Unique constraint on `(competitor_id, content_hash)` with upsert. Identical data updates its timestamp; changed data creates new records.
-- **Content**: Dual-key dedup — primary check by normalized URL, secondary by content hash.
-- **Raw Storage**: Upsert by URL — re-crawled pages update in-place.
-
----
-
-## Project Structure
-
-```
-app/
-  api/             FastAPI routes, auth, middleware
-  collectors/      Data collection modules (one per data type)
-  configuration/   Settings, config models, JSON loader
-  database/        SQLAlchemy models and repositories
-  parsers/         HTML parsing logic (strategy-based)
-  schedulers/      Background scheduler for periodic collection
-  services/        Orchestration and config sync
-  utilities/       URL normalization and content hashing
-  main.py          Application factory
-documentation/     Architecture, deployment, limitations
-migrations/        Alembic migration scripts
-scripts/           Helper scripts for native development
-sample-data/       Example competitor configuration
-tests/
-  unit/            Isolated tests with mocks
-  integration/     Tests against real PostgreSQL
+# Run linter and code formatting checks
+ruff check app tests
+ruff format --check app tests
 ```
 
 ---
 
-## Development
+## 🏗 Architecture Overview
 
-```bash
-ruff check .        # Lint
-ruff format .       # Format
-mypy app/           # Type check
-pytest              # Run tests
-```
+The system uses a strictly decoupled architecture:
+1.  **Collection Service**: Orchestrates the crawling process.
+2.  **Collectors**: Specialized modules for fetching raw data (e.g., Company, Services, Pricing).
+3.  **Parsers / Strategies**: HTML parser that uses a cascading list of strategies (JSON-LD -> Semantic HTML -> Generic DOM) to extract structured data into Pydantic models.
+4.  **Repositories**: Responsible for validating and upserting parsed models into PostgreSQL safely.
+5.  **Raw Storage**: Maintains point-in-time snapshots of raw HTML for future reprocessing.
 
----
-
-## License
-
-Proprietary
+See `documentation/architecture.md` for a deeper dive.

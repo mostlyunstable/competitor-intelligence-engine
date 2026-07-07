@@ -1,7 +1,10 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 
 class BaseParser(ABC):

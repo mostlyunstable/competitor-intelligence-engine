@@ -88,6 +88,15 @@ class Competitor(Base):
     collection_logs: Mapped[list["CollectionLog"]] = relationship(
         "CollectionLog", back_populates="competitor", cascade="all, delete-orphan"
     )
+    team_members: Mapped[list["CompetitorTeamMember"]] = relationship(
+        "CompetitorTeamMember", back_populates="competitor", cascade="all, delete-orphan"
+    )
+    certifications: Mapped[list["CompetitorCertification"]] = relationship(
+        "CompetitorCertification", back_populates="competitor", cascade="all, delete-orphan"
+    )
+    service_areas: Mapped[list["CompetitorServiceArea"]] = relationship(
+        "CompetitorServiceArea", back_populates="competitor", cascade="all, delete-orphan"
+    )
 
     __table_args__ = ({"comment": "Registered competitor websites"},)
 
@@ -133,6 +142,7 @@ class CompetitorPage(Base):
     raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
+    extracted_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -280,6 +290,94 @@ class CompetitorSocial(Base):
     )
 
 
+class CompetitorTeamMember(Base):
+    __tablename__ = "competitor_team_members"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competitor_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    department: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    linkedin_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="team_members")
+
+    __table_args__ = (
+        Index("ix_competitor_team_member_competitor_id", "competitor_id"),
+        Index("ix_competitor_team_member_content_hash", "content_hash"),
+        {"comment": "Team members and leadership collected from competitors"},
+    )
+
+
+class CompetitorCertification(Base):
+    __tablename__ = "competitor_certifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competitor_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="certification"
+    )  # certification, award, accreditation, partnership, license, insurance, guarantee
+    issuing_body: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="certifications")
+
+    __table_args__ = (
+        Index("ix_competitor_certification_competitor_id", "competitor_id"),
+        Index("ix_competitor_certification_content_hash", "content_hash"),
+        {"comment": "Certifications, awards, and trust signals collected from competitors"},
+    )
+
+
+class CompetitorServiceArea(Base):
+    __tablename__ = "competitor_service_areas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competitor_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False
+    )
+    service_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("competitor_services.id", ondelete="SET NULL"), nullable=True
+    )
+    area_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    area_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="city"
+    )  # city, state, zip, radius, region, country
+    state: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="service_areas")
+
+    __table_args__ = (
+        Index("ix_competitor_service_area_competitor_id", "competitor_id"),
+        Index("ix_competitor_service_area_content_hash", "content_hash"),
+        {"comment": "Service areas and coverage regions collected from competitors"},
+    )
+
+
 class CollectionLog(Base):
     __tablename__ = "collection_logs"
 
@@ -320,6 +418,7 @@ class RawStorage(Base):
     raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
+    extracted_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

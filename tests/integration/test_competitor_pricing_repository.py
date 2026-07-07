@@ -32,6 +32,7 @@ class TestCompetitorPricingRepository:
             discount=50.00,
         )
         assert pricing.id is not None
+        assert pricing.base_price is not None
         assert float(pricing.base_price) == 200.00
 
     async def test_get_by_competitor(self) -> None:

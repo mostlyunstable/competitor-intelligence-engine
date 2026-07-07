@@ -3,6 +3,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from app.parsers.page_segmenter import PageSegment
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 
@@ -21,6 +22,17 @@ class GenericDomHeuristicStrategy(ParsingStrategy):
         self._analyze_link_density(soup, result, url)
         self._analyze_price_elements(soup, result)
         self._analyze_contact_elements(soup, result)
+        return result
+
+    def parse_segments(self, segments: list[PageSegment], url: str) -> ParsedResult:
+        """Process each segment independently."""
+        result = ParsedResult()
+        for seg in segments:
+            soup = seg.to_soup()
+            self._analyze_heading_hierarchy(soup, result)
+            self._analyze_link_density(soup, result, url)
+            self._analyze_price_elements(soup, result)
+            self._analyze_contact_elements(soup, result)
         return result
 
     def _analyze_heading_hierarchy(self, soup: BeautifulSoup, result: ParsedResult) -> None:
@@ -50,30 +62,33 @@ class GenericDomHeuristicStrategy(ParsingStrategy):
             return
         price_pattern = re.compile(r"\$\d+(?:\.\d{2})?|\d+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)")
         for element in soup.select(
-            "[class*='price'], [class*='cost'], [class*='amount'], [data-price]"
+            "th, td, li, span, strong, em"
         ):
             text = element.get_text(strip=True)
-            if price_pattern.search(text):
-                price = self._parse_price(text)
-                if price is not None:
-                    parent = element.find_parent(["div", "section", "article", "li"])
-                    service_name = "Detected Service"
-                    if parent:
-                        heading = parent.select_one("h2, h3, h4, h5")
-                        if heading:
-                            service_name = heading.get_text(strip=True)
-                    result.pricing.append(
-                        {
-                            "service_name": service_name,
-                            "category": None,
-                            "base_price": price,
-                            "promotional_price": None,
-                            "currency": self._detect_currency(text),
-                            "discount": None,
-                            "subscription_plans": {},
-                            "membership_pricing": None,
-                        }
-                    )
+            if not text or len(text) > 60:
+                continue
+            if not price_pattern.search(text):
+                continue
+            price = self._parse_price(text)
+            if price is not None:
+                parent = element.find_parent(["div", "section", "article", "li"])
+                service_name = "Detected Price"
+                if parent:
+                    heading = parent.select_one("h2, h3, h4, h5")
+                    if heading:
+                        service_name = heading.get_text(strip=True)
+                result.pricing.append(
+                    {
+                        "service_name": service_name,
+                        "category": None,
+                        "base_price": price,
+                        "promotional_price": None,
+                        "currency": self._detect_currency(text),
+                        "discount": None,
+                        "subscription_plans": {},
+                        "membership_pricing": None,
+                    }
+                )
 
     def _analyze_contact_elements(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         if not result.contact_email:

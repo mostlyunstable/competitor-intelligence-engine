@@ -7,7 +7,7 @@ from app.database.models import CollectionLog
 from app.database.repositories.base import BaseRepository
 
 
-class CollectionLogRepository(BaseRepository):
+class CollectionLogRepository(BaseRepository[CollectionLog]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, CollectionLog)
 

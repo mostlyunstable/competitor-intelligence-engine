@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -29,7 +29,7 @@ class TestCompanyCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session)
+            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
             assert result["status"] == "success"
 
 
@@ -58,7 +58,7 @@ class TestServiceCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session)
+            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
             assert result["status"] == "success"
 
 
@@ -87,7 +87,7 @@ class TestPricingCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session)
+            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
             assert result["status"] == "success"
 
 
@@ -116,7 +116,7 @@ class TestContentCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session)
+            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
             assert result["status"] == "success"
 
 
@@ -144,5 +144,5 @@ class TestSocialCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session)
+            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
             assert result["status"] == "success"

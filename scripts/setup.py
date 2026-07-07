@@ -20,7 +20,7 @@ ENV_EXAMPLE = PROJECT_ROOT / ".env.example"
 def run(
     cmd: list[str], cwd: Path | None = None, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=cwd or PROJECT_ROOT, check=check, capture_output=False)
+    return subprocess.run(cmd, cwd=cwd or PROJECT_ROOT, check=check, capture_output=False, text=True)
 
 
 def header(msg: str) -> None:
@@ -147,7 +147,7 @@ def check_postgresql_connection() -> bool:
         dbname = parsed.path.lstrip("/") or "utservio_ci"
 
         try:
-            import psycopg2
+            import psycopg2 # type: ignore[import-untyped]
 
             conn = psycopg2.connect(
                 host=host,
@@ -162,7 +162,7 @@ def check_postgresql_connection() -> bool:
             return True
         except ImportError:
             print("  psycopg2 not available, attempting connection via asyncpg...")
-            import asyncpg
+            import asyncpg # type: ignore[import-untyped]
 
             async def test_connection() -> bool:
                 conn = await asyncpg.connect(

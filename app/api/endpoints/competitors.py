@@ -77,7 +77,7 @@ async def get_competitor(
     competitor = await repo.get_by_id(competitor_id)
     if not competitor:
         raise HTTPException(status_code=404, detail="Competitor not found")
-    return _serialize_competitor(competitor)  # type: ignore[arg-type]
+    return _serialize_competitor(competitor)
 
 
 @router.post("", status_code=201)

@@ -1,21 +1,23 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypeVar
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.connection import Base
 
+T = TypeVar("T", bound=Base)
 
-class BaseRepository:
-    def __init__(self, session: AsyncSession, model: type[Base]) -> None:
+
+class BaseRepository[T: Base]:
+    def __init__(self, session: AsyncSession, model: type[T]) -> None:
         self._session = session
         self._model = model
 
-    async def get_by_id(self, record_id: int) -> Base | None:
+    async def get_by_id(self, record_id: int) -> T | None:
         return await self._session.get(self._model, record_id)
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Any]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[T]:
         stmt = select(self._model).offset(skip).limit(limit)
         result = await self._session.execute(stmt)
         return result.scalars().all()
@@ -25,13 +27,13 @@ class BaseRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
-    async def create(self, **kwargs: Any) -> Any:
+    async def create(self, **kwargs: Any) -> T:
         instance = self._model(**kwargs)
         self._session.add(instance)
         await self._session.flush()
         return instance
 
-    async def update(self, record_id: int, **kwargs: Any) -> Any | None:
+    async def update(self, record_id: int, **kwargs: Any) -> T | None:
         instance = await self.get_by_id(record_id)
         if instance is None:
             return None

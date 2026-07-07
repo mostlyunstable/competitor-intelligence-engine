@@ -66,6 +66,7 @@ class BaseCollector(ABC):
         session: Any,
         *,
         metadata: dict[str, Any] | None = None,
+        extracted_data: dict[str, Any] | None = None,
     ) -> None:
         from app.database.repositories.raw_storage_repository import RawStorageRepository
         from app.utilities.content_hasher import compute_page_content_hash
@@ -82,6 +83,7 @@ class BaseCollector(ABC):
             raw_html=html,
             raw_json={"url": normalized_url, "content_hash": content_hash},
             metadata=metadata,
+            extracted_data=extracted_data,
         )
 
     @abstractmethod

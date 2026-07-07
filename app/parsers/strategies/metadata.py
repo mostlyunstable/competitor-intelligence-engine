@@ -3,6 +3,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from app.parsers.page_segmenter import PageSegment
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 
@@ -28,6 +29,20 @@ class MetadataStrategy(ParsingStrategy):
         self._extract_meta_description(soup, result)
         self._extract_meta_keywords(soup, result)
         self._extract_favicon(soup, result, url)
+        return result
+
+    def parse_segments(self, segments: list[PageSegment], url: str) -> ParsedResult:
+        """Meta tags are global — process once from the first segment with <head>."""
+        result = ParsedResult()
+        for seg in segments:
+            # Check if the segment IS the head or contains a head element
+            if seg.element.name == "head" or seg.element.select_one("head"):
+                self._extract_og_tags(seg.to_soup(), result, url)
+                self._extract_twitter_tags(seg.to_soup(), result)
+                self._extract_meta_description(seg.to_soup(), result)
+                self._extract_meta_keywords(seg.to_soup(), result)
+                self._extract_favicon(seg.to_soup(), result, url)
+                break
         return result
 
     def _extract_og_tags(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
@@ -71,14 +86,14 @@ class MetadataStrategy(ParsingStrategy):
         if keywords:
             kw_list = [k.strip().lower() for k in keywords.split(",")]
             industry_keywords = [
-                "home services",
-                "cleaning",
-                "plumbing",
-                "electrical",
-                "hvac",
-                "repair",
-                "maintenance",
-                "installation",
+                "software", "saas", "technology", "healthcare", "finance",
+                "insurance", "education", "retail", "manufacturing",
+                "consulting", "legal", "real estate", "construction",
+                "hospitality", "transportation", "logistics",
+                "telecommunications", "media", "entertainment",
+                "energy", "agriculture", "nonprofit", "government",
+                "home services", "cleaning", "plumbing", "electrical",
+                "hvac", "repair", "maintenance", "installation",
             ]
             for kw in kw_list:
                 if kw in industry_keywords:

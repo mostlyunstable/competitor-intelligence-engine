@@ -120,9 +120,9 @@ class TestSettings:
 
 class TestCollectionFrequency:
     def test_values(self) -> None:
-        assert CollectionFrequency.HOURLY == "hourly"
-        assert CollectionFrequency.DAILY == "daily"
-        assert CollectionFrequency.WEEKLY == "weekly"
+        assert CollectionFrequency.HOURLY.value == "hourly"
+        assert CollectionFrequency.DAILY.value == "daily"
+        assert CollectionFrequency.WEEKLY.value == "weekly"
 
     def test_all_members(self) -> None:
         assert len(CollectionFrequency) == 3
@@ -130,12 +130,12 @@ class TestCollectionFrequency:
 
 class TestCollectionModule:
     def test_values(self) -> None:
-        assert CollectionModule.DISCOVERY == "discovery"
-        assert CollectionModule.COMPANY == "company"
-        assert CollectionModule.SERVICES == "services"
-        assert CollectionModule.PRICING == "pricing"
-        assert CollectionModule.CONTENT == "content"
-        assert CollectionModule.SOCIAL == "social"
+        assert CollectionModule.DISCOVERY.value == "discovery"
+        assert CollectionModule.COMPANY.value == "company"
+        assert CollectionModule.SERVICES.value == "services"
+        assert CollectionModule.PRICING.value == "pricing"
+        assert CollectionModule.CONTENT.value == "content"
+        assert CollectionModule.SOCIAL.value == "social"
 
     def test_all_members(self) -> None:
         assert len(CollectionModule) == 6

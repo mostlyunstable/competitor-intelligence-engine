@@ -33,9 +33,8 @@ class PricingCollector(BaseCollector):
 
             html = result.html
 
-            await self.store_raw(competitor_id, url, html, session)
-
             parsed = self._parser.parse_for_type(html, url, "pricing")
+            await self.store_raw(competitor_id, url, html, session, extracted_data=parsed)
             pricing_items = parsed["pricing"]
 
             pricing_repo = CompetitorPricingRepository(session)

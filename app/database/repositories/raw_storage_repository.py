@@ -8,7 +8,7 @@ from app.database.models import CollectionStatus, RawStorage
 from app.database.repositories.base import BaseRepository
 
 
-class RawStorageRepository(BaseRepository):
+class RawStorageRepository(BaseRepository[RawStorage]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, RawStorage)
 
@@ -46,6 +46,7 @@ class RawStorageRepository(BaseRepository):
         raw_html: str | None = None,
         raw_json: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
+        extracted_data: dict[str, Any] | None = None,
         collection_status: CollectionStatus = CollectionStatus.SUCCESS,
     ) -> RawStorage:
         """Insert or update raw storage based on URL.
@@ -58,18 +59,20 @@ class RawStorageRepository(BaseRepository):
             existing.raw_html = raw_html
             existing.raw_json = raw_json
             existing.metadata_ = metadata
+            existing.extracted_data = extracted_data
             existing.content_hash = content_hash
             existing.collection_status = collection_status
             existing.collected_at = datetime.now(UTC)
             await self._session.flush()
             return existing
-        return await self.create(  # type: ignore[no-any-return]
+        return await self.create(
             competitor_id=competitor_id,
             source_url=source_url,
             content_hash=content_hash,
             raw_html=raw_html,
             raw_json=raw_json,
             metadata_=metadata,
+            extracted_data=extracted_data,
             collection_status=collection_status,
         )
 

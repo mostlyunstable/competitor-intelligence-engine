@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from app.parsers.page_segmenter import PageSegment
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 logger = logging.getLogger(__name__)
@@ -73,12 +74,31 @@ class JsonLdStrategy(ParsingStrategy):
                     self._process_item(item, result, url)
         return result
 
+    def parse_segments(self, segments: list[PageSegment], url: str) -> ParsedResult:
+        """JSON-LD scripts are global — process once from full document."""
+        # Find the segment with the most JSON-LD scripts
+        best_segment = max(segments, key=lambda s: len(s.element.select('script[type="application/ld+json"]')), default=None)
+        if best_segment:
+            return self.parse(best_segment.to_soup(), url)
+        return self.parse(BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), url)
+
+    @staticmethod
+    def _is_org_type(raw_type: str) -> bool:
+        """Check if a Schema.org type is or inherits from Organization/LocalBusiness."""
+        short = raw_type.split("/")[-1]
+        org_exact = frozenset({"LocalBusiness", "Organization", "Corporation", "Company"})
+        if short in org_exact:
+            return True
+        # Handle Schema.org subtypes — LocalBusiness subtypes end with "Business",
+        # Organization subtypes end with "Organization".
+        return short.endswith("Business") or short.endswith("Organization")
+
     def _process_item(self, item: dict[str, Any], result: ParsedResult, url: str) -> None:
         item_type = item.get("@type", "")
         if isinstance(item_type, list):
             item_type = " ".join(item_type)
 
-        if item_type in ("LocalBusiness", "Organization", "Corporation", "Company"):
+        if self._is_org_type(item_type):
             self._extract_organization(item, result, url)
         elif item_type in ("Service", "ServiceList"):
             self._extract_service(item, result)

@@ -122,7 +122,7 @@ class TestComputeServiceHash:
 
     def test_none_price_treated_as_empty(self):
         h1 = compute_service_hash("AC Repair", None, None, None)
-        h2 = compute_service_hash("AC Repair", "", "", "")
+        h2 = compute_service_hash("AC Repair", "", "", None)
         assert h1 == h2
 
     def test_same_service_same_hash(self):

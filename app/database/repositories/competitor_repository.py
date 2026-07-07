@@ -5,7 +5,7 @@ from app.database.models import Competitor
 from app.database.repositories.base import BaseRepository
 
 
-class CompetitorRepository(BaseRepository):
+class CompetitorRepository(BaseRepository[Competitor]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Competitor)
 

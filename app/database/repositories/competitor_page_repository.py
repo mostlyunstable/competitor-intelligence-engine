@@ -7,7 +7,7 @@ from app.database.models import CollectionStatus, CompetitorPage
 from app.database.repositories.base import BaseRepository
 
 
-class CompetitorPageRepository(BaseRepository):
+class CompetitorPageRepository(BaseRepository[CompetitorPage]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, CompetitorPage)
 
@@ -74,7 +74,7 @@ class CompetitorPageRepository(BaseRepository):
             existing.collected_at = datetime.now(UTC)
             await self._session.flush()
             return existing
-        return await self.create(  # type: ignore[no-any-return]
+        return await self.create(
             competitor_id=competitor_id,
             source_id=source_id,
             content_hash=content_hash,

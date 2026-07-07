@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from app.parsers.page_segmenter import PageSegment
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 
@@ -32,6 +33,48 @@ class SemanticHtmlStrategy(ParsingStrategy):
         self._extract_social_links(soup, result, url)
         return result
 
+    def parse_segments(self, segments: list[PageSegment], url: str) -> ParsedResult:
+        """Process each segment independently for better extraction."""
+        result = ParsedResult()
+        for seg in segments:
+            self._extract_from_segment(seg, result, url)
+        self._extract_emails(segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result)
+        self._extract_phones(segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result)
+        self._extract_social_links(segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result, url)
+        return result
+
+    def _extract_from_segment(self, seg: PageSegment, result: ParsedResult, url: str) -> None:
+        """Extract data from a specific segment based on its type."""
+        soup = seg.to_soup()
+        if seg.segment_type == "hero":
+            self._extract_from_header(soup, result, url)
+        elif seg.segment_type == "navigation":
+            self._extract_from_nav(soup, result, url)
+        elif seg.segment_type == "services":
+            self._extract_services_from_headings(soup, result)
+            self._extract_pricing_from_tables(soup, result)
+        elif seg.segment_type == "pricing":
+            self._extract_pricing_from_tables(soup, result)
+        elif seg.segment_type == "about":
+            self._extract_from_sections(soup, result, url)
+        elif seg.segment_type == "faq":
+            pass  # FAQ handled by content extraction
+        elif seg.segment_type == "blog":
+            self._extract_from_articles(soup, result, url)
+        elif seg.segment_type == "contact" or seg.segment_type == "footer":
+            self._extract_from_footer(soup, result, url)
+        else:
+            # Unknown segments - apply all extractors
+            self._extract_from_header(soup, result, url)
+            self._extract_from_nav(soup, result, url)
+            self._extract_from_main(soup, result, url)
+            self._extract_from_footer(soup, result, url)
+            self._extract_from_articles(soup, result, url)
+            self._extract_from_sections(soup, result, url)
+            self._extract_from_data_attrs(soup, result)
+            self._extract_from_definition_lists(soup, result)
+            self._extract_from_figures(soup, result)
+
     def _extract_from_header(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         header = soup.select_one("header")
         if not header:
@@ -40,12 +83,14 @@ class SemanticHtmlStrategy(ParsingStrategy):
             h1 = header.select_one("h1")
             if h1:
                 result.company_name = h1.get_text(strip=True)
+                result.set_field_evidence("company_name", h1)
         if not result.logo:
             img = header.select_one("img")
             if img:
                 src = str(img.get("src", ""))
                 if src:
                     result.logo = urljoin(url, src)
+                    result.set_field_evidence("logo", img)
 
     def _extract_from_nav(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         nav = soup.select_one("nav")
@@ -77,6 +122,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
             text = heading.get_text(strip=True)
             if any(kw in text.lower() for kw in service_keywords):
                 desc_el = heading.find_next_sibling("p")
+                ev = self._evidence(heading)
                 result.services.append(
                     {
                         "name": text,
@@ -85,6 +131,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
                         "starting_price": None,
                         "currency": "USD",
                         "estimated_duration": None,
+                        **ev,
                     }
                 )
 
@@ -117,10 +164,12 @@ class SemanticHtmlStrategy(ParsingStrategy):
             email_link = footer.select_one("a[href^='mailto:']")
             if email_link:
                 result.contact_email = str(email_link["href"]).replace("mailto:", "")
+                result.set_field_evidence("contact_email", email_link)
         if not result.contact_phone:
             phone_link = footer.select_one("a[href^='tel:']")
             if phone_link:
                 result.contact_phone = str(phone_link["href"]).replace("tel:", "")
+                result.set_field_evidence("contact_phone", phone_link)
 
     def _extract_from_articles(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         for article in soup.select("article"):
@@ -142,6 +191,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
                 date_el = article.select_one(".date, .publish-date, [data-date], time")
                 publish_date = date_el.get_text(strip=True) if date_el else None
             if title:
+                ev = self._evidence(title_el)
                 result.content.append(
                     {
                         "title": title,
@@ -150,6 +200,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
                         "url": urljoin(url, link) if link else None,
                         "summary": summary,
                         "content_type": "article",
+                        **ev,
                     }
                 )
 
@@ -243,6 +294,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
         email_link = soup.select_one("a[href^='mailto:']")
         if email_link:
             result.contact_email = str(email_link["href"]).replace("mailto:", "")
+            result.set_field_evidence("contact_email", email_link)
 
     def _extract_phones(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         if result.contact_phone:
@@ -250,6 +302,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
         phone_link = soup.select_one("a[href^='tel:']")
         if phone_link:
             result.contact_phone = str(phone_link["href"]).replace("tel:", "")
+            result.set_field_evidence("contact_phone", phone_link)
 
     def _extract_social_links(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         platforms = {
@@ -265,6 +318,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
             for domain, platform in platforms.items():
                 if domain in href and platform not in result.social_links:
                     result.social_links[platform] = urljoin(url, href)
+                    result.set_field_evidence(f"social_{platform}", a_tag)
 
     def _parse_price(self, price_text: str | None) -> float | None:
         if not price_text:

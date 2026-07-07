@@ -54,6 +54,7 @@ Thumbs.db
 
 # Data files
 *.log
+competitors.json
 
 # Runtime state
 strategy_stats.json

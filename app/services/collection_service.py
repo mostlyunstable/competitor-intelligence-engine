@@ -83,15 +83,19 @@ class CollectionService:
                 )
 
                 for d in discovered:
-                    existing = await source_repo.get_by_url(competitor_id, d.url)
-                    if not existing:
-                        await source_repo.create(
-                            competitor_id=competitor_id,
-                            url=d.url,
-                            page_type=self._classify_url(d.url),
-                        )
-                    else:
-                        await source_repo.mark_crawled(existing.id)
+                    try:
+                        async with session.begin_nested():
+                            existing = await source_repo.get_by_url(competitor_id, d.url)
+                            if not existing:
+                                await source_repo.create(
+                                    competitor_id=competitor_id,
+                                    url=d.url,
+                                    page_type=self._classify_url(d.url),
+                                )
+                            else:
+                                await source_repo.mark_crawled(existing.id)
+                    except Exception as e:
+                        log.warning("source_url_error", url=d.url, error=str(e))
 
                 results: dict[str, Any] = {}
                 errors: list[str] = []
@@ -126,7 +130,8 @@ class CollectionService:
                     module_results = []
                     for url in urls_to_fetch:
                         try:
-                            result = await collector.collect(competitor_id, url, session=session)
+                            async with session.begin_nested():
+                                result = await collector.collect(competitor_id, url, session=session)
                             module_results.append(result)
                             if result.get("status") == "success":
                                 records_collected += sum(

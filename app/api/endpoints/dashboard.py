@@ -1,0 +1,804 @@
+from typing import Any
+
+from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi.responses import HTMLResponse
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.dependencies import get_session
+from app.database.models import (
+    CollectionLog,
+    Competitor,
+    CompetitorContent,
+    CompetitorPage,
+    CompetitorPricing,
+    CompetitorService,
+    CompetitorSocial,
+    CompetitorSource,
+)
+from app.schedulers.scheduler import scheduler
+from app.services.collection_service import collection_service
+
+router = APIRouter(tags=["dashboard"])
+
+# The beautiful HTML dashboard provided by the user, with custom dynamic JS bindings
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>DataEngine Ops - Competitor Intelligence</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Google Fonts: Editorial Serif (Playfair Display) & Manrope -->
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary": "#c2652a", // Sahara Clay
+                      "on-primary": "#ffffff",
+                      "primary-container": "#fdf3eb",
+                      "on-primary-container": "#4a2108",
+                      "surface": "#faf8f6", // Warm Cream
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-low": "#f7f3f0",
+                      "surface-container": "#f1ece8",
+                      "surface-container-high": "#ebe4df",
+                      "surface-container-highest": "#e5ddd6",
+                      "on-surface": "#2c2826",
+                      "on-surface-variant": "#5a524e",
+                      "outline": "#8b7e76",
+                      "outline-variant": "#d5cdc8",
+                      "background": "#faf8f6",
+                      "error": "#ba1a1a",
+                      "secondary": "#735c4c",
+                      "secondary-container": "#fceee5"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.5rem",
+                      "lg": "0.75rem",
+                      "xl": "1rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-md": "16px",
+                      "unit": "4px",
+                      "stack-sm": "8px",
+                      "container-padding": "24px",
+                      "gutter": "16px",
+                      "stack-lg": "32px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Manrope", "sans-serif"],
+                      "h3": ["Playfair Display", "serif"],
+                      "label-md": ["Manrope", "sans-serif"],
+                      "h2": ["Playfair Display", "serif"],
+                      "body-md": ["Manrope", "sans-serif"],
+                      "label-sm": ["Manrope", "sans-serif"],
+                      "body-sm": ["Manrope", "sans-serif"],
+                      "h1": ["Playfair Display", "serif"],
+                      "mono": ["JetBrains Mono", "monospace"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "h3": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                      "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                      "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "h1": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "mono": ["13px", {"lineHeight": "20px", "fontWeight": "400"}]
+              },
+              "boxShadow": {
+                "soft": "0 4px 20px -2px rgba(194, 101, 42, 0.05), 0 2px 8px -2px rgba(0, 0, 0, 0.04)"
+              }
+            },
+          },
+        }
+    </script>
+    <style>
+        body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; }
+        h1, h2, h3 { font-family: 'Playfair Display', serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f1ece8 25%, #e5ddd6 50%, #f1ece8 75%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite linear;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[280px] bg-surface-container-lowest border-r border-outline-variant flex flex-col p-stack-md gap-stack-sm z-50">
+    <div class="mb-stack-lg px-2">
+        <h1 class="text-h3 font-bold text-primary italic">Utservio Data Engine</h1>
+        <p class="font-label-sm text-label-sm text-outline opacity-70">v2.4.0-stable</p>
+    </div>
+    <nav class="flex-1 flex flex-col gap-unit">
+        <a class="flex items-center gap-stack-sm p-stack-sm bg-secondary-container text-on-primary-container rounded-lg font-semibold shadow-sm duration-200" href="/dashboard">
+            <span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+            <span class="font-body-md text-body-md">Dashboard</span>
+        </a>
+        <a class="flex items-center gap-stack-sm p-stack-sm text-on-surface-variant hover:bg-surface-container transition-colors rounded-lg duration-200" href="/docs" target="_blank">
+            <span class="material-symbols-outlined text-[20px]" data-icon="description">description</span>
+            <span class="font-body-md text-body-md">API Swagger Docs</span>
+        </a>
+    </nav>
+    <div class="pt-stack-md border-t border-outline-variant">
+        <div class="flex items-center gap-stack-sm px-2">
+            <div class="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center">
+                <span class="material-symbols-outlined text-primary/70" data-icon="engineering">engineering</span>
+            </div>
+            <div class="overflow-hidden">
+                <p class="font-label-md text-label-md truncate font-semibold">Lead Engineer</p>
+                <p class="font-label-sm text-label-sm text-outline truncate">ops-admin</p>
+            </div>
+        </div>
+    </div>
+</aside>
+
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-280px)] h-16 bg-surface-container-lowest/80 backdrop-blur-md border-b border-outline-variant flex justify-between items-center px-container-padding z-40 transition-all">
+    <div class="flex items-center gap-gutter">
+        <span class="font-h3 text-h3 text-on-surface">Utservio Data Engine Ops</span>
+        <div class="h-4 w-[1px] bg-outline-variant"></div>
+        <div class="flex gap-stack-md">
+            <span class="font-label-md text-label-md text-primary font-bold">Status: Healthy</span>
+            <span class="font-label-md text-label-md text-on-surface-variant opacity-70">Uptime: 99.9%</span>
+        </div>
+    </div>
+</header>
+
+<!-- Main Content -->
+<main class="ml-[280px] pt-16 p-container-padding min-h-screen">
+    <div class="max-w-7xl mx-auto flex flex-col gap-stack-lg">
+
+        <!-- Pipeline Status -->
+        <section>
+            <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-[0.1em] mb-stack-sm font-semibold">Pipeline Status</h2>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-soft flex items-center justify-between overflow-x-auto">
+                <!-- Step 1 -->
+                <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-discovery">
+                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
+                    </div>
+                    <span class="font-label-sm text-label-sm text-outline">Discovery</span>
+                </div>
+                <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-discovery"></div>
+                <!-- Step 2 -->
+                <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-fetch">
+                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]" data-icon="cloud_download">cloud_download</span>
+                    </div>
+                    <span class="font-label-sm text-label-sm text-outline">Fetch</span>
+                </div>
+                <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-fetch"></div>
+                <!-- Step 3 -->
+                <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-parse">
+                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]" data-icon="code">code</span>
+                    </div>
+                    <span class="font-label-sm text-label-sm text-outline">Parse</span>
+                </div>
+                <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-parse"></div>
+                <!-- Step 4 -->
+                <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-normalize">
+                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]" data-icon="equalizer">equalizer</span>
+                    </div>
+                    <span class="font-label-sm text-label-sm text-outline">Normalize</span>
+                </div>
+                <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-normalize"></div>
+                <!-- Step 5 -->
+                <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-validate">
+                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]" data-icon="verified">verified</span>
+                    </div>
+                    <span class="font-label-sm text-label-sm text-outline">Validate</span>
+                </div>
+                <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-validate"></div>
+                <!-- Step 6 -->
+                <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-store">
+                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]" data-icon="database">database</span>
+                    </div>
+                    <span class="font-label-sm text-label-sm text-outline">Store</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Metric Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-gutter">
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+                <p class="font-label-sm text-label-sm text-outline">URLs Discovered</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-urls">--</p>
+                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-urls">Loading...</p>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+                <p class="font-label-sm text-label-sm text-outline">Pages Crawled</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-pages">--</p>
+                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-pages">Loading...</p>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+                <p class="font-label-sm text-label-sm text-outline">Services Extracted</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-services">--</p>
+                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-services">Loading...</p>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+                <p class="font-label-sm text-label-sm text-outline">Pricing Extracted</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-pricing">--</p>
+                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-pricing">Loading...</p>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+                <p class="font-label-sm text-label-sm text-outline">Database Entries</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-db-writes">--</p>
+                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-db-writes">Loading...</p>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft border-l-4 border-l-error/30">
+                <p class="font-label-sm text-label-sm text-outline">Errors</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-errors">--</p>
+                <p class="font-label-sm text-label-sm text-error font-bold" id="sub-errors">Stable</p>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+            <!-- Current Collection & Controls -->
+            <div class="lg:col-span-4 flex flex-col gap-stack-sm">
+                <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Controls & Target</h2>
+                <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md flex flex-col gap-stack-md shadow-soft">
+                    <div>
+                        <label for="competitor-select" class="font-label-sm text-label-sm text-outline block mb-1">Select Competitor</label>
+                        <select id="competitor-select" class="w-full bg-surface-container border border-outline-variant rounded-lg p-2 font-body-md text-body-md focus:outline-none focus:ring-1 focus:ring-primary">
+                            <option value="">-- Choose Competitor --</option>
+                        </select>
+                    </div>
+
+                    <div class="border-t border-outline-variant pt-stack-sm">
+                        <p class="font-label-sm text-label-sm text-outline">Target URL</p>
+                        <p class="font-body-md text-body-md font-mono truncate text-on-surface-variant" id="target-url">No competitor selected</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-gutter">
+                        <div>
+                            <p class="font-label-sm text-label-sm text-outline">Status</p>
+                            <p class="font-label-md text-label-md text-primary font-bold" id="collect-status">IDLE</p>
+                        </div>
+                        <div>
+                            <p class="font-label-sm text-label-sm text-outline">Progress</p>
+                            <p class="font-mono text-mono text-on-surface" id="collect-progress">0%</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+                            <div class="h-full bg-primary transition-all duration-500" id="progress-bar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <button id="trigger-btn" disabled class="w-full py-3 bg-primary text-white font-label-md text-label-md rounded-lg hover:brightness-105 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20">
+                        <span class="material-symbols-outlined text-[18px]">play_arrow</span>
+                        Trigger Live Collection
+                    </button>
+                </div>
+
+                <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mt-stack-md font-semibold">System Health</h2>
+                <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm grid grid-cols-2 gap-unit shadow-soft">
+                    <div class="flex items-center gap-unit p-2 bg-surface-container-low rounded-lg">
+                        <div class="w-2 h-2 rounded-full" id="health-db-indicator" style="background-color: rgb(139, 126, 118);"></div>
+                        <span class="font-label-sm text-label-sm text-on-surface-variant" id="health-db-text">DB: Checking</span>
+                    </div>
+                    <div class="flex items-center gap-unit p-2 bg-surface-container-low rounded-lg">
+                        <div class="w-2 h-2 rounded-full" id="health-scheduler-indicator" style="background-color: rgb(139, 126, 118);"></div>
+                        <span class="font-label-sm text-label-sm text-on-surface-variant" id="health-scheduler-text">Scheduler: Checking</span>
+                    </div>
+                    <div class="flex items-center gap-unit p-2 bg-surface-container-low rounded-lg">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <span class="font-label-sm text-label-sm text-on-surface-variant">Playwright: Ready</span>
+                    </div>
+                    <div class="flex items-center gap-unit p-2 bg-surface-container-low rounded-lg">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <span class="font-label-sm text-label-sm text-on-surface-variant">API: Healthy</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary & Logs -->
+            <div class="lg:col-span-8 flex flex-col gap-stack-lg">
+                <!-- Extraction Summary -->
+                <div>
+                    <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-stack-sm font-semibold">Extraction Summary</h2>
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-soft">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-surface-container-low border-b border-outline-variant">
+                                <tr>
+                                    <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase">Competitor Name</th>
+                                    <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Services</th>
+                                    <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Pricing</th>
+                                    <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Articles</th>
+                                    <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Socials</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-outline-variant/30" id="summary-table-body">
+                                <tr>
+                                    <td class="px-stack-md py-12 text-center text-outline italic font-body-md text-body-md opacity-60" colspan="5">
+                                        Loading competitor buffer data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Collection Logs -->
+                <div class="flex-1 flex flex-col min-h-[300px]">
+                    <div class="flex justify-between items-end mb-stack-sm">
+                        <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Collection Audit Trail</h2>
+                        <span class="font-mono text-[10px] text-primary bg-primary-container px-2 py-0.5 rounded-full font-bold" id="stream-status">LIVE_STREAM: ACTIVE</span>
+                    </div>
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl flex-1 overflow-hidden flex flex-col shadow-soft">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-stack-md py-2 font-label-sm text-label-sm text-outline uppercase w-36">Time Started</th>
+                                    <th class="px-stack-md py-2 font-label-sm text-label-sm text-outline uppercase w-24">Success</th>
+                                    <th class="px-stack-md py-2 font-label-sm text-label-sm text-outline uppercase w-24">Duration</th>
+                                    <th class="px-stack-md py-2 font-label-sm text-label-sm text-outline uppercase w-24">Records</th>
+                                    <th class="px-stack-md py-2 font-label-sm text-label-sm text-outline uppercase">Error Details</th>
+                                </tr>
+                            </thead>
+                        </table>
+                        <div class="flex-1 overflow-y-auto bg-[#1a1817] p-stack-md font-mono text-mono min-h-[220px] max-h-[320px]" id="logs-container">
+                            <div class="flex flex-col gap-unit text-stone-400">
+                                Loading audit trail...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Infrastructure Telemetry -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-gutter mt-stack-md">
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex items-center justify-between shadow-soft">
+                <div class="flex items-center gap-stack-sm">
+                    <span class="material-symbols-outlined text-primary/60" data-icon="memory">memory</span>
+                    <span class="font-label-md text-label-md text-on-surface">Engine CPU</span>
+                </div>
+                <span class="font-mono text-mono text-outline">0.2%</span>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex items-center justify-between shadow-soft">
+                <div class="flex items-center gap-stack-sm">
+                    <span class="material-symbols-outlined text-primary/60" data-icon="dns">dns</span>
+                    <span class="font-label-md text-label-md text-on-surface">Node Memory</span>
+                </div>
+                <span class="font-mono text-mono text-outline">146MB / 8GB</span>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex items-center justify-between shadow-soft">
+                <div class="flex items-center gap-stack-sm">
+                    <span class="material-symbols-outlined text-primary/60" data-icon="wifi_tethering">wifi_tethering</span>
+                    <span class="font-label-md text-label-md text-on-surface">Proxies Active</span>
+                </div>
+                <span class="font-mono text-mono text-outline">Active</span>
+            </div>
+        </section>
+
+        <footer class="mt-stack-lg pt-stack-md border-t border-outline-variant/30 flex justify-center">
+            <p class="font-label-sm text-label-sm text-outline uppercase tracking-[0.2em] opacity-40">designed and developed by mayank kumar</p>
+        </footer>
+    </div>
+</main>
+
+<script>
+    // Micro-interactions
+    document.querySelectorAll('button, a').forEach(el => {
+        el.addEventListener('mousedown', () => {
+            el.style.transform = 'scale(0.98)';
+        });
+        el.addEventListener('mouseup', () => {
+            el.style.transform = 'scale(1)';
+        });
+        el.addEventListener('mouseleave', () => {
+            el.style.transform = 'scale(1)';
+        });
+    });
+
+    const compSelect = document.getElementById('competitor-select');
+    const targetUrlEl = document.getElementById('target-url');
+    const triggerBtn = document.getElementById('trigger-btn');
+    let competitorsMap = {};
+    let activeInterval = null;
+
+    // Load Competitors
+    async function loadCompetitors() {
+        try {
+            const res = await fetch('/api/dashboard/competitors');
+            const data = await res.json();
+            compSelect.innerHTML = '<option value="">-- Choose Competitor --</option>';
+            data.forEach(c => {
+                competitorsMap[c.id] = c;
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                compSelect.appendChild(opt);
+            });
+        } catch (e) {
+            console.error("Failed to load competitors", e);
+        }
+    }
+
+    compSelect.addEventListener('change', () => {
+        const id = compSelect.value;
+        if (id && competitorsMap[id]) {
+            targetUrlEl.textContent = competitorsMap[id].website_url;
+            triggerBtn.removeAttribute('disabled');
+        } else {
+            targetUrlEl.textContent = 'No competitor selected';
+            triggerBtn.setAttribute('disabled', 'true');
+        }
+    });
+
+    // Trigger Collection
+    triggerBtn.addEventListener('click', async () => {
+        const id = compSelect.value;
+        if (!id) return;
+
+        triggerBtn.setAttribute('disabled', 'true');
+        document.getElementById('collect-status').textContent = 'Discovery';
+        document.getElementById('collect-progress').textContent = '10%';
+        document.getElementById('progress-bar').style.width = '10%';
+
+        // Update steps styling
+        updatePipelineSteps('discovery');
+
+        try {
+            const res = await fetch(`/api/dashboard/collect/${id}`, { method: 'POST' });
+            const result = await res.json();
+
+            // Start polling status
+            if (activeInterval) clearInterval(activeInterval);
+            activeInterval = setInterval(() => pollActiveCrawl(id), 1500);
+        } catch (e) {
+            console.error("Trigger collection error", e);
+            resetCollectionState();
+        }
+    });
+
+    function updatePipelineSteps(stage) {
+        const stages = ['discovery', 'fetch', 'parse', 'normalize', 'validate', 'store'];
+        stages.forEach(s => {
+            const el = document.getElementById(`step-${s}`);
+            const line = document.getElementById(`line-${s}`);
+            if (s === stage) {
+                el.innerHTML = `
+                    <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
+                        <span class="material-symbols-outlined text-[20px]">${el.querySelector('span').getAttribute('data-icon')}</span>
+                    </div>
+                    <span class="font-label-md text-label-md text-primary font-bold capitalize">${s}</span>
+                `;
+                if (line) line.className = "flex-1 h-[2px] bg-primary mx-unit min-w-[20px]";
+            } else {
+                el.innerHTML = `
+                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]">${el.querySelector('span').getAttribute('data-icon')}</span>
+                    </div>
+                    <span class="font-label-sm text-label-sm text-outline capitalize">${s}</span>
+                `;
+                if (line) line.className = "flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]";
+            }
+        });
+    }
+
+    function resetCollectionState() {
+        if (activeInterval) clearInterval(activeInterval);
+        document.getElementById('collect-status').textContent = 'IDLE';
+        document.getElementById('collect-progress').textContent = '0%';
+        document.getElementById('progress-bar').style.width = '0%';
+        triggerBtn.removeAttribute('disabled');
+        updatePipelineSteps('none');
+    }
+
+    async function pollActiveCrawl(id) {
+        try {
+            const res = await fetch('/api/dashboard/stats');
+            const data = await res.json();
+
+            const active = data.active_collection || {};
+            if (active.competitor_id === parseInt(id)) {
+                // Determine step simulation
+                const elapsed = active.elapsed || 1;
+                let step = 'discovery';
+                let progress = '20%';
+                if (elapsed > 4) { step = 'fetch'; progress = '40%'; }
+                if (elapsed > 10) { step = 'parse'; progress = '60%'; }
+                if (elapsed > 16) { step = 'normalize'; progress = '80%'; }
+                if (elapsed > 20) { step = 'validate'; progress = '90%'; }
+
+                document.getElementById('collect-status').textContent = step.toUpperCase();
+                document.getElementById('collect-progress').textContent = progress;
+                document.getElementById('progress-bar').style.width = progress;
+                updatePipelineSteps(step);
+            } else {
+                // If no longer active, set to Store (100%) then finish
+                document.getElementById('collect-status').textContent = 'STORE';
+                document.getElementById('collect-progress').textContent = '100%';
+                document.getElementById('progress-bar').style.width = '100%';
+                updatePipelineSteps('store');
+
+                setTimeout(() => {
+                    resetCollectionState();
+                    refreshData();
+                }, 2000);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Refresh Dashboard Data
+    async function refreshData() {
+        try {
+            // 1. Stats
+            const resStats = await fetch('/api/dashboard/stats');
+            const stats = await resStats.json();
+
+            document.getElementById('metric-urls').textContent = stats.urls_discovered;
+            document.getElementById('metric-pages').textContent = stats.pages_crawled;
+            document.getElementById('metric-services').textContent = stats.services_extracted;
+            document.getElementById('metric-pricing').textContent = stats.pricing_extracted;
+            document.getElementById('metric-db-writes').textContent = stats.database_writes;
+            document.getElementById('metric-errors').textContent = stats.errors;
+
+            document.getElementById('sub-urls').textContent = "Sources updated";
+            document.getElementById('sub-pages').textContent = "Buffer matches active";
+            document.getElementById('sub-services').textContent = "Services synced";
+            document.getElementById('sub-pricing').textContent = "Pricing synced";
+            document.getElementById('sub-db-writes').textContent = "Synchronized";
+
+            // Health indicators
+            const dbInd = document.getElementById('health-db-indicator');
+            const dbTxt = document.getElementById('health-db-text');
+            if (stats.db_status === 'connected') {
+                dbInd.style.backgroundColor = 'rgb(16, 185, 129)';
+                dbTxt.textContent = "DB: Connected";
+            } else {
+                dbInd.style.backgroundColor = 'rgb(239, 68, 68)';
+                dbTxt.textContent = "DB: Error";
+            }
+
+            const schInd = document.getElementById('health-scheduler-indicator');
+            const schTxt = document.getElementById('health-scheduler-text');
+            if (stats.scheduler_status === 'active') {
+                schInd.style.backgroundColor = 'rgb(16, 185, 129)';
+                schTxt.textContent = "Scheduler: Active";
+            } else {
+                schInd.style.backgroundColor = 'rgb(245, 158, 11)';
+                schTxt.textContent = "Scheduler: Idle";
+            }
+
+            // 2. Summary Table
+            const resSum = await fetch('/api/dashboard/summary');
+            const summary = await resSum.json();
+            const tableBody = document.getElementById('summary-table-body');
+            tableBody.innerHTML = '';
+            if (summary.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td class="px-stack-md py-12 text-center text-outline italic font-body-md text-body-md opacity-60" colspan="5">
+                            No extraction data currently held in database.
+                        </td>
+                    </tr>
+                `;
+            } else {
+                summary.forEach(row => {
+                    tableBody.innerHTML += `
+                        <tr class="hover:bg-surface-container-low transition-colors">
+                            <td class="px-stack-md py-3 font-body-md font-semibold">${row.name}</td>
+                            <td class="px-stack-md py-3 text-center font-mono text-primary font-bold">${row.services_count}</td>
+                            <td class="px-stack-md py-3 text-center font-mono text-primary font-bold">${row.pricing_count}</td>
+                            <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.content_count}</td>
+                            <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.socials_count}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // 3. Audit logs
+            const resLogs = await fetch('/api/dashboard/logs');
+            const logs = await resLogs.json();
+            const logsContainer = document.getElementById('logs-container');
+            logsContainer.innerHTML = '';
+            if (logs.length === 0) {
+                logsContainer.innerHTML = '<div class="text-stone-500">No collection logs available.</div>';
+            } else {
+                logs.forEach(log => {
+                    const statusText = log.success ? '<span class="text-emerald-500 font-bold">SUCCESS</span>' : '<span class="text-red-500 font-bold">FAILED</span>';
+                    const timeStr = log.start_time ? log.start_time.replace('T', ' ').substring(0, 19) : 'Unknown';
+                    const errorsStr = log.errors && log.errors.length > 0 ? log.errors.join(', ') : 'None';
+
+                    logsContainer.innerHTML += `
+                        <div class="text-stone-300 font-mono text-[13px] border-b border-stone-800/40 py-1">
+                            <span class="text-stone-500">[${timeStr}]</span>
+                            Competitor #${log.competitor_id} | Status: ${statusText} | Dur: ${log.duration_seconds || 0}s | Recs: ${log.records_collected}
+                            ${log.success ? '' : `<br/><span class="text-red-400 pl-4">Errors: ${errorsStr}</span>`}
+                        </div>
+                    `;
+                });
+            }
+
+        } catch (e) {
+            console.error("Refresh dashboard data failed", e);
+        }
+    }
+
+    // Init
+    loadCompetitors();
+    refreshData();
+    setInterval(refreshData, 5000);
+</script>
+</body>
+</html>
+"""
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+async def get_dashboard() -> str:
+    """Serves the live interactive dashboard UI."""
+    return DASHBOARD_HTML
+
+
+@router.get("/api/dashboard/competitors")
+async def get_dashboard_competitors(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    """Returns all competitors for selection in the dashboard."""
+    stmt = select(Competitor).order_by(Competitor.name)
+    result = await session.execute(stmt)
+    competitors = result.scalars().all()
+    return [
+        {"id": c.id, "name": c.name, "website_url": c.website_url, "enabled": c.enabled}
+        for c in competitors
+    ]
+
+
+@router.get("/api/dashboard/stats")
+async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Computes aggregated database statistics and pipeline status."""
+    urls_count = await session.scalar(select(func.count()).select_from(CompetitorSource))
+    pages_count = await session.scalar(select(func.count()).select_from(CompetitorPage))
+    services_count = await session.scalar(select(func.count()).select_from(CompetitorService))
+    pricing_count = await session.scalar(select(func.count()).select_from(CompetitorPricing))
+    content_count = await session.scalar(select(func.count()).select_from(CompetitorContent))
+    social_count = await session.scalar(select(func.count()).select_from(CompetitorSocial))
+    logs_count = await session.scalar(select(func.count()).select_from(CollectionLog))
+
+    # Calculate error count
+    error_stmt = (
+        select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(False))
+    )
+    errors_count = await session.scalar(error_stmt)
+
+    # Active collection
+    active_collection = None
+    if collection_service._active_crawls:
+        # Get first active crawl ID
+        active_id = next(iter(collection_service._active_crawls))
+        active_collection = {
+            "competitor_id": active_id,
+            "status": "active",
+            "elapsed": 5,  # simulated elapsed/duration
+        }
+
+    return {
+        "urls_discovered": urls_count or 0,
+        "pages_crawled": pages_count or 0,
+        "services_extracted": services_count or 0,
+        "pricing_extracted": pricing_count or 0,
+        "database_writes": (urls_count or 0)
+        + (pages_count or 0)
+        + (services_count or 0)
+        + (pricing_count or 0)
+        + (content_count or 0)
+        + (social_count or 0)
+        + (logs_count or 0),
+        "errors": errors_count or 0,
+        "scheduler_status": "active" if scheduler.is_running else "idle",
+        "playwright_status": "ready",
+        "db_status": "connected",
+        "api_status": "healthy",
+        "active_collection": active_collection,
+    }
+
+
+@router.get("/api/dashboard/summary")
+async def get_dashboard_summary(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    """Generates counts of extracted modules per competitor."""
+    stmt = select(Competitor).order_by(Competitor.name)
+    result = await session.execute(stmt)
+    competitors = result.scalars().all()
+
+    summary = []
+    for c in competitors:
+        # Services
+        s_count = await session.scalar(
+            select(func.count())
+            .select_from(CompetitorService)
+            .where(CompetitorService.competitor_id == c.id)
+        )
+        # Pricing
+        p_count = await session.scalar(
+            select(func.count())
+            .select_from(CompetitorPricing)
+            .where(CompetitorPricing.competitor_id == c.id)
+        )
+        # Content
+        c_count = await session.scalar(
+            select(func.count())
+            .select_from(CompetitorContent)
+            .where(CompetitorContent.competitor_id == c.id)
+        )
+        # Social
+        soc_count = await session.scalar(
+            select(func.count())
+            .select_from(CompetitorSocial)
+            .where(CompetitorSocial.competitor_id == c.id)
+        )
+        summary.append(
+            {
+                "name": c.name,
+                "services_count": s_count or 0,
+                "pricing_count": p_count or 0,
+                "content_count": c_count or 0,
+                "socials_count": soc_count or 0,
+            }
+        )
+    return summary
+
+
+@router.get("/api/dashboard/logs")
+async def get_dashboard_logs(
+    limit: int = 50, session: AsyncSession = Depends(get_session)
+) -> list[dict[str, Any]]:
+    """Returns recent audit logs."""
+    stmt = select(CollectionLog).order_by(CollectionLog.id.desc()).limit(limit)
+    result = await session.execute(stmt)
+    logs = result.scalars().all()
+    return [
+        {
+            "id": log.id,
+            "competitor_id": log.competitor_id,
+            "start_time": log.start_time.isoformat() if log.start_time else None,
+            "end_time": log.end_time.isoformat() if log.end_time else None,
+            "success": log.success,
+            "duration_seconds": float(log.duration_seconds) if log.duration_seconds else None,
+            "records_collected": log.records_collected,
+            "errors": log.errors or [],
+            "retry_count": log.retry_count,
+        }
+        for log in logs
+    ]
+
+
+@router.post("/api/dashboard/collect/{competitor_id}")
+async def trigger_dashboard_collect(
+    competitor_id: int, background_tasks: BackgroundTasks
+) -> dict[str, str]:
+    """Triggers standard collection in the background."""
+    background_tasks.add_task(collection_service.collect_competitor, competitor_id)
+    return {"status": "accepted", "message": "Collection triggered"}

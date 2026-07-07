@@ -5,7 +5,7 @@ Implements 6 sequential passes over a parsed HTML document.
 
 Pass 1  — Structured data      : JSON-LD, Schema.org, Microdata
 Pass 2  — Semantic HTML        : main, article, section, table, dl, nav
-Pass 3  — Visual content blocks: cards, grids, pricing blocks, feature blocks
+Pass 3  — Repeated Structure Extraction: cards, grids, repeated sections/containers
 Pass 4  — DOM relationships    : heading → paragraph → list → button → price
 Pass 5  — Metadata             : OpenGraph, Twitter Card, canonical
 Pass 6  — Regex fallback       : raw-text price, email, phone, social patterns
@@ -25,12 +25,15 @@ from __future__ import annotations
 import contextlib
 import json
 import re
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
 
 from app.parsers.strategy import ParsedResult, ParsingStrategy
+
+if TYPE_CHECKING:
+    from app.parsers.page_segmenter import PageSegment
 
 # ---------------------------------------------------------------------------
 # Shared constants
@@ -233,6 +236,14 @@ class _Pass1Structured:
     _PRICE_TYPES: ClassVar[set[str]] = {"Offer", "AggregateOffer", "Product"}
     _ARTICLE_TYPES: ClassVar[set[str]] = {"Article", "BlogPosting", "NewsArticle"}
 
+    @staticmethod
+    def _is_org_type(raw_type: str) -> bool:
+        """Check if a Schema.org type is or inherits from Organization/LocalBusiness."""
+        short = raw_type.split("/")[-1]
+        if short in _Pass1Structured._ORG_TYPES:
+            return True
+        return short.endswith("Business") or short.endswith("Organization")
+
     def run(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         # ---- JSON-LD ----
         for script in soup.select('script[type="application/ld+json"]'):
@@ -260,7 +271,7 @@ class _Pass1Structured:
         raw_type = item.get("@type", "")
         item_type = raw_type if isinstance(raw_type, str) else " ".join(raw_type)
 
-        if item_type in self._ORG_TYPES:
+        if self._is_org_type(item_type):
             self._org(item, result, url)
         if item_type in self._SVC_TYPES:
             self._service(item, result, url)
@@ -403,7 +414,7 @@ class _Pass1Structured:
                 return None
             return str(el.get("content") or el.get("href") or el.get_text(strip=True)) or None
 
-        if any(t in item_type for t in ("Organization", "LocalBusiness", "Corporation")):
+        if self._is_org_type(item_type):
             _safe_set(result, "company_name", _prop("name"))
             _safe_set(result, "description", _prop("description"))
             _safe_set(result, "contact_email", _prop("email"))
@@ -560,69 +571,123 @@ class _Pass2Semantic:
 
 
 # ---------------------------------------------------------------------------
-# Pass 3: Visual content blocks (cards, grids, pricing blocks)
+# Pass 3: Repeated Structure Extraction (cards, grids, repeated containers)
 # ---------------------------------------------------------------------------
 
 
-class _Pass3Visual:
+class _Pass3RepeatedStructure:
     """
-    Identify repeating visual block patterns.
-    Strategy: find groups of sibling elements that share the same tag
-    and each contain a heading + price or a heading + paragraph.
-    Does NOT rely on any class names.
+    Detect repeated DOM patterns — no visual rendering, DOM structure only.
+    Finds: cards, grids, repeated sections, repeated containers, service blocks.
     """
 
     def run(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
-        self._repeating_blocks(soup, result, url)
+        self._repeated_card_grids(soup, result, url)
         self._figure_cards(soup, result)
         self._data_attr_blocks(soup, result)
 
-    def _repeating_blocks(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _repeated_card_grids(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         """
-        Look for parent containers whose direct children are a homogeneous
-        list (≥2 items of the same tag).  Each child must contain a heading.
+        Detect repeated structural patterns:
+          - Homogeneous sibling groups (same tag, similar structure)
+          - Grid containers (multiple direct children with same child tags)
+          - Card patterns (div/li/article with heading + description + optional price)
         """
-        for parent in soup.select("ul, ol, div, section"):
+        candidates: list[Tag] = []
+        for parent in soup.select("ul, ol, div, section, main, article, nav, aside, form"):
             children = [c for c in parent.children if isinstance(c, Tag)]
             if len(children) < 2:
                 continue
-            # All children must share the same tag
             tags = {c.name for c in children}
             if len(tags) != 1:
                 continue
             child_tag = next(iter(tags))
-            if child_tag not in ("li", "div", "article", "section"):
+            if child_tag not in ("li", "div", "article", "section", "tr", "figure"):
                 continue
+            candidates.append(parent)
+            self._extract_from_group(parent, children, result, url)
+
+        self._detect_cards_from_structure(soup, result, url)
+
+    def _extract_from_group(
+        self,
+        parent: Tag,
+        children: list[Tag],
+        result: ParsedResult,
+        url: str,
+    ) -> None:
+        for child in children:
+            heading = child.select_one("h1, h2, h3, h4, h5, h6")
+            if not heading:
+                continue
+            title = heading.get_text(strip=True)
+            if not title or len(title) < 2:
+                continue
+
+            all_text = child.get_text(" ", strip=True)
+            price, currency = _parse_price(all_text)
+            desc_el = child.select_one("p")
+            desc = desc_el.get_text(strip=True) if desc_el else None
+            link_el = child.select_one("a[href]")
+            time_el = child.select_one("time[datetime]")
+
+            # Classify the block by content keywords and structure
+            lower_title = title.lower()
+            lower_all = all_text.lower()
+            has_price_kw = any(kw in lower_all for kw in _PRICE_KW)
+            has_svc_kw = any(kw in lower_title for kw in _SERVICE_KW)
+            has_date = time_el is not None
+            has_link = link_el is not None
+
+            if price is not None and has_price_kw:
+                _add_pricing(result, title, base_price=price, currency=currency)
+                if has_svc_kw:
+                    _add_service(result, title, description=desc)
+            elif price is not None and has_svc_kw:
+                _add_service(result, title, description=desc, starting_price=price, currency=currency)
+            elif has_svc_kw:
+                _add_service(result, title, description=desc)
+            elif has_date or has_link:
+                link = urljoin(url, str(link_el.get("href", ""))) if link_el else url
+                pub_date = _normalize_date(str(time_el.get("datetime"))) if time_el else None
+                _add_content(result, title, summary=desc, publish_date=pub_date, url=link)
+            elif has_price_kw and price is not None:
+                _add_pricing(result, title, base_price=price, currency=currency)
+
+    def _detect_cards_from_structure(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
+        """
+        Detect card-like patterns without class names.
+        A card = a container whose direct children are divs/articles/sections
+        that each contain exactly one heading and one paragraph (typical card pattern).
+        """
+        for container in soup.select("div, section, main"):
+            children = [c for c in container.children if isinstance(c, Tag)]
+            if len(children) < 2:
+                continue
+            # Check each child looks like a card: contains heading + text
+            non_card = 0
             for child in children:
-                heading = child.select_one("h1, h2, h3, h4, h5")
+                h = child.select_one("h1, h2, h3, h4, h5, h6")
+                p = child.select_one("p")
+                if not h or not p:
+                    non_card += 1
+            if non_card > len(children) // 2:
+                continue  # less than half look like cards
+            for child in children:
+                heading = child.select_one("h1, h2, h3, h4, h5, h6")
                 if not heading:
                     continue
                 title = heading.get_text(strip=True)
                 if not title:
                     continue
-                # Check if block has a price
-                price_el = child.select_one("[data-price], [itemprop='price'], [itemprop='offers']")
-                price_text = price_el.get_text(strip=True) if price_el else ""
-                # Also scan all text for price patterns
-                all_text = child.get_text(" ", strip=True)
-                price, currency = _parse_price(price_text or all_text)
-                desc_el = child.select_one("p")
-                desc = desc_el.get_text(strip=True) if desc_el else None
-
-                if price is not None and any(kw in all_text.lower() for kw in _PRICE_KW):
-                    _add_pricing(result, title, base_price=price, currency=currency, category=None)
-                elif any(kw in title.lower() for kw in _SERVICE_KW | _PRICE_KW):
-                    _add_service(
-                        result, title, description=desc, starting_price=price, currency=currency
-                    )
-
-                # Blog-like blocks
-                link_el = child.select_one("a[href]")
-                time_el = child.select_one("time[datetime]")
-                if time_el or any(kw in title.lower() for kw in _BLOG_KW):
-                    pub_date = _normalize_date(str(time_el.get("datetime"))) if time_el else None
-                    link = urljoin(url, str(link_el.get("href", ""))) if link_el else url
-                    _add_content(result, title, summary=desc, publish_date=pub_date, url=link)
+                p = child.select_one("p")
+                desc = p.get_text(strip=True) if p else None
+                price, currency = _parse_price(child.get_text(" ", strip=True))
+                if price is not None:
+                    _add_pricing(result, title, base_price=price, currency=currency)
+                _add_service(result, title, description=desc, starting_price=price)
 
     def _figure_cards(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         for figure in soup.select("figure"):
@@ -642,7 +707,9 @@ class _Pass3Visual:
 
     def _data_attr_blocks(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         """Elements with explicit data-* service/price attributes."""
-        for el in soup.select("[data-service-name], [data-service], [data-product-name]"):
+        for el in soup.select(
+            "[data-service-name], [data-service], [data-product-name], [data-card], [data-item]"
+        ):
             name = (
                 el.get("data-service-name")
                 or el.get("data-service")
@@ -859,8 +926,8 @@ class MultiPassStrategy(ParsingStrategy):
         # Pass 2 — Semantic HTML
         _Pass2Semantic().run(soup, result, url)
 
-        # Pass 3 — Visual content blocks
-        _Pass3Visual().run(soup, result, url)
+        # Pass 3 — Repeated Structure Extraction (cards, grids, containers)
+        _Pass3RepeatedStructure().run(soup, result, url)
 
         # Pass 4 — DOM relationship traversal
         _Pass4DomRelationships().run(soup, result, url)
@@ -870,5 +937,38 @@ class MultiPassStrategy(ParsingStrategy):
 
         # Pass 6 — Regex fallback (lowest confidence, fills remaining gaps)
         _Pass6Regex().run(soup, result, url)
+
+        return result
+
+    def parse_segments(self, segments: list[PageSegment], url: str) -> ParsedResult:
+        """Process each segment independently for passes that benefit from segmentation."""
+        result = ParsedResult()
+
+        # Pass 1 — Structured data (global, but prefer segment with most JSON-LD)
+        best_jsonld_segment = max(segments, key=lambda s: len(s.element.select('script[type="application/ld+json"]')), default=None)
+        if best_jsonld_segment:
+            _Pass1Structured().run(best_jsonld_segment.to_soup(), result, url)
+
+        # Pass 2 — Semantic HTML (per segment)
+        for seg in segments:
+            _Pass2Semantic().run(seg.to_soup(), result, url)
+
+        # Pass 3 — Repeated Structure Extraction (cards, grids, containers) (services/pricing segments)
+        for seg in segments:
+            if seg.segment_type in ("services", "pricing", "hero", "about"):
+                _Pass3RepeatedStructure().run(seg.to_soup(), result, url)
+
+        # Pass 4 — DOM relationship traversal (per segment)
+        for seg in segments:
+            _Pass4DomRelationships().run(seg.to_soup(), result, url)
+
+        # Pass 5 — Metadata (global, first segment with <head>)
+        for seg in segments:
+            if seg.element.select_one("head"):
+                _Pass5Metadata().run(seg.to_soup(), result, url)
+                break
+
+        # Pass 6 — Regex fallback (global, combined text)
+        _Pass6Regex().run(BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), result, url)
 
         return result

@@ -2,18 +2,23 @@ import os
 from collections.abc import AsyncGenerator
 
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.database.connection import Base
 
 TEST_DATABASE_URL = os.environ.get(
     "CI_TEST_DATABASE_URL",
-    "postgresql+asyncpg://utservio_test:test_password@localhost:5433/utservio_ci_test",
+    "postgresql+asyncpg://localhost:5432/utservio_ci_test",
 )
 
 
 @pytest_asyncio.fixture(scope="session")
-async def engine():
+async def engine() -> AsyncGenerator[AsyncEngine, None]:
     eng = create_async_engine(TEST_DATABASE_URL, echo=False)
 
     async with eng.begin() as conn:
@@ -29,7 +34,7 @@ async def engine():
 
 
 @pytest_asyncio.fixture
-async def session(engine) -> AsyncGenerator[AsyncSession, None]:
+async def session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     async with session_factory() as session:
         yield session

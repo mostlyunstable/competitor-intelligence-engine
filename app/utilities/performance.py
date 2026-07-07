@@ -13,13 +13,20 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import structlog
 
-logger = structlog.get_logger(__name__)
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec  # type: ignore
 
+P = ParamSpec("P")
+R = TypeVar("R")
 T = TypeVar("T")
+
+logger = structlog.get_logger(__name__)
 
 
 class LRUCache:
@@ -154,14 +161,14 @@ class ContentDeduplicator:
         }
 
 
-def cached_parse(max_size: int = 500, ttl_seconds: int = 1800) -> Callable[[Any], Any]:
+def cached_parse(max_size: int = 500, ttl_seconds: int = 1800) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to cache parse results by content hash."""
 
-    def decorator(func: Any) -> Any:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         cache = LRUCache(max_size=max_size, ttl_seconds=ttl_seconds)
 
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Handle both instance methods (self, html, url) and functions (html, url)
             if len(args) >= 3:
                 # Instance method: self, html, url, ...
@@ -188,13 +195,13 @@ def cached_parse(max_size: int = 500, ttl_seconds: int = 1800) -> Callable[[Any]
             cached = cache.get(content_key)
             if cached is not None:
                 logger.debug("parse_cache_hit", url=url)
-                return cached
+                return cast("R", cached)
 
             result = func(*args, **kwargs)
             cache.put(content_key, result)
             return result
 
-        wrapper.cache = cache  # type: ignore[attr-defined]
+        wrapper.cache = cache # type: ignore[attr-defined]
         return wrapper
 
     return decorator
