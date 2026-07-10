@@ -1,18 +1,33 @@
-import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Any
 
+import structlog
+
 from app.collectors.fetcher import FetchResult, HybridFetcher
 from app.utilities.performance import ContentDeduplicator, URLDeduplicator
 
-logger = logging.getLogger(__name__)
+logger: Any = structlog.get_logger(__name__)
 
 _shared_fetcher: HybridFetcher | None = None
 
-# Shared deduplicators across all collectors
+# Shared deduplicators across all collectors.
+# Reset via reset_deduplicators() at the start of each collection run
+# to prevent unbounded memory growth.
 _url_deduplicator = URLDeduplicator()
 _content_deduplicator = ContentDeduplicator()
+
+
+def reset_deduplicators() -> None:
+    """Reset global deduplicators for a new collection run.
+
+    Must be called at the start of each competitor collection to prevent
+    the seen-URL sets and content-hash dicts from growing unboundedly
+    across the process lifetime.
+    """
+    _url_deduplicator.reset()
+    _content_deduplicator.reset()
+    logger.debug("deduplicators_reset")
 
 
 def get_shared_fetcher() -> HybridFetcher:
@@ -38,9 +53,11 @@ class BaseCollector(ABC):
     async def close(self) -> None:
         await self._fetcher.close()
 
-    async def fetch(self, url: str) -> FetchResult:
+    async def fetch(
+        self, url: str, competitor_id: int | None = None, *, force_render: bool = False
+    ) -> FetchResult:
         """Fetch a page using hybrid strategy (httpx + Playwright fallback)."""
-        return await self._fetcher.fetch(url)
+        return await self._fetcher.fetch(url, competitor_id, force_render=force_render)
 
     def is_duplicate_url(self, url: str) -> bool:
         """Check if URL has been seen before."""
@@ -58,6 +75,23 @@ class BaseCollector(ABC):
         """Mark content hash as seen for a URL."""
         self._content_deduplicator.register(content_hash, url)
 
+    async def is_unchanged(self, competitor_id: int, url: str, html: str, session: Any) -> bool:
+        from app.database.repositories.raw_storage_repository import RawStorageRepository
+        from app.utilities.content_hasher import compute_page_content_hash
+        from app.utilities.url_normalizer import normalize_url
+
+        normalized_url = normalize_url(url)
+        content_hash = compute_page_content_hash(html, normalized_url)
+
+        raw_repo = RawStorageRepository(session)
+        latest = await raw_repo.get_by_url(competitor_id, normalized_url)
+
+        if latest and latest.content_hash == content_hash:
+            logger.info("UNCHANGED_PAGE_SKIPPED", url=normalized_url, hash=content_hash)
+            return True
+
+        return False
+
     async def store_raw(
         self,
         competitor_id: int,
@@ -69,19 +103,26 @@ class BaseCollector(ABC):
         extracted_data: dict[str, Any] | None = None,
     ) -> None:
         from app.database.repositories.raw_storage_repository import RawStorageRepository
+        from app.storage.provider import storage_provider
         from app.utilities.content_hasher import compute_page_content_hash
         from app.utilities.url_normalizer import normalize_url
 
         normalized_url = normalize_url(url)
         content_hash = compute_page_content_hash(html, normalized_url)
 
+        # Save raw html to Object Storage
+        mime_type = "text/html"
+        storage_uri = await storage_provider.save(content_hash, html, mime_type)
+        file_size_bytes = len(html.encode("utf-8"))
+
         raw_repo = RawStorageRepository(session)
         await raw_repo.upsert(
             competitor_id=competitor_id,
             source_url=normalized_url,
             content_hash=content_hash,
-            raw_html=html,
-            raw_json={"url": normalized_url, "content_hash": content_hash},
+            storage_uri=storage_uri,
+            mime_type=mime_type,
+            file_size_bytes=file_size_bytes,
             metadata=metadata,
             extracted_data=extracted_data,
         )

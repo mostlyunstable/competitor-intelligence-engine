@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any
 
@@ -20,7 +21,7 @@ class ServiceCollector(BaseCollector):
         start_time: float = time.time()
 
         try:
-            result = await self.fetch(url)
+            result = await self.fetch(url, competitor_id)
             if result.not_modified:
                 return {
                     "status": "skipped",
@@ -33,13 +34,25 @@ class ServiceCollector(BaseCollector):
 
             html = result.html
 
-            parsed = self._parser.parse_for_type(html, url, "services")
+            if await self.is_unchanged(competitor_id, url, html, session):
+                return {
+                    "status": "skipped",
+                    "reason": "unchanged",
+                    "services_found": 0,
+                    "services_created": 0,
+                    "services_updated": 0,
+                    "elapsed_seconds": self._elapsed(start_time),
+                }
+
+            parsed = await asyncio.to_thread(self._parser.parse_for_type, html, url, "services")
             await self.store_raw(competitor_id, url, html, session, extracted_data=parsed)
             services = parsed["services"]
 
             service_repo = CompetitorServiceRepository(session)
             services_created = 0
             services_updated = 0
+
+            # Check existence before native upsert to track created vs updated
             for svc in services:
                 service_name = svc.get("name", "Unknown")
                 service_category = svc.get("category")
@@ -51,7 +64,8 @@ class ServiceCollector(BaseCollector):
                     service_name, service_category, description, starting_price, currency
                 )
 
-                existing = await service_repo.get_by_hash(competitor_id, content_hash)
+                # Single existence check — native upsert handles the actual write
+                existing = await self._get_existing(service_repo, competitor_id, content_hash)
                 await service_repo.upsert(
                     competitor_id=competitor_id,
                     content_hash=content_hash,
@@ -83,3 +97,24 @@ class ServiceCollector(BaseCollector):
                 "services_updated": 0,
                 "elapsed_seconds": self._elapsed(start_time),
             }
+
+    @staticmethod
+    async def _get_existing(
+        repo: CompetitorServiceRepository, competitor_id: int, content_hash: str
+    ) -> bool:
+        """Check if a service with this content hash already exists.
+
+        Uses a lightweight existence check instead of fetching the full row.
+        """
+        from sqlalchemy import select
+
+        stmt = (
+            select(1)
+            .where(
+                repo._model.competitor_id == competitor_id,
+                repo._model.content_hash == content_hash,
+            )
+            .limit(1)
+        )
+        result = await repo._session.execute(stmt)
+        return result.scalar_one_or_none() is not None

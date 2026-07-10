@@ -4,12 +4,23 @@ An advanced, adaptive data collection engine that crawls competitor websites and
 
 ## 🚀 Key Features
 
-*   **15+ Adaptive Extraction Strategies:** Uses DOM proximity, Schema.org/JSON-LD, NLP, semantic HTML, and multi-pass heuristic models to extract data gracefully even when sites change layouts.
+*   **23 Adaptive Extraction Strategies:** Uses DOM proximity, Schema.org/JSON-LD, NLP, semantic HTML, and multi-pass heuristic models to extract data gracefully even when sites change layouts.
 *   **Comprehensive Data Coverage:** Extracts Companies, Services, Pricing, Content, Social Profiles, Team Members, Physical Locations, FAQs, Reviews, Trust Signals, Contact Forms, Tables, Media Assets, and Breadcrumb structures.
 *   **Intelligent Crawl Budgeting:** Priority queue with URL scoring, canonical URL enforcement (50+ tracking params stripped), and duplicate detection via ETag/Last-Modified.
 *   **Robust Deduplication:** Dual-layer deduplication using fast normalized hash sets for URLs and SHA-256 content hashes for stored data.
 *   **Production-Ready Observability:** Built-in Prometheus metrics (`/metrics`) monitoring crawl duration, extraction yields, strategy success rates, and errors.
 *   **Self-Healing Database:** Uses upsert logic and transaction boundaries per collector to ensure database consistency.
+*   **Dynamic Confidence Scoring:** Per-field confidence scores with cross-strategy consistency checks.
+*   **Entity Resolution:** Automatic deduplication with fuzzy matching and canonicalization.
+*   **Relationship Linking:** Connect extracted entities into coherent graphs.
+*   **Evidence Metadata:** DOM path, XPath, and HTML snippet for every extraction.
+*   **Monitoring Dashboard:** Real-time system health, collection metrics, and alert status.
+
+## 📚 Documentation
+
+- **[Architecture Guide](docs/architecture.md)** - System design and component overview
+- **[API Documentation](docs/api.md)** - REST API reference with examples
+- **[OpenAPI Specification](https://api.utservio.com/openapi.json)** - Machine-readable API spec
 
 ---
 

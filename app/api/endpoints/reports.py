@@ -109,9 +109,7 @@ async def get_diff_report(
         raise HTTPException(status_code=404, detail="After log not found for this competitor")
 
     async def _fetch(model: Any) -> Sequence[Any]:
-        result = await session.execute(
-            select(model).where(model.competitor_id == competitor_id)
-        )
+        result = await session.execute(select(model).where(model.competitor_id == competitor_id))
         return result.scalars().all()
 
     report = await reporting_service.compute_diff(
@@ -169,30 +167,30 @@ async def get_comparison_report(
 
     for comp in competitors:
         r = await session.execute(
-            select(func.count()).select_from(CompetitorService).where(
-                CompetitorService.competitor_id == comp.id
-            )
+            select(func.count())
+            .select_from(CompetitorService)
+            .where(CompetitorService.competitor_id == comp.id)
         )
         services_map[comp.id] = r.scalar() or 0
 
         r = await session.execute(
-            select(func.count()).select_from(CompetitorPricing).where(
-                CompetitorPricing.competitor_id == comp.id
-            )
+            select(func.count())
+            .select_from(CompetitorPricing)
+            .where(CompetitorPricing.competitor_id == comp.id)
         )
         pricing_map[comp.id] = r.scalar() or 0
 
         r = await session.execute(
-            select(func.count()).select_from(CompetitorContent).where(
-                CompetitorContent.competitor_id == comp.id
-            )
+            select(func.count())
+            .select_from(CompetitorContent)
+            .where(CompetitorContent.competitor_id == comp.id)
         )
         content_map[comp.id] = r.scalar() or 0
 
         r = await session.execute(
-            select(func.count()).select_from(CompetitorSocial).where(
-                CompetitorSocial.competitor_id == comp.id
-            )
+            select(func.count())
+            .select_from(CompetitorSocial)
+            .where(CompetitorSocial.competitor_id == comp.id)
         )
         social_map[comp.id] = r.scalar() or 0
 

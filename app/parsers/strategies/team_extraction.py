@@ -23,12 +23,28 @@ if TYPE_CHECKING:
     from app.parsers.page_segmenter import PageSegment
 
 # Keywords that indicate a team/people section
-_TEAM_HEADING_KW = frozenset({
-    "team", "leadership", "staff", "people", "founders", "our people",
-    "meet the team", "our team", "the team", "who we are", "about us",
-    "management", "executives", "directors", "leadership team",
-    "senior leadership", "founding team", "board of directors",
-})
+_TEAM_HEADING_KW = frozenset(
+    {
+        "team",
+        "leadership",
+        "staff",
+        "people",
+        "founders",
+        "our people",
+        "meet the team",
+        "our team",
+        "the team",
+        "who we are",
+        "about us",
+        "management",
+        "executives",
+        "directors",
+        "leadership team",
+        "senior leadership",
+        "founding team",
+        "board of directors",
+    }
+)
 
 # Keywords that indicate a role/title
 _ROLE_KW = re.compile(
@@ -76,6 +92,7 @@ class TeamExtractionStrategy(ParsingStrategy):
         for script in soup.select('script[type="application/ld+json"]'):
             try:
                 import json
+
                 data = json.loads(script.string or "")
             except (json.JSONDecodeError, TypeError):
                 continue
@@ -118,20 +135,26 @@ class TeamExtractionStrategy(ParsingStrategy):
             image = image.get("url", "")
         same_as = item.get("sameAs", "")
         if isinstance(same_as, list):
-            same_as = next((s for s in same_as if isinstance(s, str) and "linkedin" in s.lower()), "")
+            same_as = next(
+                (s for s in same_as if isinstance(s, str) and "linkedin" in s.lower()), ""
+            )
 
         # Avoid duplicates
         if any(m.get("name") == name for m in result.team):
             return
 
-        result.team.append({
-            "name": str(name),
-            "title": str(job_title) if job_title else None,
-            "bio": str(description) if description else None,
-            "image_url": urljoin(url, str(image)) if image else None,
-            "linkedin_url": str(same_as) if same_as and "linkedin" in str(same_as).lower() else None,
-            "source": "json_ld",
-        })
+        result.team.append(
+            {
+                "name": str(name),
+                "title": str(job_title) if job_title else None,
+                "bio": str(description) if description else None,
+                "image_url": urljoin(url, str(image)) if image else None,
+                "linkedin_url": (
+                    str(same_as) if same_as and "linkedin" in str(same_as).lower() else None
+                ),
+                "source": "json_ld",
+            }
+        )
 
     def _extract_from_microdata(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         for el in soup.select('[itemtype*="Person"]'):
@@ -150,16 +173,20 @@ class TeamExtractionStrategy(ParsingStrategy):
                     linkedin_url = str(href)
 
             if name and len(name) < 100 and not any(m.get("name") == name for m in result.team):
-                    result.team.append({
+                result.team.append(
+                    {
                         "name": name,
                         "title": job_title,
                         "bio": description,
                         "image_url": urljoin(url, str(image_url)) if image_url else None,
                         "linkedin_url": linkedin_url,
                         "source": "microdata",
-                    })
+                    }
+                )
 
-    def _extract_from_team_sections(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _extract_from_team_sections(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
         for heading in soup.select("h1, h2, h3, h4, h5, h6"):
             text = heading.get_text(strip=True).lower()
             if not any(kw in text for kw in _TEAM_HEADING_KW):
@@ -226,7 +253,15 @@ class TeamExtractionStrategy(ParsingStrategy):
 
         # Find role/title
         role = None
-        for role_selector in [".role", ".title", ".job-title", ".position", ".designation", "p", "span"]:
+        for role_selector in [
+            ".role",
+            ".title",
+            ".job-title",
+            ".position",
+            ".designation",
+            "p",
+            "span",
+        ]:
             role_el = card.select_one(role_selector)
             if role_el:
                 role_text = role_el.get_text(strip=True)
@@ -259,20 +294,25 @@ class TeamExtractionStrategy(ParsingStrategy):
                 bio = bio_text[:500]
 
         if not any(m.get("name") == name for m in result.team):
-            result.team.append({
-                "name": name,
-                "title": role,
-                "bio": bio,
-                "image_url": image_url,
-                "linkedin_url": linkedin_url,
-                "source": "section_heuristic",
-            })
+            result.team.append(
+                {
+                    "name": name,
+                    "title": role,
+                    "bio": bio,
+                    "image_url": image_url,
+                    "linkedin_url": linkedin_url,
+                    "source": "section_heuristic",
+                }
+            )
 
-    def _extract_from_card_patterns(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _extract_from_card_patterns(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
         """Detect repeated card patterns that look like team grids."""
         for container in soup.select("div, section, main, ul"):
             children = [
-                c for c in container.children
+                c
+                for c in container.children
                 if isinstance(c, Tag) and c.name in ("div", "li", "article", "section")
             ]
             if len(children) < 2:

@@ -31,20 +31,66 @@ _PUNCTUATION_RE = re.compile(f"[{re.escape(string.punctuation)}]+")
 _WHITESPACE_RE = re.compile(r"\s+")
 
 # Stop words removed entirely during comparison
-_STOP_WORDS: frozenset[str] = frozenset([
-    "the", "a", "an", "and", "or", "of", "in", "at", "to", "for",
-    "with", "by", "on", "is", "are", "was", "were", "per",
-    "its", "our", "your", "their", "this", "that", "these", "those",
-])
+_STOP_WORDS: frozenset[str] = frozenset(
+    [
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "of",
+        "in",
+        "at",
+        "to",
+        "for",
+        "with",
+        "by",
+        "on",
+        "is",
+        "are",
+        "was",
+        "were",
+        "per",
+        "its",
+        "our",
+        "your",
+        "their",
+        "this",
+        "that",
+        "these",
+        "those",
+    ]
+)
 
 # Generic qualifier words that don't carry entity identity (safe to drop)
-_REMOVABLE_WORDS: frozenset[str] = frozenset([
-    "service", "services", "plan", "plans", "package", "packages",
-    "tier", "tiers", "option", "options",
-    "solution", "solutions", "program", "programs", "system", "systems",
-    "type", "types", "category", "categories",
-    "feature", "features", "product", "products",
-])
+_REMOVABLE_WORDS: frozenset[str] = frozenset(
+    [
+        "service",
+        "services",
+        "plan",
+        "plans",
+        "package",
+        "packages",
+        "tier",
+        "tiers",
+        "option",
+        "options",
+        "solution",
+        "solutions",
+        "program",
+        "programs",
+        "system",
+        "systems",
+        "type",
+        "types",
+        "category",
+        "categories",
+        "feature",
+        "features",
+        "product",
+        "products",
+    ]
+)
 
 # Industry-standard abbreviations (not company-specific)
 _ABBREVIATIONS: dict[str, str] = {
@@ -150,8 +196,7 @@ def name_similarity(a: str, b: str) -> float:
         shorter_tokens = min(a_tokens, b_tokens, key=len)
         longer_tokens = max(a_tokens, b_tokens, key=len)
         containment = (
-            len(shorter_tokens & longer_tokens) / len(shorter_tokens)
-            if shorter_tokens else 0.0
+            len(shorter_tokens & longer_tokens) / len(shorter_tokens) if shorter_tokens else 0.0
         )
 
     # Exact containment (all tokens of one name are in the other) → strong signal
@@ -233,15 +278,17 @@ class EntityResolver:
         resolution_maps: dict[str, dict[str, str]] = {}
 
         for list_name in (
-            "services", "plans", "features", "locations",
-            "reviews", "offers",
+            "services",
+            "plans",
+            "features",
+            "locations",
+            "reviews",
+            "offers",
         ):
             items: list[dict[str, Any]] = getattr(result, list_name, [])
             keys = _ENTITY_KEYS.get(list_name, ("name",))
             if items and keys:
-                resolution_maps[list_name] = self._resolve_list(
-                    items, keys, list_name
-                )
+                resolution_maps[list_name] = self._resolve_list(items, keys, list_name)
 
         # Phase 2 — Update cross-references
         for list_name, ref_field, source_type in _CROSS_REFERENCE_UPDATES:
@@ -252,8 +299,13 @@ class EntityResolver:
 
         # Phase 3 — Deduplicate after renaming
         for list_name in (
-            "services", "pricing", "plans", "features", "locations",
-            "reviews", "offers",
+            "services",
+            "pricing",
+            "plans",
+            "features",
+            "locations",
+            "reviews",
+            "offers",
         ):
             items = getattr(result, list_name, [])
             keys = _ENTITY_KEYS.get(list_name, ("name",))
@@ -337,9 +389,13 @@ class EntityResolver:
         for vi in variant_indices:
             variant = items[vi]
             for key, value in variant.items():
-                if (value is not None and value != ""
-                        and (items[canonical_idx].get(key) is None
-                             or items[canonical_idx].get(key) == "")):
+                if (
+                    value is not None
+                    and value != ""
+                    and (
+                        items[canonical_idx].get(key) is None or items[canonical_idx].get(key) == ""
+                    )
+                ):
                     items[canonical_idx][key] = value
 
         # Build variant → canonical mapping
@@ -422,12 +478,10 @@ def _pick_canonical(
     On a tie, picks the longest descriptive name.
     Returns (index, canonical_name).
     """
+
     def _score(idx: int) -> tuple[int, int]:
         item = items[idx]
-        filled = sum(
-            1 for v in item.values()
-            if v is not None and v != "" and v is not True
-        )
+        filled = sum(1 for v in item.values() if v is not None and v != "" and v is not True)
         if item.get("__merged__"):
             filled = -1
         name_len = len(str(item.get("name", item.get("plan_name", ""))))

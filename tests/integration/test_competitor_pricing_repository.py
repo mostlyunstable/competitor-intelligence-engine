@@ -38,8 +38,18 @@ class TestCompetitorPricingRepository:
     async def test_get_by_competitor(self) -> None:
         competitor = await self._create_competitor()
         repo = CompetitorPricingRepository(self.session)
-        await repo.create(competitor_id=competitor.id, service_name="Service 1", base_price=100)
-        await repo.create(competitor_id=competitor.id, service_name="Service 2", base_price=200)
+        await repo.create(
+            competitor_id=competitor.id,
+            service_name="Service 1",
+            base_price=100,
+            content_hash="hash1",
+        )
+        await repo.create(
+            competitor_id=competitor.id,
+            service_name="Service 2",
+            base_price=200,
+            content_hash="hash2",
+        )
         pricing = await repo.get_by_competitor(competitor.id)
         assert len(pricing) == 2
 
@@ -47,10 +57,18 @@ class TestCompetitorPricingRepository:
         competitor = await self._create_competitor()
         repo = CompetitorPricingRepository(self.session)
         await repo.create(
-            competitor_id=competitor.id, service_name="HVAC", category="Heating", base_price=100
+            competitor_id=competitor.id,
+            service_name="HVAC",
+            category="Heating",
+            base_price=100,
+            content_hash="hash1",
         )
         await repo.create(
-            competitor_id=competitor.id, service_name="Plumbing", category="Water", base_price=200
+            competitor_id=competitor.id,
+            service_name="Plumbing",
+            category="Water",
+            base_price=200,
+            content_hash="hash2",
         )
         heating = await repo.get_by_category(competitor.id, "Heating")
         assert len(heating) == 1

@@ -95,9 +95,17 @@ ENT_MEDIA = "media"
 # Container tags (elements that define a logical grouping region)
 # ---------------------------------------------------------------------------
 
-_CONTAINER_TAGS = frozenset({
-    "div", "section", "article", "main", "aside", "header", "footer",
-})
+_CONTAINER_TAGS = frozenset(
+    {
+        "div",
+        "section",
+        "article",
+        "main",
+        "aside",
+        "header",
+        "footer",
+    }
+)
 
 
 class RelationshipEngine:
@@ -157,29 +165,44 @@ class RelationshipEngine:
         rels: list[Relationship],
     ) -> None:
         """Service ↔ Pricing: match services[].name with pricing[].service_name."""
-        service_names = {
-            s["name"] for s in result.services if s.get("name")
-        }
+        service_names = {s["name"] for s in result.services if s.get("name")}
         for price in result.pricing:
             pn = price.get("service_name")
             if not pn:
                 continue
             # Exact match
             if pn in service_names:
-                rels.append(Relationship(
-                    ENT_SERVICE, pn, ENT_PRICING, pn,
-                    REL_HAS_PRICE, 0.92, "name_match",
-                    {"match": "exact"},
-                ))
+                rels.append(
+                    Relationship(
+                        ENT_SERVICE,
+                        pn,
+                        ENT_PRICING,
+                        pn,
+                        REL_HAS_PRICE,
+                        0.92,
+                        "name_match",
+                        {"match": "exact"},
+                    )
+                )
             else:
                 # Partial / substring match
                 matched = _best_substring_match(pn, service_names, min_ratio=0.4)
                 if matched:
-                    rels.append(Relationship(
-                        ENT_SERVICE, matched, ENT_PRICING, pn,
-                        REL_HAS_PRICE, 0.60, "text_overlap",
-                        {"match": "partial", "match_detail": f"'{pn}' contained in '{matched}'"},
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_SERVICE,
+                            matched,
+                            ENT_PRICING,
+                            pn,
+                            REL_HAS_PRICE,
+                            0.60,
+                            "text_overlap",
+                            {
+                                "match": "partial",
+                                "match_detail": f"'{pn}' contained in '{matched}'",
+                            },
+                        )
+                    )
 
     @staticmethod
     def _match_plans_features(
@@ -197,19 +220,33 @@ class RelationshipEngine:
             plan_features: list[str] = plan.get("features", []) or []
             for pf in plan_features:
                 if pf in feature_names:
-                    rels.append(Relationship(
-                        ENT_PLAN, pn, ENT_FEATURE, pf,
-                        REL_HAS_FEATURE, 0.95, "name_match",
-                        {"match": "exact"},
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_PLAN,
+                            pn,
+                            ENT_FEATURE,
+                            pf,
+                            REL_HAS_FEATURE,
+                            0.95,
+                            "name_match",
+                            {"match": "exact"},
+                        )
+                    )
                 else:
                     matched = _best_substring_match(pf, feature_names, min_ratio=0.4)
                     if matched:
-                        rels.append(Relationship(
-                            ENT_PLAN, pn, ENT_FEATURE, matched,
-                            REL_HAS_FEATURE, 0.55, "text_overlap",
-                            {"match": "partial"},
-                        ))
+                        rels.append(
+                            Relationship(
+                                ENT_PLAN,
+                                pn,
+                                ENT_FEATURE,
+                                matched,
+                                REL_HAS_FEATURE,
+                                0.55,
+                                "text_overlap",
+                                {"match": "partial"},
+                            )
+                        )
 
     @staticmethod
     def _match_plans_services(
@@ -225,19 +262,33 @@ class RelationshipEngine:
             if not pn:
                 continue
             if pn in service_names:
-                rels.append(Relationship(
-                    ENT_PLAN, pn, ENT_SERVICE, pn,
-                    REL_HAS_SERVICE, 0.90, "name_match",
-                    {"match": "exact"},
-                ))
+                rels.append(
+                    Relationship(
+                        ENT_PLAN,
+                        pn,
+                        ENT_SERVICE,
+                        pn,
+                        REL_HAS_SERVICE,
+                        0.90,
+                        "name_match",
+                        {"match": "exact"},
+                    )
+                )
             else:
                 matched = _best_substring_match(pn, service_names, min_ratio=0.4)
                 if matched:
-                    rels.append(Relationship(
-                        ENT_PLAN, pn, ENT_SERVICE, matched,
-                        REL_HAS_SERVICE, 0.55, "text_overlap",
-                        {"match": "partial"},
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_PLAN,
+                            pn,
+                            ENT_SERVICE,
+                            matched,
+                            REL_HAS_SERVICE,
+                            0.55,
+                            "text_overlap",
+                            {"match": "partial"},
+                        )
+                    )
 
     @staticmethod
     def _match_offers_services(
@@ -260,10 +311,17 @@ class RelationshipEngine:
             for name in all_names:
                 # Check if offer title contains the service/plan name
                 if name.lower() in title_lower:
-                    rels.append(Relationship(
-                        ENT_SERVICE, name, ENT_OFFER, title,
-                        REL_HAS_OFFER, 0.70, "text_overlap",
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_SERVICE,
+                            name,
+                            ENT_OFFER,
+                            title,
+                            REL_HAS_OFFER,
+                            0.70,
+                            "text_overlap",
+                        )
+                    )
 
     @staticmethod
     def _match_reviews_services(
@@ -284,10 +342,17 @@ class RelationshipEngine:
             rev_text = f"{rev_title} {rev_body}".lower()
             for sn in service_names:
                 if sn.lower() in rev_text:
-                    rels.append(Relationship(
-                        ENT_SERVICE, sn, ENT_REVIEW, rev_title,
-                        REL_HAS_REVIEW, 0.65, "text_overlap",
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_SERVICE,
+                            sn,
+                            ENT_REVIEW,
+                            rev_title,
+                            REL_HAS_REVIEW,
+                            0.65,
+                            "text_overlap",
+                        )
+                    )
 
     @staticmethod
     def _match_locations_services(
@@ -309,10 +374,17 @@ class RelationshipEngine:
                 svc_cat = svc.get("category", "")
                 context = f"{svc_name} {svc_desc} {svc_cat}".lower()
                 if loc_lower in context:
-                    rels.append(Relationship(
-                        ENT_SERVICE, svc_name, ENT_LOCATION, loc_name,
-                        REL_HAS_LOCATION, 0.60, "text_overlap",
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_SERVICE,
+                            svc_name,
+                            ENT_LOCATION,
+                            loc_name,
+                            REL_HAS_LOCATION,
+                            0.60,
+                            "text_overlap",
+                        )
+                    )
 
     @staticmethod
     def _match_faq_services(
@@ -321,7 +393,8 @@ class RelationshipEngine:
     ) -> None:
         """FAQ ↔ Service: FAQ content title/summary mentions a service name."""
         faq_items = [
-            c for c in result.content
+            c
+            for c in result.content
             if c.get("content_type") == "faq" and (c.get("title") or c.get("summary"))
         ]
         if not faq_items:
@@ -334,10 +407,17 @@ class RelationshipEngine:
             faq_text = f"{faq.get('title', '')} {faq.get('summary', '')}".lower()
             for sn in service_names:
                 if sn.lower() in faq_text:
-                    rels.append(Relationship(
-                        ENT_FAQ, faq.get("title", ""), ENT_SERVICE, sn,
-                        REL_IS_ABOUT, 0.65, "text_overlap",
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_FAQ,
+                            faq.get("title", ""),
+                            ENT_SERVICE,
+                            sn,
+                            REL_IS_ABOUT,
+                            0.65,
+                            "text_overlap",
+                        )
+                    )
 
     @staticmethod
     def _match_pricing_plans(
@@ -353,17 +433,31 @@ class RelationshipEngine:
             svc_name = price.get("service_name", "")
             for plan_key in subs:
                 if plan_key in plan_names:
-                    rels.append(Relationship(
-                        ENT_PRICING, svc_name, ENT_PLAN, plan_key,
-                        REL_HAS_PLAN, 0.88, "name_match",
-                    ))
+                    rels.append(
+                        Relationship(
+                            ENT_PRICING,
+                            svc_name,
+                            ENT_PLAN,
+                            plan_key,
+                            REL_HAS_PLAN,
+                            0.88,
+                            "name_match",
+                        )
+                    )
                 else:
                     matched = _best_substring_match(plan_key, plan_names, min_ratio=0.4)
                     if matched:
-                        rels.append(Relationship(
-                            ENT_PRICING, svc_name, ENT_PLAN, matched,
-                            REL_HAS_PLAN, 0.55, "text_overlap",
-                        ))
+                        rels.append(
+                            Relationship(
+                                ENT_PRICING,
+                                svc_name,
+                                ENT_PLAN,
+                                matched,
+                                REL_HAS_PLAN,
+                                0.55,
+                                "text_overlap",
+                            )
+                        )
 
     # ------------------------------------------------------------------
     # DOM proximity detection
@@ -386,38 +480,59 @@ class RelationshipEngine:
         # Collect text -> entity mappings for each entity type
         for svc in result.services:
             self._add_to_container_groups(
-                soup, svc.get("name", ""), ENT_SERVICE,
-                "name", entity_groups,
+                soup,
+                svc.get("name", ""),
+                ENT_SERVICE,
+                "name",
+                entity_groups,
             )
         for price in result.pricing:
             self._add_to_container_groups(
-                soup, price.get("service_name", ""), ENT_PRICING,
-                "service_name", entity_groups,
+                soup,
+                price.get("service_name", ""),
+                ENT_PRICING,
+                "service_name",
+                entity_groups,
             )
         for plan in result.plans:
             self._add_to_container_groups(
-                soup, plan.get("plan_name", ""), ENT_PLAN,
-                "plan_name", entity_groups,
+                soup,
+                plan.get("plan_name", ""),
+                ENT_PLAN,
+                "plan_name",
+                entity_groups,
             )
         for offer in result.offers:
             self._add_to_container_groups(
-                soup, offer.get("title", ""), ENT_OFFER,
-                "title", entity_groups,
+                soup,
+                offer.get("title", ""),
+                ENT_OFFER,
+                "title",
+                entity_groups,
             )
         for review in result.reviews:
             self._add_to_container_groups(
-                soup, review.get("title", ""), ENT_REVIEW,
-                "title", entity_groups,
+                soup,
+                review.get("title", ""),
+                ENT_REVIEW,
+                "title",
+                entity_groups,
             )
         for feature in result.features:
             self._add_to_container_groups(
-                soup, feature.get("name", ""), ENT_FEATURE,
-                "name", entity_groups,
+                soup,
+                feature.get("name", ""),
+                ENT_FEATURE,
+                "name",
+                entity_groups,
             )
         for loc in result.locations:
             self._add_to_container_groups(
-                soup, loc.get("name", ""), ENT_LOCATION,
-                "name", entity_groups,
+                soup,
+                loc.get("name", ""),
+                ENT_LOCATION,
+                "name",
+                entity_groups,
             )
 
         # Generate relationships between entities in the same container
@@ -440,11 +555,13 @@ class RelationshipEngine:
         cid = id(container)
         if cid not in groups:
             groups[cid] = []
-        groups[cid].append({
-            "type": entity_type,
-            "value": text,
-            "value_key": value_key,
-        })
+        groups[cid].append(
+            {
+                "type": entity_type,
+                "value": text,
+                "value_key": value_key,
+            }
+        )
 
     @staticmethod
     def _create_relations_from_groups(
@@ -487,11 +604,18 @@ class RelationshipEngine:
                         # Skip if this exact relation already exists
                         if _has_relation(rels, src_type, src_val, tgt_type, tgt_val, relation):
                             continue
-                        rels.append(Relationship(
-                            src_type, src_val, tgt_type, tgt_val,
-                            relation, conf, "dom_proximity",
-                            {"container_id": container_id},
-                        ))
+                        rels.append(
+                            Relationship(
+                                src_type,
+                                src_val,
+                                tgt_type,
+                                tgt_val,
+                                relation,
+                                conf,
+                                "dom_proximity",
+                                {"container_id": container_id},
+                            )
+                        )
 
     # ------------------------------------------------------------------
     # Dedup

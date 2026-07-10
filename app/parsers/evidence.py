@@ -64,11 +64,7 @@ def xpath(tag: Tag) -> str:
     while current is not None and current.name not in ("[document]", "html"):
         parent = current.parent
         if parent and hasattr(parent, "children"):
-            siblings = [
-                c
-                for c in parent.children
-                if isinstance(c, Tag) and c.name == current.name
-            ]
+            siblings = [c for c in parent.children if isinstance(c, Tag) and c.name == current.name]
             if len(siblings) > 1:
                 pos = siblings.index(current) + 1
                 parts.append(f"{current.name}[{pos}]")

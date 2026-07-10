@@ -32,26 +32,70 @@ from app.parsers.page_segmenter import (
 # Block boundary tags (semantic HTML elements that serve as block delimiters)
 # ---------------------------------------------------------------------------
 
-_BOUNDARY_TAGS: frozenset[str] = frozenset({
-    "header", "nav", "main", "footer", "aside",
-    "section", "article",
-})
+_BOUNDARY_TAGS: frozenset[str] = frozenset(
+    {
+        "header",
+        "nav",
+        "main",
+        "footer",
+        "aside",
+        "section",
+        "article",
+    }
+)
 
 # Additional block-level grouping tags (split inside these if they contain
 # multiple heading-bound sub-blocks)
-_CONTAINER_TAGS: frozenset[str] = frozenset({
-    "div", "section", "article",
-})
+_CONTAINER_TAGS: frozenset[str] = frozenset(
+    {
+        "div",
+        "section",
+        "article",
+    }
+)
 
 # Tags that are NOT valid block roots (inline, phrasing, or metadata)
-_SKIP_TAGS: frozenset[str] = frozenset({
-    "script", "style", "noscript", "template", "br", "hr", "wbr",
-    "span", "a", "b", "i", "em", "strong", "small", "sub", "sup",
-    "img", "input", "button", "label", "select", "textarea",
-    "ul", "ol", "li", "dl", "dt", "dd",
-    "h1", "h2", "h3", "h4", "h5", "h6",
-    "p", "figure", "figcaption",
-})
+_SKIP_TAGS: frozenset[str] = frozenset(
+    {
+        "script",
+        "style",
+        "noscript",
+        "template",
+        "br",
+        "hr",
+        "wbr",
+        "span",
+        "a",
+        "b",
+        "i",
+        "em",
+        "strong",
+        "small",
+        "sub",
+        "sup",
+        "img",
+        "input",
+        "button",
+        "label",
+        "select",
+        "textarea",
+        "ul",
+        "ol",
+        "li",
+        "dl",
+        "dt",
+        "dd",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+        "figure",
+        "figcaption",
+    }
+)
 
 
 class DomBlockExtractor:
@@ -144,8 +188,7 @@ class DomBlockExtractor:
         # Strategy 4 — Container with sub-containers → split children.
         if element.name in _CONTAINER_TAGS:
             block_children = [
-                c for c in element.children
-                if isinstance(c, Tag) and c.name not in _SKIP_TAGS
+                c for c in element.children if isinstance(c, Tag) and c.name not in _SKIP_TAGS
             ]
             if len(block_children) >= 2:
                 result = []
@@ -162,8 +205,7 @@ class DomBlockExtractor:
     def _split_container_children(self, container: Tag, depth: int) -> list[Tag]:
         """Split a container's children into blocks, recursing into each."""
         children = [
-            c for c in container.children
-            if isinstance(c, Tag) and c.name not in _SKIP_TAGS
+            c for c in container.children if isinstance(c, Tag) and c.name not in _SKIP_TAGS
         ]
         if not children:
             block = self._wrap(container)
@@ -377,6 +419,7 @@ class DomBlockExtractor:
 # ---------------------------------------------------------------------------
 # Convenience import alias — strategies use this function
 # ---------------------------------------------------------------------------
+
 
 def page_segments(segments: list[PageSegment], *types: str) -> list[PageSegment]:
     """Filter blocks to only those matching one of the given types."""

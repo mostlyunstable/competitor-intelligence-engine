@@ -25,17 +25,26 @@ if TYPE_CHECKING:
     from app.parsers.page_segmenter import PageSegment
 
 # Heading keywords for review/testimonial sections
-_REVIEW_HEADING_KW = frozenset({
-    "reviews", "review", "testimonials", "testimonial",
-    "what our customers say", "customer reviews", "client reviews",
-    "feedback", "ratings", "imonials",
-})
+_REVIEW_HEADING_KW = frozenset(
+    {
+        "reviews",
+        "review",
+        "testimonials",
+        "testimonial",
+        "what our customers say",
+        "customer reviews",
+        "client reviews",
+        "feedback",
+        "ratings",
+        "imonials",
+    }
+)
 
 # Rating patterns
 _RATING_PATTERN = re.compile(
     r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)|"  # 4.5/5
-    r"(\d+(?:\.\d+)?)\s*stars?|"                  # 4.5 stars
-    r"(\d+(?:\.\d+)?)\s*out of\s*(\d+)",          # 4.5 out of 5
+    r"(\d+(?:\.\d+)?)\s*stars?|"  # 4.5 stars
+    r"(\d+(?:\.\d+)?)\s*out of\s*(\d+)",  # 4.5 out of 5
     re.IGNORECASE,
 )
 
@@ -128,15 +137,17 @@ class ReviewExtractionStrategy(ParsingStrategy):
 
         if review_body or title:
             display_title = str(title) if title else f"Review from {author}" if author else "Review"
-            result.reviews.append({
-                "title": display_title[:300],
-                "author": str(author) if author else None,
-                "body": str(review_body)[:1000] if review_body else None,
-                "rating": rating,
-                "publish_date": str(date)[:10] if date else None,
-                "source_url": url,
-                "source": "json_ld",
-            })
+            result.reviews.append(
+                {
+                    "title": display_title[:300],
+                    "author": str(author) if author else None,
+                    "body": str(review_body)[:1000] if review_body else None,
+                    "rating": rating,
+                    "publish_date": str(date)[:10] if date else None,
+                    "source_url": url,
+                    "source": "json_ld",
+                }
+            )
 
     def _add_aggregate_rating(self, item: dict[str, Any], result: ParsedResult) -> None:
         rating_value = item.get("ratingValue")
@@ -154,17 +165,19 @@ class ReviewExtractionStrategy(ParsingStrategy):
                 with contextlib.suppress(ValueError, TypeError):
                     count = int(review_count)
             # Store as a special aggregate review entry
-            result.reviews.append({
-                "title": "Aggregate Rating",
-                "author": None,
-                "body": None,
-                "rating": rating_float,
-                "review_count": count,
-                "best_rating": int(best) if best else 5,
-                "worst_rating": int(worst) if worst else 1,
-                "source_url": "",
-                "source": "json_ld_aggregate",
-            })
+            result.reviews.append(
+                {
+                    "title": "Aggregate Rating",
+                    "author": None,
+                    "body": None,
+                    "rating": rating_float,
+                    "review_count": count,
+                    "best_rating": int(best) if best else 5,
+                    "worst_rating": int(worst) if worst else 1,
+                    "source_url": "",
+                    "source": "json_ld_aggregate",
+                }
+            )
 
     def _extract_from_microdata(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         def _is_review_itemtype(value: str | None) -> bool:
@@ -187,17 +200,21 @@ class ReviewExtractionStrategy(ParsingStrategy):
 
             if review_body or title or author:
                 display_title = title if title else f"Review from {author}" if author else "Review"
-                result.reviews.append({
-                    "title": display_title[:300],
-                    "author": author,
-                    "body": review_body[:1000] if review_body else None,
-                    "rating": rating,
-                    "publish_date": date[:10] if date and len(date) >= 10 else date,
-                    "source_url": url,
-                    "source": "microdata",
-                })
+                result.reviews.append(
+                    {
+                        "title": display_title[:300],
+                        "author": author,
+                        "body": review_body[:1000] if review_body else None,
+                        "rating": rating,
+                        "publish_date": date[:10] if date and len(date) >= 10 else date,
+                        "source_url": url,
+                        "source": "microdata",
+                    }
+                )
 
-    def _extract_from_review_sections(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _extract_from_review_sections(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
         for heading in soup.select("h1, h2, h3, h4, h5, h6"):
             text = heading.get_text(strip=True).lower()
             if not any(kw in text for kw in _REVIEW_HEADING_KW):
@@ -235,16 +252,20 @@ class ReviewExtractionStrategy(ParsingStrategy):
         if any(r.get("body") == text for r in result.reviews):
             return
 
-        result.reviews.append({
-            "title": title[:300] if title else f"Review from {author}" if author else "Review",
-            "author": author,
-            "body": text[:1000],
-            "rating": rating,
-            "source_url": url,
-            "source": "section_heuristic",
-        })
+        result.reviews.append(
+            {
+                "title": title[:300] if title else f"Review from {author}" if author else "Review",
+                "author": author,
+                "body": text[:1000],
+                "rating": rating,
+                "source_url": url,
+                "source": "section_heuristic",
+            }
+        )
 
-    def _extract_from_blockquotes(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _extract_from_blockquotes(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
         for bq in soup.select("blockquote"):
             text = bq.get_text(strip=True)
             if not text or len(text) < 20:
@@ -271,14 +292,16 @@ class ReviewExtractionStrategy(ParsingStrategy):
             if any(r.get("body") == text for r in result.reviews):
                 return
 
-            result.reviews.append({
-                "title": f"Testimonial from {author}" if author else "Testimonial",
-                "author": author,
-                "body": text[:1000],
-                "rating": None,
-                "source_url": url,
-                "source": "blockquote",
-            })
+            result.reviews.append(
+                {
+                    "title": f"Testimonial from {author}" if author else "Testimonial",
+                    "author": author,
+                    "body": text[:1000],
+                    "rating": None,
+                    "source_url": url,
+                    "source": "blockquote",
+                }
+            )
 
     def _parse_rating(self, element: Tag) -> float | None:
         # Try numeric rating patterns

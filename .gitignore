@@ -1,9 +1,14 @@
-# Environment
+# ================================
+# Environment & Secrets
+# ================================
 .env
 .env.local
 .env.production
+.env.*
 
+# ================================
 # Python
+# ================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -17,44 +22,92 @@ eggs/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Virtual environments
+# ================================
+# Virtual Environments
+# ================================
 venv/
 .venv/
 ENV/
 
-# IDE
+# ================================
+# IDE / Editor
+# ================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Testing
+# ================================
+# Testing & Quality
+# ================================
 .coverage
 .coverage.*
 htmlcov/
+coverage.xml
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
+# ================================
 # Docker
+# ================================
 postgres-data/
 redis-data/
 app-data/
 
-# Alembic
-migrations/versions/*.pyc
-
+# ================================
 # Playwright
+# ================================
 ms-playwright/
 
+# ================================
 # OS
+# ================================
 .DS_Store
-Thumbs.db
+Thumbbs.db
 
-# Data files
+# ================================
+# Databases (local dev/test only)
+# ================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ================================
+# Logs & Runtime Artifacts
+# ================================
 *.log
+logs/
+
+# ================================
+# Generated Reports (runtime output)
+# ================================
+reports/
+strategy_metrics.jsonl
+
+# ================================
+# Screenshots & Storage (runtime)
+# ================================
+storage/screenshots/
+storage/raw_html/
+
+# ================================
+# Runtime State Files
+# ================================
+strategy_stats.json
 competitors.json
 
-# Runtime state
-strategy_stats.json
+# ================================
+# Backup & Temporary Files
+# ================================
+*.bak
+*.tmp
+*.old
+*.orig
+*.backup
+
+# ================================
+# Alembic
+# ================================
+migrations/versions/*.pyc

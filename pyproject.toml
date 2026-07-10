@@ -10,7 +10,7 @@ name = "utservio-competitor-intelligence"
 version = "0.1.0"
 description = "Data collection engine for Utservio's competitor intelligence platform"
 readme = "README.md"
-license = "LicenseRef-Proprietary"
+license = {file = "LICENSE"}
 requires-python = ">=3.12"
 authors = [
     { name = "Utservio Engineering", email = "engineering@utservio.com" },
@@ -29,6 +29,9 @@ dependencies = [
     "lxml>=5.2,<6",
     "structlog>=24.4,<25",
     "prometheus-client>=0.21,<1",
+    "imagehash>=4.3,<5",
+    "Pillow>=10.0,<12",
+    "redis>=5.0,<6",
 ]
 
 [project.optional-dependencies]
@@ -83,8 +86,8 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["tests.*"]
-disallow_untyped_defs = false
+module = ["playwright_stealth", "redis.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

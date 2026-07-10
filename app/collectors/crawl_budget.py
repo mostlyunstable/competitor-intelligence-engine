@@ -12,7 +12,7 @@ import heapq
 import re
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 import structlog
 
@@ -108,7 +108,9 @@ class CrawlBudgetEngine:
 
         Returns True if URL was accepted, False if rejected.
         """
-        normalized = url.rstrip("/")
+        # Strip query parameters for deduplication purposes to prevent infinite loops
+        parsed = urlparse(url)
+        normalized = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, "", "")).rstrip("/")
 
         if normalized in self._visited:
             return False

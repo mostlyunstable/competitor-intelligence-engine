@@ -161,7 +161,9 @@ class ContentDeduplicator:
         }
 
 
-def cached_parse(max_size: int = 500, ttl_seconds: int = 1800) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def cached_parse(
+    max_size: int = 500, ttl_seconds: int = 1800
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to cache parse results by content hash."""
 
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
@@ -201,7 +203,7 @@ def cached_parse(max_size: int = 500, ttl_seconds: int = 1800) -> Callable[[Call
             cache.put(content_key, result)
             return result
 
-        wrapper.cache = cache # type: ignore[attr-defined]
+        wrapper.cache = cache  # type: ignore[attr-defined]
         return wrapper
 
     return decorator

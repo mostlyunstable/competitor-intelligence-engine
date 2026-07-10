@@ -3,6 +3,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 
+from app.observability.parser_metrics import ParserObserver
 from app.parsers.adaptive_orderer import AdaptiveStrategyOrderer
 from app.parsers.block_extractor import DomBlockExtractor
 from app.parsers.page_segmenter import PageSegment
@@ -53,11 +54,11 @@ DEFAULT_STRATEGIES: list[ParsingStrategy] = [
     SemanticHtmlStrategy(),  # supplementary semantic HTML
     CardExtractionStrategy(),  # card/plan/review extraction
     ListExtractionStrategy(),  # structured list extraction
-    LocationExtractionStrategy(), # locations and coverage areas
-    TeamExtractionStrategy(), # team and leadership
-    ReviewExtractionStrategy(), # reviews and testimonials
-    TrustSignalExtractionStrategy(), # trust signals and badges
-    AssetExtractionStrategy(), # assets and documents
+    LocationExtractionStrategy(),  # locations and coverage areas
+    TeamExtractionStrategy(),  # team and leadership
+    ReviewExtractionStrategy(),  # reviews and testimonials
+    TrustSignalExtractionStrategy(),  # trust signals and badges
+    AssetExtractionStrategy(),  # assets and documents
     MediaExtractionStrategy(),  # image/video/document extraction
     GenericDomHeuristicStrategy(),
     GenericCssPatternStrategy(),
@@ -67,6 +68,8 @@ DEFAULT_STRATEGIES: list[ParsingStrategy] = [
 
 
 class StrategyParser:
+    """Orchestrates strategy execution, merging, and fallback."""
+
     def __init__(
         self,
         strategies: list[ParsingStrategy] | None = None,
@@ -77,6 +80,7 @@ class StrategyParser:
         self._strategies = strategies or DEFAULT_STRATEGIES
         self._confidence_threshold = confidence_threshold
         self._orderer = AdaptiveStrategyOrderer() if use_adaptive_ordering else None
+        self._observer = ParserObserver()
         self._segmenter = DomBlockExtractor()
         self._preprocessor = Preprocessor() if enable_preprocessing else None
 
@@ -87,6 +91,10 @@ class StrategyParser:
             html = self._preprocessor.process(html)
 
         soup = BeautifulSoup(html, "html.parser")
+
+        # Hardcoding competitor ID as 0 for generic parser loop
+        self._observer.on_page_start(url, 0, len(html), len(soup.find_all(True)))
+
         combined = ParsedResult()
 
         # --- DOM Block Extraction (splits page into typed blocks before all strategies) ---
@@ -122,24 +130,58 @@ class StrategyParser:
         _reset_calculator()
 
         for strategy in strategies:
+            self._observer.on_strategy_start(strategy.name)
             start = time.perf_counter()
             try:
                 partial = strategy.parse_segments(blocks, url)
                 elapsed_ms = (time.perf_counter() - start) * 1000
+
+                # Deepcopy combined fields to know exact accepted/rejected entities
+                combined.count_entities()
+
+                # We need to snapshot the state before merge
+                ParsedResult()
+                # To avoid complex deepcopy issues with bs4 elements inside FieldValue, we just use the raw count
+                # The entity_profiler will inspect partial_result and combined to find exact overlaps.
+                # Actually, since `combined.merge()` mutates `combined`, we can just pass the original `combined` as `post_merge_result`
+                # and just use its current state as pre-merge.
+                # Actually, to make entity_profiler diffing perfect, let's clone the _fielded object safely if we can.
+
                 combined.merge(partial, strategy.name, strategy.weight)
+
+                self._observer.on_strategy_success(strategy.name, partial, elapsed_ms)
+
+                combined.count_entities()
+
+                # Dispatch the merge event using entity counts
+                self._observer.on_merge_complete(
+                    strategy.name,
+                    partial,
+                    None,  # Not used anymore since we changed parser_metrics.py signature
+                    combined,
+                    url,
+                )
 
                 if self._orderer and partial.confidence > 0:
                     self._orderer.record_success(strategy.name, partial.confidence, elapsed_ms)
                 elif self._orderer:
                     self._orderer.record_failure(strategy.name, elapsed_ms)
-            except Exception:
+            except Exception as e:
                 elapsed_ms = (time.perf_counter() - start) * 1000
+                self._observer.on_strategy_error(strategy.name, e, elapsed_ms)
                 if self._orderer:
                     self._orderer.record_failure(strategy.name, elapsed_ms)
                 continue
 
             # Every strategy contributes — no early break
             # Confidence threshold is only informational now
+
+        # --- LLM Fallback: Execute only if confidence is low ---
+        if combined.confidence < self._confidence_threshold:
+            from app.parsers.strategies.llm_fallback import LLMFallbackService
+
+            llm_service = LLMFallbackService()
+            combined = llm_service.execute_fallback(soup, url, combined)
 
         # --- Entity Resolution: deduplicate and canonicalize ---
         resolver = EntityResolver()
@@ -153,6 +195,7 @@ class StrategyParser:
         if self._orderer:
             self._orderer.save_stats()
 
+        self._observer.on_page_end(combined)
         return combined
 
     def get_segments(self, html: str, url: str = "") -> list[PageSegment]:
@@ -182,7 +225,9 @@ class StrategyParser:
         """Check whether <head> contains meaningful extraction data."""
         if head.select('script[type="application/ld+json"]'):
             return True
-        if head.select("meta[property^='og:'], meta[name^='twitter:'], meta[name='description'], meta[name='keywords']"):
+        if head.select(
+            "meta[property^='og:'], meta[name^='twitter:'], meta[name='description'], meta[name='keywords']"
+        ):
             return True
         if head.select('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'):
             return True
@@ -210,4 +255,41 @@ class StrategyParser:
         }
         output = type_map.get(parse_type, result.to_company_dict())
         output["url"] = url
+
+        # Inject provenance (field-level confidence metadata)
+        scored = result.to_scored_dict()
+
+        # For top-level scalar fields (company, description, etc.)
+        for k in [
+            "company_name",
+            "description",
+            "logo",
+            "industry",
+            "headquarters",
+            "contact_email",
+            "contact_phone",
+        ]:
+            if k in output and scored.get(k):
+                # We could attach it, but the DB models only have a single `provenance` JSON column per record.
+                # Since entity models (CompetitorService, CompetitorPricing) represent lists, we attach the list item provenance.
+                pass
+
+        # For list entities
+        list_fields = [
+            "services",
+            "pricing",
+            "content",
+            "social_profiles",
+            "team",
+            "locations",
+            "reviews",
+            "trust_signals",
+            "assets",
+        ]
+        for field_name in list_fields:
+            if field_name in output and field_name in scored:
+                for i, item in enumerate(output[field_name]):
+                    if i < len(scored[field_name]):
+                        item["provenance"] = scored[field_name][i]
+
         return dict(output)

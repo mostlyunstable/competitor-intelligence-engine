@@ -1,6 +1,8 @@
 import asyncio
 import contextlib
 import re
+import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 from urllib.parse import urlparse
@@ -151,9 +153,25 @@ class PlaywrightRenderer:
         if self._playwright is None:
             from playwright.async_api import async_playwright
 
+            from app.configuration.settings import get_settings
+            import random
+
+            settings = get_settings()
+            proxy = None
+            if settings.stealth.enabled:
+                proxy_str = ""
+                if settings.stealth.proxy_urls:
+                    proxy_str = random.choice(settings.stealth.proxy_urls)
+                elif settings.stealth.proxy_url:
+                    proxy_str = settings.stealth.proxy_url
+                
+                if proxy_str:
+                    proxy = {"server": proxy_str}
+
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(
                 headless=True,
+                proxy=proxy,
                 args=[
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
@@ -174,6 +192,7 @@ class PlaywrightRenderer:
         *,
         timeout: int = 30000,
         primary_selector: str = "body",
+        competitor_id: int | None = None,
     ) -> str:
         """Render a page and return the HTML.
 
@@ -183,11 +202,33 @@ class PlaywrightRenderer:
         context = await self._ensure_browser()
         page = await context.new_page()
 
+        from app.configuration.settings import get_settings
+
+        if get_settings().stealth.enabled:
+            from playwright_stealth import stealth_async
+
+            await stealth_async(page)
+
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
 
             with contextlib.suppress(Exception):
                 await page.wait_for_selector(primary_selector, timeout=min(timeout, 10000))
+
+            if competitor_id is not None:
+                from app.services.visual_diff_service import VisualDiffService
+
+                diff_service = VisualDiffService()
+                has_changed = await diff_service.detect_visual_change(
+                    competitor_id=competitor_id, url=url, page_object=page
+                )
+                if has_changed:
+                    from app.services.webhook_service import WebhookService
+
+                    webhook_svc = WebhookService()
+                    await webhook_svc.notify_change(
+                        "Unknown", "Visual UX", f"Significant visual changes detected on {url}"
+                    )
 
             html = str(await page.content())
             logger.info("playwright_rendered", url=url, html_length=len(html))
@@ -251,18 +292,42 @@ class CacheEntry:
 
 
 class HttpCacheLayer:
-    """HTTP cache layer supporting conditional GET requests.
+    """HTTP cache layer with LRU eviction and TTL expiration.
 
     Stores ETag, Last-Modified, and Cache-Control headers per URL.
     Enables 304 Not Modified responses to avoid re-downloading unchanged pages.
+    Entries are evicted when max_size is exceeded (LRU) or after ttl_seconds.
     """
 
-    def __init__(self) -> None:
-        self._cache: dict[str, CacheEntry] = {}
+    def __init__(self, max_size: int = 10_000, ttl_seconds: int = 3600) -> None:
+        self._max_size = max_size
+        self._ttl_seconds = ttl_seconds
+        self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
+        self._timestamps: dict[str, float] = {}
+
+    def _evict_expired(self) -> None:
+        """Remove expired entries."""
+        now = time.monotonic()
+        expired = [url for url, ts in self._timestamps.items() if now - ts > self._ttl_seconds]
+        for url in expired:
+            self._cache.pop(url, None)
+            self._timestamps.pop(url, None)
 
     def get(self, url: str) -> CacheEntry | None:
-        """Retrieve cached metadata for a URL."""
-        return self._cache.get(url)
+        """Retrieve cached metadata for a URL. Returns None if expired or missing."""
+        entry = self._cache.get(url)
+        if entry is None:
+            return None
+
+        ts = self._timestamps.get(url, 0.0)
+        if time.monotonic() - ts > self._ttl_seconds:
+            self._cache.pop(url, None)
+            self._timestamps.pop(url, None)
+            return None
+
+        # Move to end (most recently used)
+        self._cache.move_to_end(url)
+        return entry
 
     def store(
         self,
@@ -272,7 +337,16 @@ class HttpCacheLayer:
         cache_control: str | None = None,
         content_hash: str = "",
     ) -> CacheEntry:
-        """Store or update cache metadata for a URL."""
+        """Store or update cache metadata for a URL with LRU eviction."""
+        # Evict expired entries periodically
+        if len(self._cache) >= self._max_size:
+            self._evict_expired()
+
+        # If still at capacity after eviction, remove oldest entry
+        if len(self._cache) >= self._max_size:
+            oldest_url, _ = self._cache.popitem(last=False)
+            self._timestamps.pop(oldest_url, None)
+
         from datetime import UTC, datetime
 
         entry = self._cache.get(url)
@@ -286,6 +360,7 @@ class HttpCacheLayer:
             if content_hash:
                 entry.content_hash = content_hash
             entry.last_checked = datetime.now(UTC).isoformat()
+            self._cache.move_to_end(url)
         else:
             entry = CacheEntry(
                 url=url,
@@ -296,6 +371,8 @@ class HttpCacheLayer:
                 last_checked=datetime.now(UTC).isoformat(),
             )
             self._cache[url] = entry
+
+        self._timestamps[url] = time.monotonic()
         return entry
 
     def build_conditional_headers(self, url: str) -> dict[str, str]:
@@ -360,7 +437,7 @@ class HybridFetcher:
     - Does not retry permanent failures (4xx except 429)
     - Tracks redirect chains
     - Only retries transient failures (5xx, network errors, 429)
-    - Respects rate limiting via token-bucket algorithm
+    - Respects per-domain rate limiting via token-bucket algorithm
     - Supports conditional GET via ETag/Last-Modified for incremental crawling
     """
 
@@ -369,17 +446,46 @@ class HybridFetcher:
         self._client: httpx.AsyncClient | None = None
         self._analyzer = PageAnalyzer()
         self._renderer: PlaywrightRenderer | None = None
-        self._rate_limiter = RateLimiter(self._settings.rate_limit_per_second)
-        self._cache_layer = HttpCacheLayer()
+        self._domain_limiters: dict[str, RateLimiter] = {}
+        cache_settings = get_settings().cache
+        self._cache_layer = HttpCacheLayer(
+            max_size=cache_settings.max_entries,
+            ttl_seconds=cache_settings.default_ttl_seconds,
+        )
+
+    def _get_domain_limiter(self, url: str) -> RateLimiter:
+        """Get or create a per-domain rate limiter."""
+        from urllib.parse import urlparse
+
+        domain = urlparse(url).netloc
+        if domain not in self._domain_limiters:
+            self._domain_limiters[domain] = RateLimiter(self._settings.rate_limit_per_second)
+        return self._domain_limiters[domain]
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create httpx client."""
         if self._client is None or self._client.is_closed:
+            import random
+            from app.configuration.settings import get_settings
+            
+            settings = get_settings()
+            proxy = None
+            if settings.stealth.enabled:
+                proxy_str = ""
+                if settings.stealth.proxy_urls:
+                    proxy_str = random.choice(settings.stealth.proxy_urls)
+                elif settings.stealth.proxy_url:
+                    proxy_str = settings.stealth.proxy_url
+                
+                if proxy_str:
+                    proxy = proxy_str
+            
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(self._settings.collection_timeout),
                 headers={"User-Agent": self._settings.user_agent},
                 follow_redirects=True,
                 verify=True,
+                proxy=proxy,
             )
         return self._client
 
@@ -389,7 +495,9 @@ class HybridFetcher:
             self._renderer = PlaywrightRenderer()
         return self._renderer
 
-    async def fetch(self, url: str) -> FetchResult:
+    async def fetch(
+        self, url: str, competitor_id: int | None = None, *, force_render: bool = False
+    ) -> FetchResult:
         """Fetch a page using hybrid strategy with incremental crawling support.
 
         Workflow:
@@ -399,9 +507,32 @@ class HybridFetcher:
         4. If content hash unchanged → skip parsing, skip DB writes, log reason
         5. Otherwise → full fetch with Playwright fallback
         6. Detect language and classify page type
+
+        Args:
+            force_render: Skip httpx entirely and use Playwright for rendering.
+                Use when JavaScript execution is required to obtain meaningful
+                content (e.g., technographic detection, SPA pages).
         """
         from app.parsers.language_detector import LanguageDetector
         from app.parsers.page_classifier import PageClassifier
+
+        if force_render:
+            logger.info("forced_playwright_render", url=url)
+            from app.utilities.metrics import metrics
+
+            metrics.inc_counter("playwright_fallback_total")
+            dynamic_result = await self._fetch_dynamic(url, competitor_id)
+            if dynamic_result.html:
+                lang_detector = LanguageDetector()
+                lang_result = lang_detector.detect(dynamic_result.html)
+                dynamic_result.language = lang_result.language
+                dynamic_result.language_confidence = lang_result.confidence
+
+                classifier = PageClassifier()
+                class_result = classifier.classify(dynamic_result.html, url)
+                dynamic_result.page_type = class_result.page_type
+                dynamic_result.page_type_confidence = class_result.confidence
+            return dynamic_result
 
         cache_expired = self._cache_layer.is_cache_expired(url)
         conditional_headers = self._cache_layer.build_conditional_headers(url)
@@ -495,7 +626,7 @@ class HybridFetcher:
         metrics.inc_counter("playwright_fallback_total")
 
         try:
-            dynamic_result = await self._fetch_dynamic(url)
+            dynamic_result = await self._fetch_dynamic(url, competitor_id)
             if dynamic_result.html:
                 lang_detector = LanguageDetector()
                 lang_result = lang_detector.detect(dynamic_result.html)
@@ -565,7 +696,7 @@ class HybridFetcher:
         self, url: str, conditional_headers: dict[str, str] | None = None
     ) -> FetchResult:
         """Fetch page using httpx with smart retry logic and conditional GET."""
-        await self._rate_limiter.acquire()
+        await self._get_domain_limiter(url).acquire()
 
         last_error: Exception | None = None
         redirect_chain: list[str] = []
@@ -685,9 +816,9 @@ class HybridFetcher:
 
         raise last_error or RuntimeError(f"Failed to fetch {url}")
 
-    async def _fetch_dynamic(self, url: str) -> FetchResult:
+    async def _fetch_dynamic(self, url: str, competitor_id: int | None = None) -> FetchResult:
         """Fetch page using Playwright."""
-        await self._rate_limiter.acquire()
+        await self._get_domain_limiter(url).acquire()
 
         renderer = await self._get_renderer()
         settings = get_settings().collector
@@ -695,6 +826,7 @@ class HybridFetcher:
             url,
             timeout=settings.playwright_timeout,
             primary_selector=get_settings().collector.primary_selector,
+            competitor_id=competitor_id,
         )
 
         return FetchResult(

@@ -71,10 +71,20 @@ _GENERATOR_PATTERN = re.compile(
 )
 
 # Heading keywords for download sections
-_DOWNLOAD_HEADING_KW = frozenset({
-    "download", "resources", "documents", "brochures", "literature",
-    "whitepapers", "case studies", "guides", "templates", "toolkits",
-})
+_DOWNLOAD_HEADING_KW = frozenset(
+    {
+        "download",
+        "resources",
+        "documents",
+        "brochures",
+        "literature",
+        "whitepapers",
+        "case studies",
+        "guides",
+        "templates",
+        "toolkits",
+    }
+)
 
 
 class AssetExtractionStrategy(ParsingStrategy):
@@ -131,17 +141,23 @@ class AssetExtractionStrategy(ParsingStrategy):
             asset_type = "document"
             if is_doc:
                 ext = href.rsplit(".", 1)[-1].lower() if "." in href else ""
-                asset_type = ext if ext in ("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv") else "document"
+                asset_type = (
+                    ext
+                    if ext in ("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv")
+                    else "document"
+                )
             elif is_download:
                 asset_type = "download"
 
-            result.assets.append({
-                "url": full_url,
-                "name": text if text else href.split("/")[-1].split("?")[0],
-                "type": asset_type,
-                "category": "document",
-                "source": "asset_extraction",
-            })
+            result.assets.append(
+                {
+                    "url": full_url,
+                    "name": text if text else href.split("/")[-1].split("?")[0],
+                    "type": asset_type,
+                    "category": "document",
+                    "source": "asset_extraction",
+                }
+            )
 
     def _extract_tech_from_scripts(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         for script in soup.select("script[src]"):
@@ -186,7 +202,7 @@ class AssetExtractionStrategy(ParsingStrategy):
                 for keyword in ("powered by", "built with"):
                     idx = combined.find(keyword)
                     if idx >= 0:
-                        tech_text = combined[idx + len(keyword):].strip()
+                        tech_text = combined[idx + len(keyword) :].strip()
                         if tech_text and len(tech_text) < 50:
                             self._add_tech(result, tech_text.title(), "cms", "badge")
                             break
@@ -199,10 +215,12 @@ class AssetExtractionStrategy(ParsingStrategy):
         # Deduplicate by name
         if any(t.get("name") == name for t in result.assets):
             return
-        result.assets.append({
-            "url": "",
-            "name": name,
-            "type": "technology",
-            "category": category,
-            "source": f"tech_{method}",
-        })
+        result.assets.append(
+            {
+                "url": "",
+                "name": name,
+                "type": "technology",
+                "category": category,
+                "source": f"tech_{method}",
+            }
+        )

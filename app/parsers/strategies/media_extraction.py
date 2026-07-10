@@ -125,28 +125,38 @@ class MediaExtractionStrategy(ParsingStrategy):
             src = str(video.get("src", ""))
             if src and src not in seen_urls:
                 seen_urls.add(src)
-                result.media.append({
-                    "type": "video",
-                    "url": urljoin(url, src),
-                    "title": None,
-                    "alt_text": None,
-                    "mime_type": self._guess_mime(src),
-                })
+                result.media.append(
+                    {
+                        "type": "video",
+                        "url": urljoin(url, src),
+                        "title": None,
+                        "alt_text": None,
+                        "mime_type": self._guess_mime(src),
+                    }
+                )
 
         for iframe in soup.select("iframe[src]"):
             src = str(iframe.get("src", ""))
             if not src:
                 continue
             # Detect video embeds
-            if any(domain in src.lower() for domain in ("youtube", "youtu.be", "vimeo", "wistia", "loom")) and src not in seen_urls:
-                    seen_urls.add(src)
-                    result.media.append({
+            if (
+                any(
+                    domain in src.lower()
+                    for domain in ("youtube", "youtu.be", "vimeo", "wistia", "loom")
+                )
+                and src not in seen_urls
+            ):
+                seen_urls.add(src)
+                result.media.append(
+                    {
                         "type": "video_embed",
                         "url": src,
                         "title": str(iframe.get("title", "")) or None,
                         "alt_text": None,
                         "mime_type": "text/html",
-                    })
+                    }
+                )
 
     def _extract_downloads(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         """Extract downloadable documents (PDFs, brochures, spec sheets)."""
@@ -163,24 +173,36 @@ class MediaExtractionStrategy(ParsingStrategy):
             seen_urls.add(full_url)
 
             text = a.get_text(strip=True) or None
-            result.media.append({
-                "type": "download",
-                "url": full_url,
-                "title": text,
-                "alt_text": None,
-                "mime_type": self._guess_mime(full_url),
-            })
+            result.media.append(
+                {
+                    "type": "download",
+                    "url": full_url,
+                    "title": text,
+                    "alt_text": None,
+                    "mime_type": self._guess_mime(full_url),
+                }
+            )
 
     @staticmethod
     def _guess_mime(url_str: str) -> str:
         ext = urlparse(url_str).path.split(".")[-1].lower() if "." in url_str else ""
         mime_map = {
-            "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-            "gif": "image/gif", "svg": "image/svg+xml", "webp": "image/webp",
-            "avif": "image/avif", "ico": "image/x-icon",
-            "mp4": "video/mp4", "webm": "video/webm", "ogg": "video/ogg",
-            "mov": "video/quicktime", "avi": "video/x-msvideo", "mkv": "video/x-matroska",
-            "pdf": "application/pdf", "doc": "application/msword",
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "gif": "image/gif",
+            "svg": "image/svg+xml",
+            "webp": "image/webp",
+            "avif": "image/avif",
+            "ico": "image/x-icon",
+            "mp4": "video/mp4",
+            "webm": "video/webm",
+            "ogg": "video/ogg",
+            "mov": "video/quicktime",
+            "avi": "video/x-msvideo",
+            "mkv": "video/x-matroska",
+            "pdf": "application/pdf",
+            "doc": "application/msword",
             "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "xls": "application/vnd.ms-excel",
             "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

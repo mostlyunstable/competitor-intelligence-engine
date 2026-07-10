@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +61,7 @@ class CompetitorContentRepository(BaseRepository[CompetitorContent]):
         summary: str | None = None,
         raw_content: str | None = None,
         content_type: str | None = None,
+        provenance: dict[str, Any] | None = None,
     ) -> CompetitorContent:
         """Insert or update a content item based on URL or content hash.
 
@@ -70,6 +72,7 @@ class CompetitorContentRepository(BaseRepository[CompetitorContent]):
         # Primary: check by URL
         existing = await self.get_by_url(competitor_id, url)
         if existing:
+            existing.provenance = provenance
             existing.collected_at = datetime.now(UTC)
             await self._session.flush()
             return existing
@@ -77,6 +80,7 @@ class CompetitorContentRepository(BaseRepository[CompetitorContent]):
         # Secondary: check by content hash (same content, different URL)
         existing = await self.get_by_hash(competitor_id, content_hash)
         if existing:
+            existing.provenance = provenance
             existing.collected_at = datetime.now(UTC)
             await self._session.flush()
             return existing
@@ -91,6 +95,7 @@ class CompetitorContentRepository(BaseRepository[CompetitorContent]):
             summary=summary,
             raw_content=raw_content,
             content_type=content_type,
+            provenance=provenance,
         )
 
     async def delete_by_competitor(self, competitor_id: int) -> None:

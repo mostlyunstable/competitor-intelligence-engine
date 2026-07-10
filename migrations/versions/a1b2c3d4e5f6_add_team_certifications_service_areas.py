@@ -21,7 +21,12 @@ def upgrade() -> None:
     op.create_table(
         "competitor_team_members",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("competitor_id", sa.Integer(), sa.ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "competitor_id",
+            sa.Integer(),
+            sa.ForeignKey("competitors.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(500), nullable=False),
         sa.Column("title", sa.String(255), nullable=True),
         sa.Column("department", sa.String(255), nullable=True),
@@ -29,46 +34,79 @@ def upgrade() -> None:
         sa.Column("linkedin_url", sa.String(2048), nullable=True),
         sa.Column("image_url", sa.String(2048), nullable=True),
         sa.Column("content_hash", sa.String(64), nullable=False, server_default=""),
-        sa.Column("collected_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "collected_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
         comment="Team members and leadership collected from competitors",
     )
-    op.create_index("ix_competitor_team_member_competitor_id", "competitor_team_members", ["competitor_id"])
-    op.create_index("ix_competitor_team_member_content_hash", "competitor_team_members", ["content_hash"])
+    op.create_index(
+        "ix_competitor_team_member_competitor_id", "competitor_team_members", ["competitor_id"]
+    )
+    op.create_index(
+        "ix_competitor_team_member_content_hash", "competitor_team_members", ["content_hash"]
+    )
 
     op.create_table(
         "competitor_certifications",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("competitor_id", sa.Integer(), sa.ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "competitor_id",
+            sa.Integer(),
+            sa.ForeignKey("competitors.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(500), nullable=False),
         sa.Column("category", sa.String(50), nullable=False, server_default="certification"),
         sa.Column("issuing_body", sa.String(255), nullable=True),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("image_url", sa.String(2048), nullable=True),
         sa.Column("content_hash", sa.String(64), nullable=False, server_default=""),
-        sa.Column("collected_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "collected_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
         comment="Certifications, awards, and trust signals collected from competitors",
     )
-    op.create_index("ix_competitor_certification_competitor_id", "competitor_certifications", ["competitor_id"])
-    op.create_index("ix_competitor_certification_content_hash", "competitor_certifications", ["content_hash"])
+    op.create_index(
+        "ix_competitor_certification_competitor_id", "competitor_certifications", ["competitor_id"]
+    )
+    op.create_index(
+        "ix_competitor_certification_content_hash", "competitor_certifications", ["content_hash"]
+    )
 
     op.create_table(
         "competitor_service_areas",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("competitor_id", sa.Integer(), sa.ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("service_id", sa.Integer(), sa.ForeignKey("competitor_services.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "competitor_id",
+            sa.Integer(),
+            sa.ForeignKey("competitors.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "service_id",
+            sa.Integer(),
+            sa.ForeignKey("competitor_services.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("area_name", sa.String(500), nullable=False),
         sa.Column("area_type", sa.String(50), nullable=False, server_default="city"),
         sa.Column("state", sa.String(100), nullable=True),
         sa.Column("country", sa.String(100), nullable=True),
         sa.Column("content_hash", sa.String(64), nullable=False, server_default=""),
-        sa.Column("collected_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "collected_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
         comment="Service areas and coverage regions collected from competitors",
     )
-    op.create_index("ix_competitor_service_area_competitor_id", "competitor_service_areas", ["competitor_id"])
-    op.create_index("ix_competitor_service_area_content_hash", "competitor_service_areas", ["content_hash"])
+    op.create_index(
+        "ix_competitor_service_area_competitor_id", "competitor_service_areas", ["competitor_id"]
+    )
+    op.create_index(
+        "ix_competitor_service_area_content_hash", "competitor_service_areas", ["content_hash"]
+    )
 
 
 def downgrade() -> None:

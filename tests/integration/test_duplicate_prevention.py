@@ -158,7 +158,7 @@ class TestPageDuplicatePrevention:
             competitor_id=competitor.id,
             content_hash=content_hash,
             source_id=None,
-            raw_html="<html>same content</html>",
+            storage_uri="file:///path/same.html",
             collection_status=CollectionStatus.SUCCESS,
         )
         assert page1.id is not None
@@ -168,7 +168,7 @@ class TestPageDuplicatePrevention:
             competitor_id=competitor.id,
             content_hash=content_hash,
             source_id=None,
-            raw_html="<html>same content</html>",
+            storage_uri="file:///path/same.html",
             collection_status=CollectionStatus.SUCCESS,
         )
         assert page2.id == page1.id
@@ -190,12 +190,12 @@ class TestPageDuplicatePrevention:
         page1 = await repo.upsert(
             competitor_id=competitor.id,
             content_hash=hash1,
-            raw_html="<html>page one</html>",
+            storage_uri="file:///path/one.html",
         )
         page2 = await repo.upsert(
             competitor_id=competitor.id,
             content_hash=hash2,
-            raw_html="<html>page two</html>",
+            storage_uri="file:///path/two.html",
         )
 
         assert page1.id != page2.id

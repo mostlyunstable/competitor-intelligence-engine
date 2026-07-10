@@ -24,26 +24,26 @@ class TestCompetitorPageRepository:
         repo = CompetitorPageRepository(self.session)
         page = await repo.create(
             competitor_id=competitor.id,
-            raw_html="<html><body>Hello</body></html>",
-            raw_json={"title": "Hello"},
+            storage_uri="file:///path/to/page.html",
+            extracted_data={"title": "Hello"},
             collection_status=CollectionStatus.SUCCESS,
         )
         assert page.id is not None
-        assert page.raw_html == "<html><body>Hello</body></html>"
+        assert page.storage_uri == "file:///path/to/page.html"
 
     async def test_get_by_competitor(self) -> None:
         competitor = await self._create_competitor()
         repo = CompetitorPageRepository(self.session)
-        await repo.create(competitor_id=competitor.id, raw_html="<html>Page 1</html>")
-        await repo.create(competitor_id=competitor.id, raw_html="<html>Page 2</html>")
+        await repo.create(competitor_id=competitor.id, storage_uri="<html>Page 1</html>")
+        await repo.create(competitor_id=competitor.id, storage_uri="<html>Page 2</html>")
         pages = await repo.get_by_competitor(competitor.id)
         assert len(pages) == 2
 
     async def test_get_latest(self) -> None:
         competitor = await self._create_competitor()
         repo = CompetitorPageRepository(self.session)
-        _first = await repo.create(competitor_id=competitor.id, raw_html="<html>First</html>")
-        second = await repo.create(competitor_id=competitor.id, raw_html="<html>Latest</html>")
+        _first = await repo.create(competitor_id=competitor.id, storage_uri="<html>First</html>")
+        second = await repo.create(competitor_id=competitor.id, storage_uri="<html>Latest</html>")
         latest = await repo.get_latest_by_competitor(competitor.id)
         assert latest is not None
         assert latest.id == second.id
@@ -51,7 +51,7 @@ class TestCompetitorPageRepository:
     async def test_cascade_delete(self) -> None:
         competitor = await self._create_competitor(name="Cascade Page Corp")
         repo = CompetitorPageRepository(self.session)
-        await repo.create(competitor_id=competitor.id, raw_html="<html>Page</html>")
+        await repo.create(competitor_id=competitor.id, storage_uri="<html>Page</html>")
         comp_repo = CompetitorRepository(self.session)
         await comp_repo.delete(competitor.id)
         pages = await repo.get_by_competitor(competitor.id)

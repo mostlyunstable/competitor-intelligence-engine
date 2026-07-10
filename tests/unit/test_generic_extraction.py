@@ -30,6 +30,7 @@ def test_team_extraction():
     assert result.team[1]["name"] == "John Smith"
     assert result.team[1]["title"] == "CTO"
 
+
 def test_location_extraction():
     html = """
     <div>
@@ -49,6 +50,7 @@ def test_location_extraction():
     assert "San Francisco" in result.locations[0]["name"]
     assert "CA" in result.locations[0]["name"]
     assert "456 Tech Ave" in result.locations[1]["name"]
+
 
 def test_review_extraction():
     html = """
@@ -77,6 +79,7 @@ def test_review_extraction():
     assert result.reviews[1]["author"] == "Bob"
     assert "We loved working with them" in result.reviews[1]["body"]
 
+
 def test_trust_signal_extraction():
     html = """
     <footer>
@@ -103,6 +106,7 @@ def test_trust_signal_extraction():
     names = [ts["name"] for ts in result.trust_signals]
     assert "SOC 2 Type II Certified" in names
     assert "30-Day Money Back Guarantee" in names
+
 
 def test_asset_extraction():
     html = """

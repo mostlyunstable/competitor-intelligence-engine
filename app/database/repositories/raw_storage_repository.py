@@ -43,21 +43,23 @@ class RawStorageRepository(BaseRepository[RawStorage]):
         competitor_id: int,
         source_url: str,
         content_hash: str,
-        raw_html: str | None = None,
-        raw_json: dict[str, Any] | None = None,
+        storage_uri: str | None = None,
+        mime_type: str | None = None,
+        file_size_bytes: int | None = None,
         metadata: dict[str, Any] | None = None,
         extracted_data: dict[str, Any] | None = None,
         collection_status: CollectionStatus = CollectionStatus.SUCCESS,
     ) -> RawStorage:
         """Insert or update raw storage based on URL.
 
-        If an entry with the same URL exists, update its HTML and metadata.
+        If an entry with the same URL exists, update its storage URI and metadata.
         Otherwise, create a new record.
         """
         existing = await self.get_by_url(competitor_id, source_url)
         if existing:
-            existing.raw_html = raw_html
-            existing.raw_json = raw_json
+            existing.storage_uri = storage_uri
+            existing.mime_type = mime_type
+            existing.file_size_bytes = file_size_bytes
             existing.metadata_ = metadata
             existing.extracted_data = extracted_data
             existing.content_hash = content_hash
@@ -69,8 +71,9 @@ class RawStorageRepository(BaseRepository[RawStorage]):
             competitor_id=competitor_id,
             source_url=source_url,
             content_hash=content_hash,
-            raw_html=raw_html,
-            raw_json=raw_json,
+            storage_uri=storage_uri,
+            mime_type=mime_type,
+            file_size_bytes=file_size_bytes,
             metadata_=metadata,
             extracted_data=extracted_data,
             collection_status=collection_status,

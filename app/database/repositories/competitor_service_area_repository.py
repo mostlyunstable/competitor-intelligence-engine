@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CompetitorServiceArea
@@ -20,7 +21,9 @@ class CompetitorServiceAreaRepository(BaseRepository[CompetitorServiceArea]):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_area_type(self, competitor_id: int, area_type: str) -> list[CompetitorServiceArea]:
+    async def get_by_area_type(
+        self, competitor_id: int, area_type: str
+    ) -> list[CompetitorServiceArea]:
         stmt = (
             select(CompetitorServiceArea)
             .where(
@@ -32,14 +35,6 @@ class CompetitorServiceAreaRepository(BaseRepository[CompetitorServiceArea]):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_hash(self, competitor_id: int, content_hash: str) -> CompetitorServiceArea | None:
-        stmt = select(CompetitorServiceArea).where(
-            CompetitorServiceArea.competitor_id == competitor_id,
-            CompetitorServiceArea.content_hash == content_hash,
-        )
-        result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
-
     async def upsert(
         self,
         competitor_id: int,
@@ -50,22 +45,32 @@ class CompetitorServiceAreaRepository(BaseRepository[CompetitorServiceArea]):
         country: str | None = None,
         service_id: int | None = None,
     ) -> CompetitorServiceArea:
-        existing = await self.get_by_hash(competitor_id, content_hash)
-        if existing:
-            existing.collected_at = datetime.now(UTC)
-            await self._session.flush()
-            return existing
-        return await self.create(
-            competitor_id=competitor_id,
-            content_hash=content_hash,
-            area_name=area_name,
-            area_type=area_type,
-            state=state,
-            country=country,
-            service_id=service_id,
+        """Native PostgreSQL upsert: single INSERT ... ON CONFLICT DO UPDATE query."""
+        now = datetime.now(UTC)
+        stmt = (
+            insert(CompetitorServiceArea)
+            .values(
+                competitor_id=competitor_id,
+                content_hash=content_hash,
+                area_name=area_name,
+                area_type=area_type,
+                state=state,
+                country=country,
+                service_id=service_id,
+                collected_at=now,
+            )
+            .on_conflict_do_update(
+                constraint="uq_competitor_service_area_hash",
+                set_={"collected_at": now},
+            )
+            .returning(CompetitorServiceArea)
         )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
 
     async def delete_by_competitor(self, competitor_id: int) -> None:
-        stmt = delete(CompetitorServiceArea).where(CompetitorServiceArea.competitor_id == competitor_id)
+        stmt = delete(CompetitorServiceArea).where(
+            CompetitorServiceArea.competitor_id == competitor_id
+        )
         await self._session.execute(stmt)
         await self._session.flush()

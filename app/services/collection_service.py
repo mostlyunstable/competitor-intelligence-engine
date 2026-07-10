@@ -5,16 +5,20 @@ from typing import Any
 
 import structlog
 
+from app.collectors.base import reset_deduplicators
 from app.collectors.company import CompanyCollector
 from app.collectors.content import ContentCollector
 from app.collectors.discovery import DiscoveryEngine
 from app.collectors.pricing import PricingCollector
 from app.collectors.service import ServiceCollector
 from app.collectors.social import SocialCollector
+from app.collectors.technographic import TechnographicCollector
 from app.database.connection import db_manager
 from app.database.repositories.collection_log_repository import CollectionLogRepository
 from app.database.repositories.competitor_repository import CompetitorRepository
 from app.database.repositories.competitor_source_repository import CompetitorSourceRepository
+from app.observability.parser_metrics import registry
+from app.services.webhook_service import WebhookService
 
 logger = structlog.get_logger(__name__)
 
@@ -24,6 +28,7 @@ MODULE_COLLECTORS: dict[str, Any] = {
     "pricing": PricingCollector,
     "content": ContentCollector,
     "social": SocialCollector,
+    "technographic": TechnographicCollector,
 }
 
 
@@ -53,132 +58,119 @@ class CollectionService:
         start_time = time.time()
         log = logger.bind(competitor_id=competitor_id)
 
+        # Reset global deduplicators to prevent unbounded memory growth
+        reset_deduplicators()
+
         try:
-            async with db_manager.session() as session:
-                comp_repo = CompetitorRepository(session)
-                competitor = await comp_repo.get_by_id(competitor_id)
-                if not competitor:
-                    return {"status": "failed", "error": f"Competitor {competitor_id} not found"}
+            # Phase 1: Load competitor config (short-lived session)
+            competitor_data = await self._load_competitor(competitor_id)
+            if competitor_data.get("status") == "failed":
+                return competitor_data
+            if competitor_data.get("status") == "skipped":
+                return competitor_data
 
-                enabled = getattr(competitor, "enabled", True)
-                if not enabled:
-                    return {"status": "skipped", "reason": "Competitor disabled"}
+            modules = competitor_data["modules"]
+            base_url = competitor_data["base_url"]
+            competitor_name = competitor_data["name"]
 
-                modules = getattr(competitor, "modules", []) or []
-                if not modules:
-                    return {"status": "skipped", "reason": "No modules configured"}
+            log.info("collection_started", modules=modules, base_url=base_url)
 
-                base_url = getattr(competitor, "website_url", "")
-                source_repo = CompetitorSourceRepository(session)
-                log.info("collection_started", modules=modules, base_url=base_url)
+            # Phase 2: Discover URLs (no DB session needed)
+            discovery_engine = DiscoveryEngine()
+            discovered = await discovery_engine.discover(base_url)
+            discovered_urls = [d.url for d in discovered]
+            log.info(
+                "discovery_complete",
+                total_urls=len(discovered_urls),
+                sources=self._count_sources(discovered),
+            )
 
-                discovery_engine = DiscoveryEngine()
-                discovered = await discovery_engine.discover(base_url)
+            # Phase 3: Save discovered URLs (short-lived session)
+            await self._save_discovered_urls(competitor_id, discovered, log)
 
-                discovered_urls = [d.url for d in discovered]
+            # Phase 4: Collect from each module (short-lived session per URL)
+            results: dict[str, Any] = {}
+            errors: list[str] = []
+            records_collected = 0
+            skipped_urls: list[str] = []
+
+            for module in modules:
+                if module == "discovery":
+                    results[module] = [{"status": "completed", "source": "DiscoveryEngine"}]
+                    continue
+
+                collector = self._get_collector(module)
+                if not collector:
+                    log.warning("unknown_module", module=module)
+                    continue
+
+                urls_to_fetch = self._select_urls_for_module(module, discovered_urls, base_url)
+
+                if not urls_to_fetch:
+                    log.info("no_urls_for_module", module=module)
+                    skipped_urls.append(f"{module}: no matching URLs")
+                    results[module] = []
+                    continue
+
                 log.info(
-                    "discovery_complete",
-                    total_urls=len(discovered_urls),
-                    sources=self._count_sources(discovered),
+                    "module_fetching_urls",
+                    module=module,
+                    url_count=len(urls_to_fetch),
+                    urls=urls_to_fetch[:5],
                 )
 
-                for d in discovered:
+                module_results = []
+                for url in urls_to_fetch:
                     try:
-                        async with session.begin_nested():
-                            existing = await source_repo.get_by_url(competitor_id, d.url)
-                            if not existing:
-                                await source_repo.create(
-                                    competitor_id=competitor_id,
-                                    url=d.url,
-                                    page_type=self._classify_url(d.url),
-                                )
-                            else:
-                                await source_repo.mark_crawled(existing.id)
-                    except Exception as e:
-                        log.warning("source_url_error", url=d.url, error=str(e))
-
-                results: dict[str, Any] = {}
-                errors: list[str] = []
-                records_collected = 0
-                skipped_urls: list[str] = []
-
-                for module in modules:
-                    if module == "discovery":
-                        results[module] = [{"status": "completed", "source": "DiscoveryEngine"}]
-                        continue
-
-                    collector = self._get_collector(module)
-                    if not collector:
-                        log.warning("unknown_module", module=module)
-                        continue
-
-                    urls_to_fetch = self._select_urls_for_module(module, discovered_urls, base_url)
-
-                    if not urls_to_fetch:
-                        log.info("no_urls_for_module", module=module)
-                        skipped_urls.append(f"{module}: no matching URLs")
-                        results[module] = []
-                        continue
-
-                    log.info(
-                        "module_fetching_urls",
-                        module=module,
-                        url_count=len(urls_to_fetch),
-                        urls=urls_to_fetch[:5],
-                    )
-
-                    module_results = []
-                    for url in urls_to_fetch:
-                        try:
-                            async with session.begin_nested():
-                                result = await collector.collect(competitor_id, url, session=session)
-                            module_results.append(result)
-                            if result.get("status") == "success":
-                                records_collected += sum(
-                                    v for v in result.values() if isinstance(v, int) and v > 0
-                                )
-                        except Exception as e:
-                            log.error(
-                                "module_collection_failed",
-                                module=module,
-                                url=url,
-                                error=str(e),
+                        # Each URL gets its own short-lived session
+                        async with db_manager.session() as session:
+                            result = await collector.collect(competitor_id, url, session=session)
+                        module_results.append(result)
+                        if result.get("status") == "success":
+                            records_collected += sum(
+                                v for v in result.values() if isinstance(v, int) and v > 0
                             )
-                            module_results.append({"status": "failed", "error": str(e)})
-                            errors.append(f"{module}/{url}: {e!s}")
+                    except Exception as e:
+                        log.error(
+                            "module_collection_failed",
+                            module=module,
+                            url=url,
+                            error=str(e),
+                        )
+                        module_results.append({"status": "failed", "error": str(e)})
+                        errors.append(f"{module}/{url}: {e!s}")
 
-                    results[module] = module_results
+                results[module] = module_results
 
-                elapsed = round(time.time() - start_time, 2)
+            elapsed = round(time.time() - start_time, 2)
 
-                log_repo = CollectionLogRepository(session)
-                await log_repo.create(
-                    competitor_id=competitor_id,
-                    start_time=datetime.fromtimestamp(start_time, tz=UTC),
-                    end_time=datetime.now(UTC),
-                    success=len(errors) == 0,
-                    duration_seconds=elapsed,
-                    records_collected=records_collected,
-                    errors=errors,
-                    retry_count=0,
+            # Phase 5: Save collection log (short-lived session)
+            await self._save_collection_log(competitor_id, start_time, errors, records_collected)
+
+            log.info(
+                "collection_completed",
+                elapsed=elapsed,
+                modules=modules,
+                records_collected=records_collected,
+                errors=len(errors),
+            )
+
+            if records_collected > 0:
+                webhook_svc = WebhookService()
+                await webhook_svc.notify_change(
+                    competitor_name=competitor_name,
+                    data_type="Data Collection",
+                    message=f"Collection completed successfully in {elapsed}s. {records_collected} new/updated records found.",
                 )
 
-                log.info(
-                    "collection_completed",
-                    elapsed=elapsed,
-                    modules=modules,
-                    records_collected=records_collected,
-                    errors=len(errors),
-                )
-
-                return {
-                    "status": "success",
-                    "competitor_id": competitor_id,
-                    "modules_collected": modules,
-                    "results": results,
-                    "elapsed_seconds": elapsed,
-                    "discovered_urls": len(discovered_urls),
-                }
+            return {
+                "status": "success",
+                "competitor_id": competitor_id,
+                "modules_collected": modules,
+                "results": results,
+                "elapsed_seconds": elapsed,
+                "discovered_urls": len(discovered_urls),
+            }
         except Exception as e:
             elapsed = round(time.time() - start_time, 2)
             log.error("collection_failed", error=str(e), elapsed=elapsed)
@@ -189,8 +181,73 @@ class CollectionService:
                 "elapsed_seconds": elapsed,
             }
         finally:
+            registry.clear()
             async with self._crawls_lock:
                 self._active_crawls.discard(competitor_id)
+
+    async def _load_competitor(self, competitor_id: int) -> dict[str, Any]:
+        """Load competitor configuration in a short-lived session."""
+        async with db_manager.session() as session:
+            comp_repo = CompetitorRepository(session)
+            competitor = await comp_repo.get_by_id(competitor_id)
+            if not competitor:
+                return {"status": "failed", "error": f"Competitor {competitor_id} not found"}
+
+            enabled = getattr(competitor, "enabled", True)
+            if not enabled:
+                return {"status": "skipped", "reason": "Competitor disabled"}
+
+            modules = getattr(competitor, "modules", []) or []
+            if not modules:
+                return {"status": "skipped", "reason": "No modules configured"}
+
+            return {
+                "modules": modules,
+                "base_url": getattr(competitor, "website_url", ""),
+                "name": getattr(competitor, "name", f"ID {competitor_id}"),
+            }
+
+    async def _save_discovered_urls(
+        self, competitor_id: int, discovered: list[Any], log: Any
+    ) -> None:
+        """Save discovered URLs to the database in a short-lived session."""
+        async with db_manager.session() as session:
+            source_repo = CompetitorSourceRepository(session)
+            for d in discovered:
+                try:
+                    async with session.begin_nested():
+                        existing = await source_repo.get_by_url(competitor_id, d.url)
+                        if not existing:
+                            await source_repo.create(
+                                competitor_id=competitor_id,
+                                url=d.url,
+                                page_type=self._classify_url(d.url),
+                            )
+                        else:
+                            await source_repo.mark_crawled(existing.id)
+                except Exception as e:
+                    log.warning("source_url_error", url=d.url, error=str(e))
+
+    async def _save_collection_log(
+        self,
+        competitor_id: int,
+        start_time: float,
+        errors: list[str],
+        records_collected: int,
+    ) -> None:
+        """Save collection log in a short-lived session."""
+        async with db_manager.session() as session:
+            log_repo = CollectionLogRepository(session)
+            await log_repo.create(
+                competitor_id=competitor_id,
+                start_time=datetime.fromtimestamp(start_time, tz=UTC),
+                end_time=datetime.now(UTC),
+                success=len(errors) == 0,
+                duration_seconds=round(time.time() - start_time, 2),
+                records_collected=records_collected,
+                errors=errors,
+                retry_count=0,
+            )
 
     def _select_urls_for_module(
         self, module: str, discovered_urls: list[str], base_url: str

@@ -130,7 +130,7 @@ class TestForeignKeyConstraints:
         with pytest.raises(IntegrityError):
             await repo.create(
                 competitor_id=999999,
-                raw_html="<html></html>",
+                storage_uri="file://html",
             )
             await session.flush()
 
@@ -292,8 +292,8 @@ class TestCascadeDeletes:
         )
 
         page_repo = CompetitorPageRepository(session)
-        await page_repo.create(competitor_id=competitor.id, raw_html="<html>p1</html>")
-        await page_repo.create(competitor_id=competitor.id, raw_html="<html>p2</html>")
+        await page_repo.create(competitor_id=competitor.id, storage_uri="file://p1")
+        await page_repo.create(competitor_id=competitor.id, storage_uri="file://p2")
 
         await comp_repo.delete(competitor.id)
         pages = await page_repo.get_by_competitor(competitor.id)
@@ -307,8 +307,12 @@ class TestCascadeDeletes:
         )
 
         service_repo = CompetitorServiceRepository(session)
-        await service_repo.create(competitor_id=competitor.id, service_name="Service 1")
-        await service_repo.create(competitor_id=competitor.id, service_name="Service 2")
+        await service_repo.create(
+            competitor_id=competitor.id, service_name="Service 1", content_hash="hash1"
+        )
+        await service_repo.create(
+            competitor_id=competitor.id, service_name="Service 2", content_hash="hash2"
+        )
 
         await comp_repo.delete(competitor.id)
         services = await service_repo.get_by_competitor(competitor.id)
@@ -323,10 +327,16 @@ class TestCascadeDeletes:
 
         pricing_repo = CompetitorPricingRepository(session)
         await pricing_repo.create(
-            competitor_id=competitor.id, service_name="Pricing 1", base_price=100
+            competitor_id=competitor.id,
+            service_name="Pricing 1",
+            base_price=100,
+            content_hash="hash1",
         )
         await pricing_repo.create(
-            competitor_id=competitor.id, service_name="Pricing 2", base_price=200
+            competitor_id=competitor.id,
+            service_name="Pricing 2",
+            base_price=200,
+            content_hash="hash2",
         )
 
         await comp_repo.delete(competitor.id)
@@ -399,7 +409,7 @@ class TestCascadeDeletes:
         await raw_repo.create(
             competitor_id=competitor.id,
             source_url="https://cascaderaw.com/page",
-            raw_html="<html>raw</html>",
+            storage_uri="file://raw",
         )
 
         await comp_repo.delete(competitor.id)
@@ -463,6 +473,7 @@ class TestJsonFields:
         self, session: AsyncSession, engine: AsyncEngine
     ) -> None:
         from typing import cast
+
         comp_repo = CompetitorRepository(session)
         competitor = await comp_repo.create(
             name="JSON Pricing Corp",
@@ -520,8 +531,8 @@ class TestJsonFields:
         raw = await raw_repo.create(
             competitor_id=competitor.id,
             source_url="https://jsonraw.com/page",
-            raw_html="<html></html>",
-            raw_json={"title": "Test", "status": "ok"},
+            storage_uri="file:///path/to/json.html",
+            extracted_data={"title": "Test", "status": "ok"},
             metadata_={"collector": "discovery", "version": "1.0"},
         )
         await session.commit()
@@ -529,8 +540,8 @@ class TestJsonFields:
         async with async_sessionmaker(engine)() as new_session:
             fetched = await new_session.get(RawStorage, raw.id)
             assert fetched is not None
-            assert fetched.raw_json is not None
-            assert fetched.raw_json["title"] == "Test"
+            assert fetched.extracted_data is not None
+            assert fetched.extracted_data["title"] == "Test"
             assert fetched.metadata_ is not None
             assert fetched.metadata_["collector"] == "discovery"
 

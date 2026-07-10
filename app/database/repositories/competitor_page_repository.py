@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,9 +56,11 @@ class CompetitorPageRepository(BaseRepository[CompetitorPage]):
         competitor_id: int,
         content_hash: str,
         source_id: int | None = None,
-        raw_html: str | None = None,
-        raw_json: dict[str, object] | None = None,
-        metadata: dict[str, object] | None = None,
+        storage_uri: str | None = None,
+        mime_type: str | None = None,
+        file_size_bytes: int | None = None,
+        extracted_data: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
         collection_status: CollectionStatus = CollectionStatus.SUCCESS,
     ) -> CompetitorPage:
         """Insert or update a page based on content hash.
@@ -67,8 +70,10 @@ class CompetitorPageRepository(BaseRepository[CompetitorPage]):
         """
         existing = await self.get_by_hash(competitor_id, source_id, content_hash)
         if existing:
-            existing.raw_html = raw_html
-            existing.raw_json = raw_json
+            existing.storage_uri = storage_uri
+            existing.mime_type = mime_type
+            existing.file_size_bytes = file_size_bytes
+            existing.extracted_data = extracted_data
             existing.metadata_ = metadata
             existing.collection_status = collection_status
             existing.collected_at = datetime.now(UTC)
@@ -78,8 +83,10 @@ class CompetitorPageRepository(BaseRepository[CompetitorPage]):
             competitor_id=competitor_id,
             source_id=source_id,
             content_hash=content_hash,
-            raw_html=raw_html,
-            raw_json=raw_json,
+            storage_uri=storage_uri,
+            mime_type=mime_type,
+            file_size_bytes=file_size_bytes,
+            extracted_data=extracted_data,
             metadata_=metadata,
             collection_status=collection_status,
         )

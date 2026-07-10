@@ -104,7 +104,9 @@ class CardExtractionStrategy(ParsingStrategy):
         containers = self._find_card_containers(soup)
 
         for container in containers:
-            children = [c for c in container.children if isinstance(c, Tag) and self._is_card_like(c)]
+            children = [
+                c for c in container.children if isinstance(c, Tag) and self._is_card_like(c)
+            ]
             for child in children:
                 self._extract_card(child, result, url)
 
@@ -136,7 +138,9 @@ class CardExtractionStrategy(ParsingStrategy):
         button_url = None
         button_text = None
         if button_el:
-            button_url = urljoin(url, str(button_el.get("href", ""))) if button_el.name == "a" else None
+            button_url = (
+                urljoin(url, str(button_el.get("href", ""))) if button_el.name == "a" else None
+            )
             button_text = button_el.get_text(strip=True) or None
 
         # Badge / label (small spans, strong elements near heading)
@@ -153,46 +157,55 @@ class CardExtractionStrategy(ParsingStrategy):
                 features.append(ft)
 
         lower_title = title.lower()
-        has_svc_kw = any(kw in lower_title for kw in (
-            "service", "plan", "package", "tier", "membership", "subscription"
-        ))
+        has_svc_kw = any(
+            kw in lower_title
+            for kw in ("service", "plan", "package", "tier", "membership", "subscription")
+        )
 
         if price_val is not None:
-            result.pricing.append({
-                "service_name": title,
-                "category": None,
-                "base_price": price_val,
-                "promotional_price": None,
-                "currency": currency,
-                "discount": None,
-                "subscription_plans": {},
-                "membership_pricing": None,
-            })
+            result.pricing.append(
+                {
+                    "service_name": title,
+                    "category": None,
+                    "base_price": price_val,
+                    "promotional_price": None,
+                    "currency": currency,
+                    "discount": None,
+                    "subscription_plans": {},
+                    "membership_pricing": None,
+                }
+            )
 
         if has_svc_kw:
-            result.plans.append({
-                "plan_name": title,
-                "description": description,
-                "price": price_val,
-                "currency": currency,
-                "features": features,
-            })
+            result.plans.append(
+                {
+                    "plan_name": title,
+                    "description": description,
+                    "price": price_val,
+                    "currency": currency,
+                    "features": features,
+                }
+            )
 
         if rating_val is not None:
-            result.reviews.append({
-                "title": title,
-                "rating": rating_val,
-                "body": description,
-                "author": None,
-                "source_url": url,
-            })
+            result.reviews.append(
+                {
+                    "title": title,
+                    "rating": rating_val,
+                    "body": description,
+                    "author": None,
+                    "source_url": url,
+                }
+            )
 
         if features:
-            result.features.append({
-                "name": title,
-                "description": description,
-                "price": price_val,
-            })
+            result.features.append(
+                {
+                    "name": title,
+                    "description": description,
+                    "price": price_val,
+                }
+            )
 
         if image_url or button_url:
             media_entry: dict[str, Any] = {"type": "card", "title": title}
@@ -204,14 +217,20 @@ class CardExtractionStrategy(ParsingStrategy):
                 media_entry["label"] = button_text
             result.media.append(media_entry)
 
-        result.services.append({
-            "name": title,
-            "description": description,
-            "category": None,
-            "starting_price": price_val,
-            "currency": currency,
-            "estimated_duration": None,
-        })
+        # Only add to services if the card has meaningful content.
+        # Cards with only a heading and a link are likely navigation items.
+        has_meaningful_content = bool(description or price_val or features)
+        if has_meaningful_content:
+            result.services.append(
+                {
+                    "name": title,
+                    "description": description,
+                    "category": None,
+                    "starting_price": price_val,
+                    "currency": currency,
+                    "estimated_duration": None,
+                }
+            )
 
     @staticmethod
     def _parse_rating(match: re.Match[str]) -> float | None:

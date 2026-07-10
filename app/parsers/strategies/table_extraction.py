@@ -9,18 +9,58 @@ from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 _HEADER_KW: dict[str, set[str]] = {
     "name": {"service", "plan", "name", "product", "feature", "item", "package", "tier"},
-    "price": {"price", "cost", "rate", "fee", "charge", "amount", "total", "per", "monthly", "annual", "starting"},
+    "price": {
+        "price",
+        "cost",
+        "rate",
+        "fee",
+        "charge",
+        "amount",
+        "total",
+        "per",
+        "monthly",
+        "annual",
+        "starting",
+    },
     "currency": {"currency", "cur", "symbol"},
-    "duration": {"duration", "term", "period", "length", "commitment", "billing", "cycle", "frequency"},
+    "duration": {
+        "duration",
+        "term",
+        "period",
+        "length",
+        "commitment",
+        "billing",
+        "cycle",
+        "frequency",
+    },
     "description": {"description", "details", "desc", "info", "about", "overview"},
     "category": {"category", "type", "class", "group", "section", "department"},
     "discount": {"discount", "saving", "offer", "promo", "deal", "special"},
     "rating": {"rating", "review", "score", "stars", "rank"},
-    "features": {"features", "includes", "included", "what's included", "benefits", "what you get", "highlights", "capabilities"},
+    "features": {
+        "features",
+        "includes",
+        "included",
+        "what's included",
+        "benefits",
+        "what you get",
+        "highlights",
+        "capabilities",
+    },
 }
 
 _TABLE_KW: dict[str, set[str]] = {
-    "pricing": {"pricing", "plan", "subscription", "package", "tier", "rate", "cost", "price", "membership"},
+    "pricing": {
+        "pricing",
+        "plan",
+        "subscription",
+        "package",
+        "tier",
+        "rate",
+        "cost",
+        "price",
+        "membership",
+    },
     "services": {"service", "offering", "solution", "product", "catalog", "menu", "what we offer"},
     "membership": {"membership", "member", "club", "premium", "loyalty", "rewards", "vip"},
 }
@@ -39,22 +79,34 @@ _PRICE_RE = re.compile(
 
 _DURATION_RE = re.compile(
     r"(per\s*month|/month|/mo|monthly|per\s*year|/year|/yr|annually|"  # monthly/yearly
-    r"per\s*hour|/hour|hourly|per\s*week|/week|weekly|"               # hourly/weekly
-    r"per\s*day|/day|daily|"                                           # daily
-    r"one.time|one.off|setup\s*fee|once|flat\s*fee)",                 # one-time
+    r"per\s*hour|/hour|hourly|per\s*week|/week|weekly|"  # hourly/weekly
+    r"per\s*day|/day|daily|"  # daily
+    r"one.time|one.off|setup\s*fee|once|flat\s*fee)",  # one-time
     re.I,
 )
 
 _FEATURE_SEP_RE = re.compile(r"[•●◆◇‣-▪▸→➤⇒✓✔✗✘⊕⊖±·⋅]+")
 
 _CURRENCY_SYMBOLS: dict[str, str] = {
-    "$": "USD", "€": "EUR", "£": "GBP", "₹": "INR", "¥": "JPY",
-    "C$": "CAD", "A$": "AUD", "CHF": "CHF",
+    "$": "USD",
+    "€": "EUR",
+    "£": "GBP",
+    "₹": "INR",
+    "¥": "JPY",
+    "C$": "CAD",
+    "A$": "AUD",
+    "CHF": "CHF",
 }
 
 _CURRENCY_CODES: dict[str, str] = {
-    "USD": "USD", "EUR": "EUR", "GBP": "GBP", "INR": "INR",
-    "JPY": "JPY", "CAD": "CAD", "AUD": "AUD", "CHF": "CHF",
+    "USD": "USD",
+    "EUR": "EUR",
+    "GBP": "GBP",
+    "INR": "INR",
+    "JPY": "JPY",
+    "CAD": "CAD",
+    "AUD": "AUD",
+    "CHF": "CHF",
 }
 
 
@@ -91,7 +143,9 @@ def _table_classifier_structure(table: Tag) -> str | None:
         return "pricing"
     header_cells = table.find_all("th")
     header_text = " ".join(th.get_text(strip=True).lower() for th in header_cells)
-    svc_hits = sum(1 for kw in (_TABLE_KW["services"] | _TABLE_KW["membership"]) if kw in header_text)
+    svc_hits = sum(
+        1 for kw in (_TABLE_KW["services"] | _TABLE_KW["membership"]) if kw in header_text
+    )
     if svc_hits:
         return "services"
     return None
@@ -144,13 +198,28 @@ def _parse_duration(text: str | None) -> str | None:
     if m:
         raw = m.group(1).strip().lower()
         norm: dict[str, str] = {
-            "per month": "monthly", "/month": "monthly", "/mo": "monthly", "monthly": "monthly",
-            "per year": "yearly", "/year": "yearly", "/yr": "yearly", "annually": "yearly",
-            "per hour": "hourly", "/hour": "hourly", "hourly": "hourly",
-            "per week": "weekly", "/week": "weekly", "weekly": "weekly",
-            "per day": "daily", "/day": "daily", "daily": "daily",
-            "one-time": "one-time", "one off": "one-time", "setup fee": "one-time",
-            "once": "one-time", "flat fee": "one-time",
+            "per month": "monthly",
+            "/month": "monthly",
+            "/mo": "monthly",
+            "monthly": "monthly",
+            "per year": "yearly",
+            "/year": "yearly",
+            "/yr": "yearly",
+            "annually": "yearly",
+            "per hour": "hourly",
+            "/hour": "hourly",
+            "hourly": "hourly",
+            "per week": "weekly",
+            "/week": "weekly",
+            "weekly": "weekly",
+            "per day": "daily",
+            "/day": "daily",
+            "daily": "daily",
+            "one-time": "one-time",
+            "one off": "one-time",
+            "setup fee": "one-time",
+            "once": "one-time",
+            "flat fee": "one-time",
         }
         return norm.get(raw, raw)
     return None
@@ -225,7 +294,11 @@ class TableExtractionStrategy(ParsingStrategy):
             if isinstance(seg, Tag):
                 self._process_table(seg, result, url)
             else:
-                sub = seg.to_soup() if hasattr(seg, "to_soup") else BeautifulSoup(str(seg), "html.parser")
+                sub = (
+                    seg.to_soup()
+                    if hasattr(seg, "to_soup")
+                    else BeautifulSoup(str(seg), "html.parser")
+                )
                 for table in sub.find_all("table"):
                     self._process_table(table, result, url)
         return result
@@ -277,9 +350,9 @@ class TableExtractionStrategy(ParsingStrategy):
             col_type = col_types[i] if i < len(col_types) else "unknown"
             self._ingest_cell(cell, raw_text, col_type, table_type, inferred)
 
-        service_name = inferred.get("name") or (
-            _find_nearest_heading(cells[0]) if cells else ""
-        ) or context
+        service_name = (
+            inferred.get("name") or (_find_nearest_heading(cells[0]) if cells else "") or context
+        )
 
         features: list[str] = inferred.get("features", [])
         features_str = "; ".join(features) if features else None
@@ -290,28 +363,35 @@ class TableExtractionStrategy(ParsingStrategy):
         duration = inferred.get("duration")
 
         if table_type == "pricing" or (table_type == "unknown" and base_price is not None):
-            result.pricing.append({
-                "service_name": service_name,
-                "category": inferred.get("category"),
-                "base_price": base_price,
-                "promotional_price": promo_price,
-                "currency": currency,
-                "discount": inferred.get("discount"),
-                "subscription_plans": {},
-                "membership_pricing": inferred.get("membership_pricing", service_name if table_type == "membership" else None),
-                "features": features,
-                "estimated_duration": duration,
-            })
+            result.pricing.append(
+                {
+                    "service_name": service_name,
+                    "category": inferred.get("category"),
+                    "base_price": base_price,
+                    "promotional_price": promo_price,
+                    "currency": currency,
+                    "discount": inferred.get("discount"),
+                    "subscription_plans": {},
+                    "membership_pricing": inferred.get(
+                        "membership_pricing", service_name if table_type == "membership" else None
+                    ),
+                    "features": features,
+                    "estimated_duration": duration,
+                }
+            )
         else:
-            result.services.append({
-                "name": service_name,
-                "description": inferred.get("description") or features_str,
-                "category": inferred.get("category") or (table_type if table_type != "unknown" else None),
-                "starting_price": base_price,
-                "currency": currency or "USD",
-                "estimated_duration": duration,
-                "features": features,
-            })
+            result.services.append(
+                {
+                    "name": service_name,
+                    "description": inferred.get("description") or features_str,
+                    "category": inferred.get("category")
+                    or (table_type if table_type != "unknown" else None),
+                    "starting_price": base_price,
+                    "currency": currency or "USD",
+                    "estimated_duration": duration,
+                    "features": features,
+                }
+            )
 
     def _ingest_cell(
         self,
@@ -371,4 +451,5 @@ def _price_is_promo(text: str) -> bool:
 
 class TestTableExtractionStrategy:
     """Minimal self-test helpers."""
+
     pass

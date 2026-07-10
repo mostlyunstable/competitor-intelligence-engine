@@ -461,9 +461,13 @@ class TestRelationshipToDict:
 
     def test_confidence_rounded(self) -> None:
         r = Relationship(
-            source_type="a", source_value="x",
-            target_type="b", target_value="y",
-            relation="r", confidence=0.923456, method="name_match",
+            source_type="a",
+            source_value="x",
+            target_type="b",
+            target_value="y",
+            relation="r",
+            confidence=0.923456,
+            method="name_match",
         )
         assert r.to_dict()["confidence"] == 0.9235
 
@@ -475,24 +479,19 @@ class TestRelationshipToDict:
 
 class TestBestSubstringMatch:
     def test_exact(self) -> None:
-        assert _best_substring_match(
-            "Web Design", {"Web Design", "SEO"}
-        ) == "Web Design"
+        assert _best_substring_match("Web Design", {"Web Design", "SEO"}) == "Web Design"
 
     def test_substring(self) -> None:
-        assert _best_substring_match(
-            "Web Design", {"Web Design Services", "SEO"}
-        ) == "Web Design Services"
+        assert (
+            _best_substring_match("Web Design", {"Web Design Services", "SEO"})
+            == "Web Design Services"
+        )
 
     def test_superstring(self) -> None:
-        assert _best_substring_match(
-            "Full Web Design Package", {"Web Design"}
-        ) == "Web Design"
+        assert _best_substring_match("Full Web Design Package", {"Web Design"}) == "Web Design"
 
     def test_word_overlap(self) -> None:
-        result = _best_substring_match(
-            "HVAC Repair", {"HVAC Repair Service", "Plumbing"}
-        )
+        result = _best_substring_match("HVAC Repair", {"HVAC Repair Service", "Plumbing"})
         assert result == "HVAC Repair Service"
 
     def test_no_match(self) -> None:

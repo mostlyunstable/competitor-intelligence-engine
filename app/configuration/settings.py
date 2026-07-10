@@ -47,6 +47,25 @@ class SchedulerSettings(BaseModel):
     check_interval_seconds: int = Field(default=60, ge=10)
 
 
+class WebhookSettings(BaseModel):
+    enabled: bool = Field(default=False)
+    slack_webhook_url: str = Field(default="")
+    teams_webhook_url: str = Field(default="")
+
+
+class LLMSettings(BaseModel):
+    enabled: bool = Field(default=False)
+    provider: str = Field(default="gemini")  # gemini, openai, anthropic
+    api_key: str = Field(default="")
+    model_name: str = Field(default="gemini-2.5-flash")
+
+
+class StealthSettings(BaseModel):
+    enabled: bool = Field(default=False)
+    proxy_url: str = Field(default="")
+    proxy_urls: list[str] = Field(default_factory=list)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -62,13 +81,43 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
     api_key: str = Field(default="")
 
+    # Staging-specific settings
+    staging_database_url: str = Field(
+        default="postgresql+asyncpg://utservio:changeme@localhost:5433/utservio_ci_staging"
+    )
+    staging_redis_url: str = Field(default="redis://localhost:6380")
+    staging_vault_url: str = Field(default="http://localhost:8201")
+
+    # Production-specific settings
+    production_database_url: str = Field(default="")
+    production_redis_url: str = Field(default="")
+    production_vault_url: str = Field(default="")
+
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     collector: CollectorSettings = Field(default_factory=CollectorSettings)
     discovery: DiscoverySettings = Field(default_factory=DiscoverySettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
     cache: CacheSettings = Field(default_factory=CacheSettings)
+    webhook: WebhookSettings = Field(default_factory=WebhookSettings)
+    llm: LLMSettings = Field(default_factory=LLMSettings)
+    stealth: StealthSettings = Field(default_factory=StealthSettings)
 
     competitors_config_path: str = Field(default="./competitors.json")
+
+    @property
+    def is_staging(self) -> bool:
+        """Check if running in staging environment."""
+        return self.environment == "staging"
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production environment."""
+        return self.environment == "production"
+
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development environment."""
+        return self.environment == "development"
 
 
 _settings_instance: Settings | None = None

@@ -194,7 +194,7 @@ class TestFaqExtraction:
         """
         result = self._parse(html)
         svc_names = {s["name"] for s in result.services}
-        assert "Service" in svc_names or "Clean" in svc_names
+        assert "What cleaning services do you offer?" in svc_names
 
     # ------------------------------------------------------------------
     # Coverage area extraction from FAQ answers
@@ -211,7 +211,7 @@ class TestFaqExtraction:
         </section>
         """
         result = self._parse(html)
-        areas = {s["name"] for s in result.services if s.get("source") == "faq_coverage"}
+        areas = {loc["name"] for loc in result.locations if loc.get("source") == "faq_coverage"}
         assert "New York" in areas
         assert "Los Angeles" in areas
 

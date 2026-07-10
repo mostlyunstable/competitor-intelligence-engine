@@ -25,21 +25,22 @@ class TestRawStorageRepository:
         raw = await repo.create(
             competitor_id=competitor.id,
             source_url="https://rawtest.com/page",
-            raw_html="<html><body>Raw</body></html>",
-            raw_json={"status": "ok"},
+            storage_uri="file:///path/to/blob.html",
+            file_size_bytes=100,
+            mime_type="text/html",
             collection_status="success",
         )
         assert raw.id is not None
-        assert raw.raw_html == "<html><body>Raw</body></html>"
+        assert raw.storage_uri == "file:///path/to/blob.html"
 
     async def test_get_by_competitor(self) -> None:
         competitor = await self._create_competitor()
         repo = RawStorageRepository(self.session)
         await repo.create(
-            competitor_id=competitor.id, source_url="https://rawtest.com/1", raw_html="HTML1"
+            competitor_id=competitor.id, source_url="https://rawtest.com/1", storage_uri="HTML1"
         )
         await repo.create(
-            competitor_id=competitor.id, source_url="https://rawtest.com/2", raw_html="HTML2"
+            competitor_id=competitor.id, source_url="https://rawtest.com/2", storage_uri="HTML2"
         )
         items = await repo.get_by_competitor(competitor.id)
         assert len(items) == 2
@@ -48,7 +49,9 @@ class TestRawStorageRepository:
         competitor = await self._create_competitor()
         repo = RawStorageRepository(self.session)
         await repo.create(
-            competitor_id=competitor.id, source_url="https://rawtest.com/lookup", raw_html="Lookup"
+            competitor_id=competitor.id,
+            source_url="https://rawtest.com/lookup",
+            storage_uri="Lookup",
         )
         found = await repo.get_by_url(competitor.id, "https://rawtest.com/lookup")
         assert found is not None
@@ -57,10 +60,10 @@ class TestRawStorageRepository:
         competitor = await self._create_competitor()
         repo = RawStorageRepository(self.session)
         _old = await repo.create(
-            competitor_id=competitor.id, source_url="https://rawtest.com/old", raw_html="Old"
+            competitor_id=competitor.id, source_url="https://rawtest.com/old", storage_uri="Old"
         )
         new = await repo.create(
-            competitor_id=competitor.id, source_url="https://rawtest.com/new", raw_html="New"
+            competitor_id=competitor.id, source_url="https://rawtest.com/new", storage_uri="New"
         )
         latest = await repo.get_latest(competitor.id)
         assert latest is not None
@@ -70,7 +73,7 @@ class TestRawStorageRepository:
         competitor = await self._create_competitor(name="Delete Raw Corp")
         repo = RawStorageRepository(self.session)
         await repo.create(
-            competitor_id=competitor.id, source_url="https://deleteraw.com", raw_html="Delete"
+            competitor_id=competitor.id, source_url="https://deleteraw.com", storage_uri="Delete"
         )
         await repo.delete_by_competitor(competitor.id)
         items = await repo.get_by_competitor(competitor.id)

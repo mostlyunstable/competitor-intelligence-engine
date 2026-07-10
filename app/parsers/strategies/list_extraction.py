@@ -21,7 +21,9 @@ if TYPE_CHECKING:
     from app.parsers.page_segmenter import PageSegment
 
 _PRICE_RE = re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{1,2})?")
-_DURATION_RE = re.compile(r"(\d+[\s-]*(?:min|hr|hour|day|week|month|year|session|visit))", re.IGNORECASE)
+_DURATION_RE = re.compile(
+    r"(\d+[\s-]*(?:min|hr|hour|day|week|month|year|session|visit))", re.IGNORECASE
+)
 
 
 class ListExtractionStrategy(ParsingStrategy):
@@ -63,6 +65,35 @@ class ListExtractionStrategy(ParsingStrategy):
                     continue
                 lower = (term + " " + definition).lower()
 
+                # Skip FAQ-like terms (exclusions, limitations, questions)
+                faq_stop_words = frozenset(
+                    {
+                        "not covered",
+                        "exclusion",
+                        "limitation",
+                        "not included",
+                        "wear and tear",
+                        "wear-and-tear",
+                        "pre-existing",
+                        "not responsible",
+                        "does not cover",
+                        "does not include",
+                        "not liable",
+                        "void if",
+                        "deductible",
+                        "claim",
+                    }
+                )
+                if any(kw in lower for kw in faq_stop_words):
+                    continue
+
+                # Skip definition list items that are clearly not services
+                # (too long, contains sentences, or looks like a FAQ answer)
+                if len(definition) > 200:
+                    continue
+                if definition.count(".") > 2:
+                    continue
+
                 # Detect price + duration in definition
                 price_match = _PRICE_RE.search(definition)
                 duration_match = _DURATION_RE.search(lower)
@@ -71,25 +102,31 @@ class ListExtractionStrategy(ParsingStrategy):
 
                 # Classify the term
                 if any(kw in lower for kw in ("price", "pricing", "cost", "$", "£", "€")):
-                    result.pricing.append({
-                        "service_name": term,
-                        "category": None,
-                        "base_price": price_val,
-                        "promotional_price": None,
-                        "currency": currency,
-                        "discount": None,
-                        "subscription_plans": {},
-                        "membership_pricing": None,
-                    })
-                else:
-                    result.services.append({
-                        "name": term,
-                        "description": definition,
-                        "category": None,
-                        "starting_price": price_val,
-                        "currency": currency,
-                        "estimated_duration": duration_match.group(1) if duration_match else None,
-                    })
+                    result.pricing.append(
+                        {
+                            "service_name": term,
+                            "category": None,
+                            "base_price": price_val,
+                            "promotional_price": None,
+                            "currency": currency,
+                            "discount": None,
+                            "subscription_plans": {},
+                            "membership_pricing": None,
+                        }
+                    )
+                elif len(term) >= 3:
+                    result.services.append(
+                        {
+                            "name": term,
+                            "description": definition,
+                            "category": None,
+                            "starting_price": price_val,
+                            "currency": currency,
+                            "estimated_duration": (
+                                duration_match.group(1) if duration_match else None
+                            ),
+                        }
+                    )
 
     def _extract_unordered_lists(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         """Extract structured data from <ul> lists.
@@ -109,43 +146,187 @@ class ListExtractionStrategy(ParsingStrategy):
             all_text = " ".join(items).lower()
             has_price = bool(_PRICE_RE.search(all_text))
 
-            if any(kw in context for kw in ("city", "location", "area", "region", "coverage", "where we serve")):
+            if any(
+                kw in context
+                for kw in (
+                    "city",
+                    "cities",
+                    "location",
+                    "locations",
+                    "area served",
+                    "areas served",
+                    "region",
+                    "where we serve",
+                    "where we operate",
+                    "office",
+                    "offices",
+                )
+            ) and not any(
+                kw in context
+                for kw in (
+                    "warranty coverage",
+                    "home warranty",
+                    "plan coverage",
+                    "what we cover",
+                    "what's covered",
+                    "best choice",
+                )
+            ):
                 for item in items:
-                    result.locations.append({
-                        "name": item,
-                        "type": "city",
-                    })
-            elif any(kw in context for kw in ("feature", "capability", "includes", "included", "what you get")):
+                    lower_item = item.lower()
+                    nav_words = {
+                        "learn more",
+                        "read more",
+                        "click here",
+                        "home",
+                        "about us",
+                        "our story",
+                        "careers",
+                        "blog",
+                        "news",
+                        "faq",
+                        "help",
+                        "support",
+                    }
+                    if lower_item in nav_words:
+                        continue
+                    if any(lower_item.startswith(s) for s in ("we ", "our ", "the ", "this ")):
+                        continue
+                    if len(item) >= 3 and len(item) <= 100:
+                        result.locations.append(
+                            {
+                                "name": item,
+                                "type": "city",
+                            }
+                        )
+            elif any(
+                kw in context
+                for kw in ("feature", "capability", "includes", "included", "what you get")
+            ):
                 for item in items:
                     price_match = _PRICE_RE.search(item)
-                    result.features.append({
-                        "name": item,
-                        "description": None,
-                        "price": self._parse_price(price_match.group(0)) if price_match else None,
-                    })
+                    result.features.append(
+                        {
+                            "name": item,
+                            "description": None,
+                            "price": (
+                                self._parse_price(price_match.group(0)) if price_match else None
+                            ),
+                        }
+                    )
             elif has_price:
                 for item in items:
                     price_match = _PRICE_RE.search(item)
-                    result.pricing.append({
-                        "service_name": item,
-                        "category": None,
-                        "base_price": self._parse_price(price_match.group(0)) if price_match else None,
-                        "promotional_price": None,
-                        "currency": self._detect_currency(item),
-                        "discount": None,
-                        "subscription_plans": {},
-                        "membership_pricing": None,
-                    })
+                    result.pricing.append(
+                        {
+                            "service_name": item,
+                            "category": None,
+                            "base_price": (
+                                self._parse_price(price_match.group(0)) if price_match else None
+                            ),
+                            "promotional_price": None,
+                            "currency": self._detect_currency(item),
+                            "discount": None,
+                            "subscription_plans": {},
+                            "membership_pricing": None,
+                        }
+                    )
             else:
                 for item in items:
-                    result.services.append({
-                        "name": item,
-                        "description": None,
-                        "category": None,
-                        "starting_price": None,
-                        "currency": "USD",
-                        "estimated_duration": None,
-                    })
+                    lower_item = item.lower()
+
+                    # Skip navigation-like items
+                    nav_words = {
+                        "learn more",
+                        "read more",
+                        "click here",
+                        "home",
+                        "about us",
+                        "our story",
+                        "careers",
+                        "blog",
+                        "news",
+                        "faq",
+                        "help",
+                        "support",
+                        "contact us",
+                        "sign up",
+                        "log in",
+                        "register",
+                        "terms",
+                        "privacy",
+                        "policy",
+                        "legal",
+                        "copyright",
+                        "why ahs",
+                        "real estate plans",
+                        "site map",
+                        "member testimonials",
+                        "promos & discounts",
+                        "terms of use",
+                        "warranty renewal",
+                        "frontdoor",
+                        "hsa home",
+                        "landmark",
+                        "oneguard",
+                    }
+                    if lower_item in nav_words:
+                        continue
+                    if any(lower_item.startswith(s) for s in ("we ", "our ", "the ", "this ")):
+                        continue
+                    # Skip nav items ending with common suffixes
+                    if lower_item.endswith(
+                        ("details", "cost", "renewal", "more", "info", "options")
+                    ):
+                        continue
+                    if "privacy" in lower_item or "policy" in lower_item or "terms" in lower_item:
+                        continue
+
+                    # Skip FAQ-like exclusion/coverage items
+                    faq_stop_words = {
+                        "not covered",
+                        "not included",
+                        "not responsible",
+                        "does not cover",
+                        "does not include",
+                        "wear and tear",
+                        "wear-and-tear",
+                        "pre-existing",
+                        "maintenance records",
+                        "defective equipment",
+                        "improper installation",
+                        "improper repairs",
+                        "refrigerant recapture",
+                        "refrigerant reclaim",
+                    }
+                    if any(kw in lower_item for kw in faq_stop_words):
+                        continue
+
+                    # Skip third-party brand names
+                    if "®" in item or "℠" in item:
+                        continue
+
+                    # Skip sentences (multiple periods) and long descriptions
+                    if item.count(".") > 1:
+                        continue
+                    if len(item) > 60:
+                        continue
+                    # Skip FAQ-like items with commas (list of exclusions)
+                    if "," in item and len(item) > 30:
+                        continue
+
+                    # Must look like a short service/plan name (not a sentence)
+                    if len(item) >= 5 and len(item) <= 80:
+                        result.services.append(
+                            {
+                                "name": item,
+                                "description": None,
+                                "category": None,
+                                "starting_price": None,
+                                "currency": "USD",
+                                "estimated_duration": None,
+                            }
+                        )
 
     def _extract_ordered_lists(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         """Extract ranked/ordered data from <ol> lists.
@@ -164,26 +345,32 @@ class ListExtractionStrategy(ParsingStrategy):
 
             if any(kw in all_text for kw in ("plan", "tier", "package", "subscription")):
                 for item in items:
-                    result.plans.append({
-                        "plan_name": item,
-                        "description": None,
-                        "price": None,
-                        "currency": "USD",
-                        "features": [],
-                    })
+                    result.plans.append(
+                        {
+                            "plan_name": item,
+                            "description": None,
+                            "price": None,
+                            "currency": "USD",
+                            "features": [],
+                        }
+                    )
             elif _PRICE_RE.search(all_text):
                 for item in items:
                     price_match = _PRICE_RE.search(item)
-                    result.pricing.append({
-                        "service_name": item,
-                        "category": None,
-                        "base_price": self._parse_price(price_match.group(0)) if price_match else None,
-                        "promotional_price": None,
-                        "currency": self._detect_currency(item),
-                        "discount": None,
-                        "subscription_plans": {},
-                        "membership_pricing": None,
-                    })
+                    result.pricing.append(
+                        {
+                            "service_name": item,
+                            "category": None,
+                            "base_price": (
+                                self._parse_price(price_match.group(0)) if price_match else None
+                            ),
+                            "promotional_price": None,
+                            "currency": self._detect_currency(item),
+                            "discount": None,
+                            "subscription_plans": {},
+                            "membership_pricing": None,
+                        }
+                    )
 
     def _extract_nested_lists(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         """Extract hierarchical categories from nested lists.
@@ -210,14 +397,18 @@ class ListExtractionStrategy(ParsingStrategy):
                 if not child_text:
                     continue
                 price_match = _PRICE_RE.search(child_text)
-                result.services.append({
-                    "name": child_text,
-                    "description": None,
-                    "category": category_name,
-                    "starting_price": self._parse_price(price_match.group(0)) if price_match else None,
-                    "currency": self._detect_currency(child_text),
-                    "estimated_duration": None,
-                })
+                result.services.append(
+                    {
+                        "name": child_text,
+                        "description": None,
+                        "category": category_name,
+                        "starting_price": (
+                            self._parse_price(price_match.group(0)) if price_match else None
+                        ),
+                        "currency": self._detect_currency(child_text),
+                        "estimated_duration": None,
+                    }
+                )
 
     @staticmethod
     def _parse_price(price_text: str | None) -> float | None:

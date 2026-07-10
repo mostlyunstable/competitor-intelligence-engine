@@ -77,10 +77,16 @@ class JsonLdStrategy(ParsingStrategy):
     def parse_segments(self, segments: list[PageSegment], url: str) -> ParsedResult:
         """JSON-LD scripts are global — process once from full document."""
         # Find the segment with the most JSON-LD scripts
-        best_segment = max(segments, key=lambda s: len(s.element.select('script[type="application/ld+json"]')), default=None)
+        best_segment = max(
+            segments,
+            key=lambda s: len(s.element.select('script[type="application/ld+json"]')),
+            default=None,
+        )
         if best_segment:
             return self.parse(best_segment.to_soup(), url)
-        return self.parse(BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), url)
+        return self.parse(
+            BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), url
+        )
 
     @staticmethod
     def _is_org_type(raw_type: str) -> bool:

@@ -25,13 +25,34 @@ if TYPE_CHECKING:
     from app.parsers.page_segmenter import PageSegment
 
 # Heading keywords that indicate a trust signals section
-_TRUST_HEADING_KW = frozenset({
-    "certifications", "certification", "awards", "recognition",
-    "accreditations", "accreditation", "badges", "trust", "trust badges",
-    "licensed", "insured", "bonded", "compliance", "why choose us", "our guarantees", "guarantees", "warranties",
-    "as featured in", "featured in", "partners", "partnerships",
-    "affiliations", "memberships", "associations",
-})
+_TRUST_HEADING_KW = frozenset(
+    {
+        "certifications",
+        "certification",
+        "awards",
+        "recognition",
+        "accreditations",
+        "accreditation",
+        "badges",
+        "trust",
+        "trust badges",
+        "licensed",
+        "insured",
+        "bonded",
+        "compliance",
+        "why choose us",
+        "our guarantees",
+        "guarantees",
+        "warranties",
+        "as featured in",
+        "featured in",
+        "partners",
+        "partnerships",
+        "affiliations",
+        "memberships",
+        "associations",
+    }
+)
 
 # Patterns for trust-related content
 _CERT_PATTERN = re.compile(
@@ -131,7 +152,9 @@ class TrustSignalExtractionStrategy(ParsingStrategy):
             if text and len(str(text)) < 200:
                 self._add_signal(result, "certification", str(text))
 
-    def _extract_badges_from_images(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _extract_badges_from_images(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
         for img in soup.select("img"):
             alt = str(img.get("alt", ""))
             title = str(img.get("title", ""))
@@ -243,8 +266,10 @@ class TrustSignalExtractionStrategy(ParsingStrategy):
         # Deduplicate by type+name combination
         if any(s.get("type") == category and s.get("name") == name for s in result.trust_signals):
             return
-        result.trust_signals.append({
-            "type": category,
-            "name": name,
-            "source": "trust_signal_extraction",
-        })
+        result.trust_signals.append(
+            {
+                "type": category,
+                "name": name,
+                "source": "trust_signal_extraction",
+            }
+        )

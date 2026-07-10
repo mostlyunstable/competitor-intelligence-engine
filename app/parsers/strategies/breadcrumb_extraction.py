@@ -8,7 +8,16 @@ from bs4 import BeautifulSoup, Tag
 
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
-_BC_NAV_KWS = frozenset({"breadcrumb", "breadcrumb trail", "bread crumbs", "you are here", "current page", "navigation path"})
+_BC_NAV_KWS = frozenset(
+    {
+        "breadcrumb",
+        "breadcrumb trail",
+        "bread crumbs",
+        "you are here",
+        "current page",
+        "navigation path",
+    }
+)
 
 _SEPARATOR_RE = re.compile(r"[>»/|→▶⋙]")
 
@@ -25,7 +34,11 @@ def _parse_jsonld_breadcrumb(soup: BeautifulSoup) -> list[str] | None:
         for item in items:
             if not isinstance(item, dict):
                 continue
-            if item.get("@type") in ("BreadcrumbList", "http://schema.org/BreadcrumbList", "https://schema.org/BreadcrumbList"):
+            if item.get("@type") in (
+                "BreadcrumbList",
+                "http://schema.org/BreadcrumbList",
+                "https://schema.org/BreadcrumbList",
+            ):
                 elements = item.get("itemListElement", [])
                 if isinstance(elements, list) and elements:
                     path: list[str] = []
@@ -45,7 +58,7 @@ def _parse_jsonld_breadcrumb(soup: BeautifulSoup) -> list[str] | None:
 
 def _parse_microdata_breadcrumb(soup: BeautifulSoup) -> list[str] | None:
     """Extract breadcrumb path from schema.org BreadcrumbList microdata."""
-    bc_list = soup.find(attrs={"itemtype": re.compile(r"BreadcrumbList", re.I)}) # type: ignore[call-overload]
+    bc_list = soup.find(attrs={"itemtype": re.compile(r"BreadcrumbList", re.I)})  # type: ignore[call-overload]
     if not bc_list:
         return None
     items = bc_list.find_all(attrs={"itemprop": re.compile(r"itemListElement|item", re.I)})
@@ -143,15 +156,17 @@ def _categorize_from_breadcrumb(path: list[str]) -> list[dict[str, Any]]:
     _skip_tokens = {"home", "page", "breadcrumb", "you are here"}
     if leaf.lower() in _skip_tokens or parent.lower() in _skip_tokens:
         return results
-    results.append({
-        "name": leaf,
-        "description": " → ".join(path[1:]),
-        "category": parent,
-        "starting_price": None,
-        "currency": "USD",
-        "estimated_duration": None,
-        "source": "breadcrumb",
-    })
+    results.append(
+        {
+            "name": leaf,
+            "description": " → ".join(path[1:]),
+            "category": parent,
+            "starting_price": None,
+            "currency": "USD",
+            "estimated_duration": None,
+            "source": "breadcrumb",
+        }
+    )
     return results
 
 
@@ -180,14 +195,16 @@ class BreadcrumbExtractionStrategy(ParsingStrategy):
         if path:
             result.strategy_results["__breadcrumb__"] = path
 
-            result.content.append({
-                "title": "Breadcrumb Path",
-                "author": None,
-                "publish_date": None,
-                "url": url,
-                "summary": " → ".join(path),
-                "content_type": "breadcrumb",
-            })
+            result.content.append(
+                {
+                    "title": "Breadcrumb Path",
+                    "author": None,
+                    "publish_date": None,
+                    "url": url,
+                    "summary": " → ".join(path),
+                    "content_type": "breadcrumb",
+                }
+            )
 
             for svc in _categorize_from_breadcrumb(path):
                 existing = {s.get("name") for s in result.services}
@@ -202,7 +219,11 @@ class BreadcrumbExtractionStrategy(ParsingStrategy):
             if isinstance(seg, Tag):
                 sub = self.parse(BeautifulSoup(str(seg), "html.parser"), url)
             else:
-                sub_soup = seg.to_soup() if hasattr(seg, "to_soup") else BeautifulSoup(str(seg), "html.parser")
+                sub_soup = (
+                    seg.to_soup()
+                    if hasattr(seg, "to_soup")
+                    else BeautifulSoup(str(seg), "html.parser")
+                )
                 sub = self.parse(sub_soup, url)
             for svc in sub.services:
                 existing = {s.get("name") for s in result.services}

@@ -23,19 +23,43 @@ if TYPE_CHECKING:
     from app.parsers.page_segmenter import PageSegment
 
 # Heading keywords for service area / location sections
-_LOCATION_HEADING_KW = frozenset({
-    "locations", "office", "offices", "service areas", "coverage",
-    "where we serve", "areas served", "service area", "coverage area",
-    "regions", "cities", "neighbourhoods", "neighborhoods",
-    "find us", "visit us", "contact us", "our offices",
-    "serving", "serving areas",
-})
+_LOCATION_HEADING_KW = frozenset(
+    {
+        "locations",
+        "office",
+        "offices",
+        "service areas",
+        "coverage",
+        "where we serve",
+        "areas served",
+        "service area",
+        "coverage area",
+        "regions",
+        "cities",
+        "neighbourhoods",
+        "neighborhoods",
+        "find us",
+        "visit us",
+        "contact us",
+        "our offices",
+        "serving",
+        "serving areas",
+    }
+)
 
 # Heading keywords that indicate coverage (different from physical locations)
-_COVERAGE_HEADING_KW = frozenset({
-    "service areas", "coverage", "areas served", "where we serve",
-    "coverage area", "serving", "serving areas", "our reach",
-})
+_COVERAGE_HEADING_KW = frozenset(
+    {
+        "service areas",
+        "coverage",
+        "areas served",
+        "where we serve",
+        "coverage area",
+        "serving",
+        "serving areas",
+        "our reach",
+    }
+)
 
 
 class LocationExtractionStrategy(ParsingStrategy):
@@ -129,13 +153,21 @@ class LocationExtractionStrategy(ParsingStrategy):
         if "GeoCircle" in str(geo_type) or "GeoRadius" in str(geo_type):
             description = area.get("description", "")
             if description:
-                self._add_location(result, str(description), "json_ld_service_area", area_type="radius")
-        elif "AdministrativeArea" in str(geo_type) or "City" in str(geo_type) or "State" in str(geo_type):
+                self._add_location(
+                    result, str(description), "json_ld_service_area", area_type="radius"
+                )
+        elif (
+            "AdministrativeArea" in str(geo_type)
+            or "City" in str(geo_type)
+            or "State" in str(geo_type)
+        ):
             if name:
                 area_type = "city" if "City" in str(geo_type) else "region"
                 self._add_location(result, str(name), "json_ld_service_area", area_type=area_type)
 
-    def _add_address_from_dict(self, address: dict[str, Any], result: ParsedResult, url: str) -> None:
+    def _add_address_from_dict(
+        self, address: dict[str, Any], result: ParsedResult, url: str
+    ) -> None:
         street = address.get("streetAddress", "")
         city = address.get("addressLocality", "")
         region = address.get("addressRegion", "")
@@ -148,7 +180,9 @@ class LocationExtractionStrategy(ParsingStrategy):
         if parts:
             name = ", ".join(str(p) for p in parts)
             self._add_location(
-                result, name, "json_ld",
+                result,
+                name,
+                "json_ld",
                 street=str(street) if street else None,
                 city=str(city) if city else None,
                 region=str(region) if region else None,
@@ -171,28 +205,40 @@ class LocationExtractionStrategy(ParsingStrategy):
             if parts:
                 name = ", ".join(parts)
                 if not any(loc.get("name") == name for loc in result.locations):
-                    result.locations.append({
-                        "name": name,
-                        "street": street,
-                        "city": city,
-                        "region": region,
-                        "postal_code": postal,
-                        "country": country,
-                        "type": "physical",
-                        "source": "microdata",
-                    })
+                    result.locations.append(
+                        {
+                            "name": name,
+                            "street": street,
+                            "city": city,
+                            "region": region,
+                            "postal_code": postal,
+                            "country": country,
+                            "type": "physical",
+                            "source": "microdata",
+                        }
+                    )
 
-    def _extract_from_address_elements(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _extract_from_address_elements(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
         for address in soup.find_all("address"):
             text = address.get_text(separator=", ", strip=True)
-            if text and 10 < len(text) < 200 and not any(loc.get("name") == text for loc in result.locations):
-                    result.locations.append({
+            if (
+                text
+                and 10 < len(text) < 200
+                and not any(loc.get("name") == text for loc in result.locations)
+            ):
+                result.locations.append(
+                    {
                         "name": text,
                         "type": "physical",
                         "source": "semantic_address",
-                    })
+                    }
+                )
 
-    def _extract_from_location_sections(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+    def _extract_from_location_sections(
+        self, soup: BeautifulSoup, result: ParsedResult, url: str
+    ) -> None:
         for heading in soup.select("h1, h2, h3, h4, h5, h6"):
             text = heading.get_text(strip=True).lower()
             if not any(kw in text for kw in _LOCATION_HEADING_KW):
@@ -209,9 +255,11 @@ class LocationExtractionStrategy(ParsingStrategy):
             for ul in section.select("ul, ol"):
                 for li in ul.select("li"):
                     li_text = li.get_text(strip=True)
-                    if li_text and 2 < len(li_text) < 100:
+                    if li_text and self._looks_like_location(li_text):
                         area_type = "coverage" if is_coverage else "city"
-                        self._add_location(result, li_text, "section_heuristic", area_type=area_type)
+                        self._add_location(
+                            result, li_text, "section_heuristic", area_type=area_type
+                        )
 
             # Look for comma-separated location lists in paragraphs
             for p in section.select("p"):
@@ -219,9 +267,11 @@ class LocationExtractionStrategy(ParsingStrategy):
                 if p_text and "," in p_text:
                     parts = [part.strip() for part in p_text.split(",")]
                     for part in parts:
-                        if part and 2 < len(part) < 50:
+                        if self._looks_like_location(part):
                             area_type = "coverage" if is_coverage else "city"
-                            self._add_location(result, part, "section_heuristic", area_type=area_type)
+                            self._add_location(
+                                result, part, "section_heuristic", area_type=area_type
+                            )
 
     def _collect_section(self, heading: Tag) -> Tag | None:
         heading_level = int(heading.name[1]) if heading.name and heading.name[0] == "h" else 3
@@ -254,6 +304,112 @@ class LocationExtractionStrategy(ParsingStrategy):
         for el in elements:
             wrapper.append(el)
         return wrapper
+
+    @staticmethod
+    def _looks_like_location(text: str) -> bool:
+        """Heuristic: does this text look like a location name?
+
+        Rejects navigation items and CTA text. Accepts city names,
+        addresses, state abbreviations, and coverage areas.
+        """
+        if len(text) < 3 or len(text) > 100:
+            return False
+        lower = text.lower()
+
+        # Reject common navigation / CTA patterns
+        nav_patterns = frozenset(
+            {
+                "learn more",
+                "read more",
+                "click here",
+                "sign up",
+                "log in",
+                "register",
+                "subscribe",
+                "contact us",
+                "get started",
+                "try free",
+                "view all",
+                "see all",
+                "show more",
+                "load more",
+                "home",
+                "about us",
+                "our story",
+                "careers",
+                "press",
+                "investors",
+                "terms",
+                "privacy",
+                "policy",
+                "legal",
+                "copyright",
+                "faq",
+                "help",
+                "support",
+                "blog",
+                "news",
+                "real estate plans",
+                "home warranty cost",
+                "warranty renewal",
+                "promos & discounts",
+                "member testimonials",
+                "site map",
+                "frontdoor",
+                "hsa home",
+                "landmark",
+                "oneguard",
+            }
+        )
+        if lower in nav_patterns:
+            return False
+
+        # Reject if it's a sentence (contains "we ", "our ", "the ", etc.)
+        sentence_starters = frozenset({"we ", "our ", "the ", "this ", "that ", "it "})
+        if any(lower.startswith(s) for s in sentence_starters):
+            return False
+
+        # Reject items with nav-like suffixes
+        nav_suffixes = ("details", "cost", "renewal", "more", "info", "options", "plans")
+        if lower.endswith(nav_suffixes):
+            return False
+
+        # Reject items containing nav/CTA keywords
+        nav_keywords = frozenset(
+            {
+                "warranty",
+                "coverage",
+                "plan",
+                "cost",
+                "price",
+                "renewal",
+                "details",
+                "options",
+                "learn",
+                "read",
+                "click",
+                "sign",
+                "subscribe",
+                "register",
+                "terms",
+                "privacy",
+                "policy",
+            }
+        )
+        if any(kw in lower for kw in nav_keywords):
+            return False
+
+        # Accept if contains comma (likely "City, State" format)
+        if "," in text:
+            return True
+
+        # Accept if 2+ words and all capitalized (proper nouns = place names)
+        words_list = text.split()
+        if len(words_list) >= 2:
+            return all(w[0].isupper() for w in words_list if w and w[0].isalpha())
+
+        # Single word: only accept if it looks like a city name (3+ chars, no special chars)
+        return len(words_list) == 1 and len(text) >= 3 and text.isalpha()
 
     @staticmethod
     def _add_location(

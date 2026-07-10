@@ -1,6 +1,8 @@
+import asyncio
 import time
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.collectors.base import BaseCollector
@@ -20,7 +22,7 @@ class PricingCollector(BaseCollector):
         start_time: float = time.time()
 
         try:
-            result = await self.fetch(url)
+            result = await self.fetch(url, competitor_id)
             if result.not_modified:
                 return {
                     "status": "skipped",
@@ -33,13 +35,24 @@ class PricingCollector(BaseCollector):
 
             html = result.html
 
-            parsed = self._parser.parse_for_type(html, url, "pricing")
+            if await self.is_unchanged(competitor_id, url, html, session):
+                return {
+                    "status": "skipped",
+                    "reason": "unchanged",
+                    "pricing_found": 0,
+                    "pricing_created": 0,
+                    "pricing_updated": 0,
+                    "elapsed_seconds": self._elapsed(start_time),
+                }
+
+            parsed = await asyncio.to_thread(self._parser.parse_for_type, html, url, "pricing")
             await self.store_raw(competitor_id, url, html, session, extracted_data=parsed)
             pricing_items = parsed["pricing"]
 
             pricing_repo = CompetitorPricingRepository(session)
             pricing_created = 0
             pricing_updated = 0
+
             for item in pricing_items:
                 service_name = item.get("service_name", "Unknown")
                 category = item.get("category")
@@ -51,7 +64,7 @@ class PricingCollector(BaseCollector):
                     service_name, category, base_price, promotional_price, currency
                 )
 
-                existing = await pricing_repo.get_by_hash(competitor_id, content_hash)
+                existing = await self._get_existing(pricing_repo, competitor_id, content_hash)
                 await pricing_repo.upsert(
                     competitor_id=competitor_id,
                     content_hash=content_hash,
@@ -85,3 +98,19 @@ class PricingCollector(BaseCollector):
                 "pricing_updated": 0,
                 "elapsed_seconds": self._elapsed(start_time),
             }
+
+    @staticmethod
+    async def _get_existing(
+        repo: CompetitorPricingRepository, competitor_id: int, content_hash: str
+    ) -> bool:
+        """Lightweight existence check."""
+        stmt = (
+            select(1)
+            .where(
+                repo._model.competitor_id == competitor_id,
+                repo._model.content_hash == content_hash,
+            )
+            .limit(1)
+        )
+        result = await repo._session.execute(stmt)
+        return result.scalar_one_or_none() is not None

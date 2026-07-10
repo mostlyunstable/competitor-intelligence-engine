@@ -7,11 +7,40 @@ from bs4 import BeautifulSoup, Tag
 
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
-_FAQ_HEADING_KWS = frozenset({"faq", "frequently asked", "question", "answer", "common question", "got a question", "have a question", "help center", "knowledge base", "support"})
+_FAQ_HEADING_KWS = frozenset(
+    {
+        "faq",
+        "frequently asked",
+        "question",
+        "answer",
+        "common question",
+        "got a question",
+        "have a question",
+        "help center",
+        "knowledge base",
+        "support",
+    }
+)
 
-_SERVICE_KWS = frozenset({"service", "offering", "solution", "product", "feature", "plan", "package", "tier", "option"})
+_SERVICE_KWS = frozenset(
+    {"service", "offering", "solution", "product", "feature", "plan", "package", "tier", "option"}
+)
 
-_COVERAGE_KWS = frozenset({"area", "location", "city", "region", "state", "zone", "coverage", "service area", "where", "serve", "operate"})
+_COVERAGE_KWS = frozenset(
+    {
+        "area",
+        "location",
+        "city",
+        "region",
+        "state",
+        "zone",
+        "coverage",
+        "service area",
+        "where",
+        "serve",
+        "operate",
+    }
+)
 
 _PRICE_PAT = re.compile(
     r"(?:[\$\€\£\₹\¥]\s*[\d,]+(?:\.\d{1,2})?)"
@@ -25,7 +54,10 @@ _DURATION_PAT = re.compile(
     re.I,
 )
 
-_FAQ_QUESTION_PAT = re.compile(r"^\s*(how|what|why|when|where|who|can|do|is|are|will|does|should|would|could|may|has|have)\b", re.I)
+_FAQ_QUESTION_PAT = re.compile(
+    r"^\s*(how|what|why|when|where|who|can|do|is|are|will|does|should|would|could|may|has|have)\b",
+    re.I,
+)
 
 _COVERAGE_PAT = re.compile(
     r"(?:we\s+)?(?:serve|cover|operate|available\s+in|offer\s+in|service\s+(?:area|location)s?\s*(?:include|:)?\s*)(.+?)(?:\.|$)",
@@ -97,7 +129,7 @@ def _parse_accordion(container: Tag) -> list[tuple[str, str]]:
 def _parse_microdata_faq(soup: BeautifulSoup) -> list[tuple[str, str]]:
     """Extract Q/A from FAQPage schema.org microdata."""
     pairs: list[tuple[str, str]] = []
-    faq_container = soup.find(attrs={"itemtype": re.compile(r"FAQPage", re.I)}) # type: ignore[call-overload]
+    faq_container = soup.find(attrs={"itemtype": re.compile(r"FAQPage", re.I)})  # type: ignore[call-overload]
     if not faq_container:
         return pairs
     for question_el in faq_container.find_all(attrs={"itemprop": "mainEntity"}, recursive=True):
@@ -132,16 +164,18 @@ def _extract_pricing_from_answer(text: str) -> list[dict[str, Any]]:
                     currency = "INR"
                 elif "¥" in raw:
                     currency = "JPY"
-                pricing.append({
-                    "service_name": "FAQ Mentioned Service",
-                    "category": None,
-                    "base_price": price,
-                    "promotional_price": None,
-                    "currency": currency,
-                    "discount": None,
-                    "subscription_plans": {},
-                    "membership_pricing": None,
-                })
+                pricing.append(
+                    {
+                        "service_name": "FAQ Mentioned Service",
+                        "category": None,
+                        "base_price": price,
+                        "promotional_price": None,
+                        "currency": currency,
+                        "discount": None,
+                        "subscription_plans": {},
+                        "membership_pricing": None,
+                    }
+                )
             except ValueError:
                 continue
     return pricing
@@ -154,18 +188,22 @@ def _extract_service_from_answer(question: str, answer: str) -> list[dict[str, A
     matched_kws = [kw for kw in _SERVICE_KWS if kw in combined]
     if not matched_kws:
         return services
-    best_kw = max(matched_kws, key=len)
     lines = [line.strip() for line in re.split(r"[.!\n]", answer) if line.strip()]
-    desc_lines = [line for line in lines if best_kw in line.lower() and len(line) > 15]
+    desc_lines = [line for line in lines if len(line) > 30]
     if desc_lines:
-        services.append({
-            "name": best_kw.title(),
-            "description": desc_lines[0],
-            "category": None,
-            "starting_price": None,
-            "currency": "USD",
-            "estimated_duration": None,
-        })
+        name = question.strip()
+        if len(name) > 100:
+            name = name[:100]
+        services.append(
+            {
+                "name": name,
+                "description": desc_lines[0],
+                "category": None,
+                "starting_price": None,
+                "currency": "USD",
+                "estimated_duration": None,
+            }
+        )
     return services
 
 
@@ -225,14 +263,16 @@ class FaqExtractionStrategy(ParsingStrategy):
                 continue
             seen_questions.add(normalized_q)
 
-            result.content.append({
-                "title": question,
-                "author": None,
-                "publish_date": None,
-                "url": url,
-                "summary": answer[:2000] if answer else None,
-                "content_type": "faq",
-            })
+            result.content.append(
+                {
+                    "title": question,
+                    "author": None,
+                    "publish_date": None,
+                    "url": url,
+                    "summary": answer[:2000] if answer else None,
+                    "content_type": "faq",
+                }
+            )
 
             for pricing in _extract_pricing_from_answer(answer):
                 existing = {p.get("service_name") for p in result.pricing}
@@ -250,20 +290,16 @@ class FaqExtractionStrategy(ParsingStrategy):
 
             areas = _extract_coverage_from_answer(answer)
             for area in areas:
-                existing = {
-                    s.get("name") for s in result.services
-                    if s.get("source") == "faq_coverage"
-                }
+                # Add coverage areas as locations, not services
+                existing = {loc.get("name") for loc in result.locations}
                 if area not in existing:
-                    result.services.append({
-                        "name": area,
-                        "description": None,
-                        "category": "Coverage Area",
-                        "starting_price": None,
-                        "currency": "USD",
-                        "estimated_duration": None,
-                        "source": "faq_coverage",
-                    })
+                    result.locations.append(
+                        {
+                            "name": area,
+                            "type": "coverage",
+                            "source": "faq_coverage",
+                        }
+                    )
 
         return result
 
@@ -273,7 +309,11 @@ class FaqExtractionStrategy(ParsingStrategy):
             if isinstance(seg, Tag):
                 sub_result = self.parse(BeautifulSoup(str(seg), "html.parser"), url)
             else:
-                sub = seg.to_soup() if hasattr(seg, "to_soup") else BeautifulSoup(str(seg), "html.parser")
+                sub = (
+                    seg.to_soup()
+                    if hasattr(seg, "to_soup")
+                    else BeautifulSoup(str(seg), "html.parser")
+                )
                 sub_result = self.parse(sub, url)
             result.content.extend(sub_result.content)
             result.pricing.extend(sub_result.pricing)

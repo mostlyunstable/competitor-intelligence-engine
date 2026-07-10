@@ -25,11 +25,14 @@ class TestCompanyCollectorRawStorage:
         with (
             patch.object(collector, "fetch", new_callable=AsyncMock, return_value=mock_result),
             patch.object(collector, "store_raw", new_callable=AsyncMock) as mock_store,
+            patch.object(collector, "is_unchanged", new_callable=AsyncMock, return_value=False),
         ):
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
+            mock_store.assert_called_once_with(
+                1, "https://example.com", mock_result.html, session, extracted_data=ANY
+            )
             assert result["status"] == "success"
 
 
@@ -48,6 +51,7 @@ class TestServiceCollectorRawStorage:
         with (
             patch.object(collector, "fetch", new_callable=AsyncMock, return_value=mock_result),
             patch.object(collector, "store_raw", new_callable=AsyncMock) as mock_store,
+            patch.object(collector, "is_unchanged", new_callable=AsyncMock, return_value=False),
             patch("app.collectors.service.CompetitorServiceRepository") as mock_repo_cls,
         ):
             mock_repo = AsyncMock()
@@ -58,7 +62,9 @@ class TestServiceCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
+            mock_store.assert_called_once_with(
+                1, "https://example.com", mock_result.html, session, extracted_data=ANY
+            )
             assert result["status"] == "success"
 
 
@@ -77,6 +83,7 @@ class TestPricingCollectorRawStorage:
         with (
             patch.object(collector, "fetch", new_callable=AsyncMock, return_value=mock_result),
             patch.object(collector, "store_raw", new_callable=AsyncMock) as mock_store,
+            patch.object(collector, "is_unchanged", new_callable=AsyncMock, return_value=False),
             patch("app.collectors.pricing.CompetitorPricingRepository") as mock_repo_cls,
         ):
             mock_repo = AsyncMock()
@@ -87,7 +94,9 @@ class TestPricingCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
+            mock_store.assert_called_once_with(
+                1, "https://example.com", mock_result.html, session, extracted_data=ANY
+            )
             assert result["status"] == "success"
 
 
@@ -106,6 +115,7 @@ class TestContentCollectorRawStorage:
         with (
             patch.object(collector, "fetch", new_callable=AsyncMock, return_value=mock_result),
             patch.object(collector, "store_raw", new_callable=AsyncMock) as mock_store,
+            patch.object(collector, "is_unchanged", new_callable=AsyncMock, return_value=False),
             patch("app.collectors.content.CompetitorContentRepository") as mock_repo_cls,
         ):
             mock_repo = AsyncMock()
@@ -116,7 +126,9 @@ class TestContentCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
+            mock_store.assert_called_once_with(
+                1, "https://example.com", mock_result.html, session, extracted_data=ANY
+            )
             assert result["status"] == "success"
 
 
@@ -135,6 +147,7 @@ class TestSocialCollectorRawStorage:
         with (
             patch.object(collector, "fetch", new_callable=AsyncMock, return_value=mock_result),
             patch.object(collector, "store_raw", new_callable=AsyncMock) as mock_store,
+            patch.object(collector, "is_unchanged", new_callable=AsyncMock, return_value=False),
             patch("app.collectors.social.CompetitorSocialRepository") as mock_repo_cls,
         ):
             mock_repo = AsyncMock()
@@ -144,5 +157,7 @@ class TestSocialCollectorRawStorage:
             session = MagicMock()
             result = await collector.collect(1, "https://example.com", session=session)
 
-            mock_store.assert_called_once_with(1, "https://example.com", mock_result.html, session, extracted_data=ANY)
+            mock_store.assert_called_once_with(
+                1, "https://example.com", mock_result.html, session, extracted_data=ANY
+            )
             assert result["status"] == "success"

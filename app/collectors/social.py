@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any
 
@@ -21,7 +22,7 @@ class SocialCollector(BaseCollector):
         start_time: float = time.time()
 
         try:
-            result = await self.fetch(url)
+            result = await self.fetch(url, competitor_id)
             if result.not_modified:
                 return {
                     "status": "skipped",
@@ -34,7 +35,17 @@ class SocialCollector(BaseCollector):
 
             html = result.html
 
-            parsed = self._parser.parse_for_type(html, url, "social")
+            if await self.is_unchanged(competitor_id, url, html, session):
+                return {
+                    "status": "skipped",
+                    "reason": "unchanged",
+                    "profiles_found": 0,
+                    "profiles_created": 0,
+                    "profiles_updated": 0,
+                    "elapsed_seconds": self._elapsed(start_time),
+                }
+
+            parsed = await asyncio.to_thread(self._parser.parse_for_type, html, url, "social")
             await self.store_raw(competitor_id, url, html, session, extracted_data=parsed)
             profiles = parsed["social_profiles"]
 
@@ -51,17 +62,13 @@ class SocialCollector(BaseCollector):
                 profile_url = normalize_url(profile.get("profile_url", ""), base_url=url)
                 username = profile.get("username")
 
-                existing = await social_repo.get_by_platform(competitor_id, platform)
                 await social_repo.upsert(
                     competitor_id=competitor_id,
                     platform=platform,
                     profile_url=profile_url,
                     username=username,
                 )
-                if existing:
-                    profiles_updated += 1
-                else:
-                    profiles_created += 1
+                profiles_created += 1
 
             return {
                 "status": "success",

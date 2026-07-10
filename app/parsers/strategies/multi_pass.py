@@ -644,7 +644,9 @@ class _Pass3RepeatedStructure:
                 if has_svc_kw:
                     _add_service(result, title, description=desc)
             elif price is not None and has_svc_kw:
-                _add_service(result, title, description=desc, starting_price=price, currency=currency)
+                _add_service(
+                    result, title, description=desc, starting_price=price, currency=currency
+                )
             elif has_svc_kw:
                 _add_service(result, title, description=desc)
             elif has_date or has_link:
@@ -945,7 +947,11 @@ class MultiPassStrategy(ParsingStrategy):
         result = ParsedResult()
 
         # Pass 1 — Structured data (global, but prefer segment with most JSON-LD)
-        best_jsonld_segment = max(segments, key=lambda s: len(s.element.select('script[type="application/ld+json"]')), default=None)
+        best_jsonld_segment = max(
+            segments,
+            key=lambda s: len(s.element.select('script[type="application/ld+json"]')),
+            default=None,
+        )
         if best_jsonld_segment:
             _Pass1Structured().run(best_jsonld_segment.to_soup(), result, url)
 
@@ -969,6 +975,8 @@ class MultiPassStrategy(ParsingStrategy):
                 break
 
         # Pass 6 — Regex fallback (global, combined text)
-        _Pass6Regex().run(BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), result, url)
+        _Pass6Regex().run(
+            BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), result, url
+        )
 
         return result

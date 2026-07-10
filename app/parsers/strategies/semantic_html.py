@@ -38,9 +38,15 @@ class SemanticHtmlStrategy(ParsingStrategy):
         result = ParsedResult()
         for seg in segments:
             self._extract_from_segment(seg, result, url)
-        self._extract_emails(segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result)
-        self._extract_phones(segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result)
-        self._extract_social_links(segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result, url)
+        self._extract_emails(
+            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result
+        )
+        self._extract_phones(
+            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result
+        )
+        self._extract_social_links(
+            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result, url
+        )
         return result
 
     def _extract_from_segment(self, seg: PageSegment, result: ParsedResult, url: str) -> None:

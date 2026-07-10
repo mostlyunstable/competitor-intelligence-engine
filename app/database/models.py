@@ -97,6 +97,9 @@ class Competitor(Base):
     service_areas: Mapped[list["CompetitorServiceArea"]] = relationship(
         "CompetitorServiceArea", back_populates="competitor", cascade="all, delete-orphan"
     )
+    tech_stack: Mapped[list["CompetitorTechStack"]] = relationship(
+        "CompetitorTechStack", back_populates="competitor", cascade="all, delete-orphan"
+    )
 
     __table_args__ = ({"comment": "Registered competitor websites"},)
 
@@ -139,8 +142,9 @@ class CompetitorPage(Base):
         Integer, ForeignKey("competitor_sources.id", ondelete="SET NULL"), nullable=True
     )
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
-    raw_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    storage_uri: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
     extracted_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
@@ -188,6 +192,7 @@ class CompetitorService(Base):
     offers: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     discounts: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -197,7 +202,7 @@ class CompetitorService(Base):
 
     __table_args__ = (
         Index("ix_competitor_service_competitor_id", "competitor_id"),
-        Index("ix_competitor_service_content_hash", "content_hash"),
+        UniqueConstraint("competitor_id", "content_hash", name="uq_competitor_service_hash"),
         {"comment": "Service listings collected from competitors"},
     )
 
@@ -218,6 +223,7 @@ class CompetitorPricing(Base):
     membership_pricing: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     subscription_plans: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -227,7 +233,7 @@ class CompetitorPricing(Base):
 
     __table_args__ = (
         Index("ix_competitor_pricing_competitor_id", "competitor_id"),
-        Index("ix_competitor_pricing_content_hash", "content_hash"),
+        UniqueConstraint("competitor_id", "content_hash", name="uq_competitor_pricing_hash"),
         {"comment": "Pricing data collected from competitors"},
     )
 
@@ -247,6 +253,7 @@ class CompetitorContent(Base):
     raw_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -290,6 +297,30 @@ class CompetitorSocial(Base):
     )
 
 
+class CompetitorTechStack(Base):
+    __tablename__ = "competitor_tech_stack"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competitor_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False
+    )
+    technology_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(255), nullable=True)  # e.g., CRM, Analytics
+    confidence: Mapped[float] = mapped_column(Numeric(4, 2), default=1.0, nullable=False)
+    discovered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="tech_stack")
+
+    __table_args__ = (
+        UniqueConstraint("competitor_id", "technology_name", name="uq_competitor_tech_stack_name"),
+        Index("ix_competitor_tech_stack_competitor_id", "competitor_id"),
+        {"comment": "Detected software and technologies used by competitors"},
+    )
+
+
 class CompetitorTeamMember(Base):
     __tablename__ = "competitor_team_members"
 
@@ -304,6 +335,7 @@ class CompetitorTeamMember(Base):
     linkedin_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -313,7 +345,7 @@ class CompetitorTeamMember(Base):
 
     __table_args__ = (
         Index("ix_competitor_team_member_competitor_id", "competitor_id"),
-        Index("ix_competitor_team_member_content_hash", "content_hash"),
+        UniqueConstraint("competitor_id", "content_hash", name="uq_competitor_team_member_hash"),
         {"comment": "Team members and leadership collected from competitors"},
     )
 
@@ -333,6 +365,7 @@ class CompetitorCertification(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -342,7 +375,7 @@ class CompetitorCertification(Base):
 
     __table_args__ = (
         Index("ix_competitor_certification_competitor_id", "competitor_id"),
-        Index("ix_competitor_certification_content_hash", "content_hash"),
+        UniqueConstraint("competitor_id", "content_hash", name="uq_competitor_certification_hash"),
         {"comment": "Certifications, awards, and trust signals collected from competitors"},
     )
 
@@ -364,6 +397,7 @@ class CompetitorServiceArea(Base):
     state: Mapped[str | None] = mapped_column(String(100), nullable=True)
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -373,7 +407,7 @@ class CompetitorServiceArea(Base):
 
     __table_args__ = (
         Index("ix_competitor_service_area_competitor_id", "competitor_id"),
-        Index("ix_competitor_service_area_content_hash", "content_hash"),
+        UniqueConstraint("competitor_id", "content_hash", name="uq_competitor_service_area_hash"),
         {"comment": "Service areas and coverage regions collected from competitors"},
     )
 
@@ -415,8 +449,9 @@ class RawStorage(Base):
     )
     source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
-    raw_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    storage_uri: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
     extracted_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(

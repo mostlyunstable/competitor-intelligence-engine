@@ -132,18 +132,14 @@ class ConfidenceCalculator:
     @staticmethod
     def _completeness_bonus(result: ParsedResult) -> float:
         """How many scalar fields did this strategy fill?"""
-        count = sum(
-            1 for f in _SCALAR_FIELDS if getattr(result, f, None)
-        )
+        count = sum(1 for f in _SCALAR_FIELDS if getattr(result, f, None))
         total = len(_SCALAR_FIELDS)
         if total == 0:
             return 0.0
         # Bonus up to 0.10 for filling all fields
         return (count / total) * 0.10
 
-    def _consistency_bonus(
-        self, field_name: str, value: Any, strategy_name: str
-    ) -> float:
+    def _consistency_bonus(self, field_name: str, value: Any, strategy_name: str) -> float:
         """If other strategies agree on this value, boost confidence."""
         if not self._all_results or not value:
             return 0.0
@@ -303,8 +299,10 @@ class FieldedResult:
         """Set a scalar field only if the new value has higher confidence."""
         if not value:
             return
-        conf = confidence if confidence is not None else _get_calculator().for_scalar(
-            strategy, field_name, value, ParsedResult()
+        conf = (
+            confidence
+            if confidence is not None
+            else _get_calculator().for_scalar(strategy, field_name, value, ParsedResult())
         )
         fv = FieldValue(
             value=value,
@@ -332,8 +330,10 @@ class FieldedResult:
         xpath: str | None = None,
         html_snippet: str | None = None,
     ) -> None:
-        conf = confidence if confidence is not None else _get_calculator().for_scalar(
-            strategy, f"social_{platform}", url, ParsedResult()
+        conf = (
+            confidence
+            if confidence is not None
+            else _get_calculator().for_scalar(strategy, f"social_{platform}", url, ParsedResult())
         )
         fv = FieldValue(
             value=url,
@@ -363,8 +363,10 @@ class FieldedResult:
         html_snippet: str | None = None,
     ) -> None:
         """Add an item to a list field if the dedup key is not already present."""
-        conf = confidence if confidence is not None else _get_calculator().for_list_item(
-            strategy, list_name, item, ParsedResult()
+        conf = (
+            confidence
+            if confidence is not None
+            else _get_calculator().for_list_item(strategy, list_name, item, ParsedResult())
         )
         items: list[FieldValue] = getattr(self, list_name)
         key_val = item.get(dedup_key)
@@ -394,7 +396,21 @@ class FieldedResult:
     def raw_list(self, list_name: str) -> list[dict[str, Any]]:
         return [fv.value for fv in getattr(self, list_name)]
 
-    _LIST_FIELDS = ("services", "pricing", "content", "social_profiles", "plans", "offers", "reviews", "features", "media", "locations", "team", "trust_signals", "assets")
+    _LIST_FIELDS = (
+        "services",
+        "pricing",
+        "content",
+        "social_profiles",
+        "plans",
+        "offers",
+        "reviews",
+        "features",
+        "media",
+        "locations",
+        "team",
+        "trust_signals",
+        "assets",
+    )
 
     def to_scored_dict(self) -> dict[str, Any]:
         """Return the full field-level confidence map."""
@@ -448,7 +464,9 @@ class ParsedResult:
     # Field-level confidence store — new, opt-in, never breaks existing callers
     _fielded: FieldedResult = field(default_factory=FieldedResult, repr=False, compare=False)
     # Per-field evidence (dom_path, xpath, html_snippet) keyed by field name
-    _evidence_map: dict[str, dict[str, Any]] = field(default_factory=dict, repr=False, compare=False)
+    _evidence_map: dict[str, dict[str, Any]] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     def set_field_evidence(self, field_name: str, tag: Tag | None) -> None:
         """Attach evidence (dom_path, xpath, html_snippet) to a scalar field."""
@@ -504,7 +522,9 @@ class ParsedResult:
             if existing_fv is None or conf > existing_fv.confidence:
                 evidence_kw = other._evidence_map.get(attr, {})
                 setattr(self, attr, incoming_val)
-                self._fielded.set_scalar(attr, incoming_val, strategy_name, confidence=conf, **evidence_kw)
+                self._fielded.set_scalar(
+                    attr, incoming_val, strategy_name, confidence=conf, **evidence_kw
+                )
 
         # Social links: replace if higher confidence
         for k, v in other.social_links.items():
@@ -557,7 +577,12 @@ class ParsedResult:
                 existing_platforms.add(profile["platform"])
                 conf = calculator.for_list_item(strategy_name, "social_profiles", profile, other)
                 self._fielded.add_list_item(
-                    "social_profiles", profile, "platform", strategy_name, confidence=conf, **evidence_kw
+                    "social_profiles",
+                    profile,
+                    "platform",
+                    strategy_name,
+                    confidence=conf,
+                    **evidence_kw,
                 )
 
         # Register this strategy result for cross-strategy consistency checks
@@ -608,8 +633,6 @@ class ParsedResult:
         self.strategy_results[strategy_name] = weight
         self.confidence = min(1.0, self.confidence + weight)
 
-
-
     # ------------------------------------------------------------------
     # New opt-in field-level metadata access
     # ------------------------------------------------------------------
@@ -621,6 +644,39 @@ class ParsedResult:
     def to_scored_dict(self) -> dict[str, Any]:
         """Return the full field-level confidence map for every extracted field."""
         return self._fielded.to_scored_dict()
+
+    def count_entities(self) -> int:
+        """Count the total number of populated fields and list items."""
+        count = 0
+        if self.company_name:
+            count += 1
+        if self.description:
+            count += 1
+        if self.logo:
+            count += 1
+        if self.industry:
+            count += 1
+        if self.headquarters:
+            count += 1
+        if self.contact_email:
+            count += 1
+        if self.contact_phone:
+            count += 1
+        count += len(self.social_links)
+        count += len(self.team)
+        count += len(self.locations)
+        count += len(self.reviews)
+        count += len(self.trust_signals)
+        count += len(self.assets)
+        count += len(self.services)
+        count += len(self.pricing)
+        count += len(self.content)
+        count += len(self.social_profiles)
+        count += len(self.plans)
+        count += len(self.offers)
+        count += len(self.features)
+        count += len(self.media)
+        return count
 
     # ------------------------------------------------------------------
     # Existing to_*_dict() methods — completely unchanged
@@ -644,7 +700,6 @@ class ParsedResult:
             "services": self.services,
             "pricing": self.pricing,
             "content": self.content,
-
             # Merge generic entities
             "team": self.team,
             "locations": self.locations,
@@ -654,13 +709,37 @@ class ParsedResult:
         }
 
     def to_service_dict(self) -> dict[str, Any]:
-        return {"url": "", "services": self.services, "team": self.team, "locations": self.locations, "reviews": self.reviews, "trust_signals": self.trust_signals, "assets": self.assets}
+        return {
+            "url": "",
+            "services": self.services,
+            "team": self.team,
+            "locations": self.locations,
+            "reviews": self.reviews,
+            "trust_signals": self.trust_signals,
+            "assets": self.assets,
+        }
 
     def to_pricing_dict(self) -> dict[str, Any]:
-        return {"url": "", "pricing": self.pricing, "team": self.team, "locations": self.locations, "reviews": self.reviews, "trust_signals": self.trust_signals, "assets": self.assets}
+        return {
+            "url": "",
+            "pricing": self.pricing,
+            "team": self.team,
+            "locations": self.locations,
+            "reviews": self.reviews,
+            "trust_signals": self.trust_signals,
+            "assets": self.assets,
+        }
 
     def to_content_dict(self) -> dict[str, Any]:
-        return {"url": "", "content": self.content, "team": self.team, "locations": self.locations, "reviews": self.reviews, "trust_signals": self.trust_signals, "assets": self.assets}
+        return {
+            "url": "",
+            "content": self.content,
+            "team": self.team,
+            "locations": self.locations,
+            "reviews": self.reviews,
+            "trust_signals": self.trust_signals,
+            "assets": self.assets,
+        }
 
     def to_social_dict(self) -> dict[str, Any]:
         profiles = list(self.social_profiles)
@@ -675,7 +754,15 @@ class ParsedResult:
                     }
                 )
                 existing_platforms.add(platform)
-        return {"url": "", "social_profiles": profiles, "team": self.team, "locations": self.locations, "reviews": self.reviews, "trust_signals": self.trust_signals, "assets": self.assets}
+        return {
+            "url": "",
+            "social_profiles": profiles,
+            "team": self.team,
+            "locations": self.locations,
+            "reviews": self.reviews,
+            "trust_signals": self.trust_signals,
+            "assets": self.assets,
+        }
 
 
 # ---------------------------------------------------------------------------

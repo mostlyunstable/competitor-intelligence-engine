@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CompetitorService
@@ -32,15 +33,6 @@ class CompetitorServiceRepository(BaseRepository[CompetitorService]):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_hash(self, competitor_id: int, content_hash: str) -> CompetitorService | None:
-        """Find a service by its content hash within a competitor scope."""
-        stmt = select(CompetitorService).where(
-            CompetitorService.competitor_id == competitor_id,
-            CompetitorService.content_hash == content_hash,
-        )
-        result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
-
     async def upsert(
         self,
         competitor_id: int,
@@ -56,30 +48,36 @@ class CompetitorServiceRepository(BaseRepository[CompetitorService]):
         offers: list[object] | None = None,
         discounts: list[object] | None = None,
     ) -> CompetitorService:
-        """Insert or update a service based on content hash.
+        """Native PostgreSQL upsert: single INSERT ... ON CONFLICT DO UPDATE query.
 
-        If an identical service (same competitor and content hash) exists,
-        update its collected_at timestamp. Otherwise, create a new record.
+        Returns (instance, True) for new inserts, (instance, False) for updates.
         """
-        existing = await self.get_by_hash(competitor_id, content_hash)
-        if existing:
-            existing.collected_at = datetime.now(UTC)
-            await self._session.flush()
-            return existing
-        return await self.create(
-            competitor_id=competitor_id,
-            content_hash=content_hash,
-            service_name=service_name,
-            service_category=service_category,
-            description=description,
-            estimated_duration=estimated_duration,
-            starting_price=starting_price,
-            currency=currency,
-            available_add_ons=available_add_ons or [],
-            membership_available=membership_available,
-            offers=offers or [],
-            discounts=discounts or [],
+        now = datetime.now(UTC)
+        stmt = (
+            insert(CompetitorService)
+            .values(
+                competitor_id=competitor_id,
+                content_hash=content_hash,
+                service_name=service_name,
+                service_category=service_category,
+                description=description,
+                estimated_duration=estimated_duration,
+                starting_price=starting_price,
+                currency=currency,
+                available_add_ons=available_add_ons or [],
+                membership_available=membership_available,
+                offers=offers or [],
+                discounts=discounts or [],
+                collected_at=now,
+            )
+            .on_conflict_do_update(
+                constraint="uq_competitor_service_hash",
+                set_={"collected_at": now},
+            )
+            .returning(CompetitorService)
         )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
 
     async def delete_by_competitor(self, competitor_id: int) -> None:
         stmt = delete(CompetitorService).where(CompetitorService.competitor_id == competitor_id)

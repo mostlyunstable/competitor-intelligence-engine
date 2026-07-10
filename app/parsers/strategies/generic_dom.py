@@ -61,9 +61,7 @@ class GenericDomHeuristicStrategy(ParsingStrategy):
         if result.pricing:
             return
         price_pattern = re.compile(r"\$\d+(?:\.\d{2})?|\d+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)")
-        for element in soup.select(
-            "th, td, li, span, strong, em"
-        ):
+        for element in soup.select("th, td, li, span, strong, em"):
             text = element.get_text(strip=True)
             if not text or len(text) > 60:
                 continue

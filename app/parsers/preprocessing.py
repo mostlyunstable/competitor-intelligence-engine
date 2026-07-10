@@ -15,8 +15,15 @@ from bs4.element import Comment, Tag
 
 # Elements that contribute no semantic content
 _REMOVE_TAGS: set[str] = {
-    "script", "style", "noscript", "iframe", "canvas",
-    "svg", "math", "template", "slot",
+    "script",
+    "style",
+    "noscript",
+    "iframe",
+    "canvas",
+    "svg",
+    "math",
+    "template",
+    "slot",
 }
 
 # Tracking / analytics patterns (selectors)
@@ -93,7 +100,8 @@ class Preprocessor:
         for tag in list(soup.find_all(_REMOVE_TAGS)):
             # Preserve JSON-LD / structured data scripts
             if tag.name == "script" and tag.get("type") in (
-                "application/ld+json", "application/json",
+                "application/ld+json",
+                "application/json",
             ):
                 continue
             tag.decompose()
