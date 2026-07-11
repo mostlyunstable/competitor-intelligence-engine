@@ -9,12 +9,12 @@ An advanced, adaptive data collection engine that crawls competitor websites and
 *   **Intelligent Crawl Budgeting:** Priority queue with URL scoring, canonical URL enforcement (50+ tracking params stripped), and duplicate detection via ETag/Last-Modified.
 *   **Robust Deduplication:** Dual-layer deduplication using fast normalized hash sets for URLs and SHA-256 content hashes for stored data.
 *   **Production-Ready Observability:** Built-in Prometheus metrics (`/metrics`) monitoring crawl duration, extraction yields, strategy success rates, and errors.
-*   **Self-Healing Database:** Uses upsert logic and transaction boundaries per collector to ensure database consistency.
-*   **Dynamic Confidence Scoring:** Per-field confidence scores with cross-strategy consistency checks.
-*   **Entity Resolution:** Automatic deduplication with fuzzy matching and canonicalization.
-*   **Relationship Linking:** Connect extracted entities into coherent graphs.
+*   **Self-Healing Database:** Uses upsert logic, context managers, and transaction boundaries to ensure database ACID consistency even on pipeline crashes.
+*   **Entity Resolution & Relationship Linking:** Automatic deduplication with fuzzy matching, canonicalization, and mapping entities into coherent graphs.
 *   **Evidence Metadata:** DOM path, XPath, and HTML snippet for every extraction.
-*   **Monitoring Dashboard:** Real-time system health, collection metrics, and alert status.
+*   **Interactive Real-Time Dashboard:** Access system health, collection metrics, real-time server telemetry (CPU/Memory/Proxies), and trigger background pipeline tasks visually via the interactive web UI at `/dashboard`.
+*   **Fault-Tolerant Distributed Queue:** Utilizes a Redis-backed queue system with stateful processing maps and Dead Letter Queue (DLQ) routing for maximum uptime without OOM crashes.
+*   **Hybrid Ingestion Engine:** Supports standard SSR HTML fetching via `httpx` and dynamic Single Page Application (SPA) rendering via Chromium/`Playwright`, armed with stealth modes to bypass WAFs.
 
 ## 📚 Documentation
 
@@ -118,15 +118,16 @@ alembic upgrade head
 
 #### 7. Start the Engine
 ```bash
-# Start the API server in production mode
-python scripts/run.py
+# Start the FastAPI server with auto-reload for development
+uvicorn app.main:app --reload
 
-# OR start in development mode with auto-reload
-python scripts/dev.py
+# Start the FastAPI server in production mode (using multiple workers)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-The API will be available at `http://localhost:8000`. 
-Interactive API documentation can be accessed at `http://localhost:8000/docs`.
+The application is now running.
+- **Interactive Dashboard:** Access the live UI at `http://localhost:8000/dashboard`.
+- **API Documentation:** Interactive Swagger UI is at `http://localhost:8000/docs`.
 
 ---
 
@@ -155,9 +156,16 @@ docker compose exec api alembic upgrade head
 
 Competitors are managed via a `competitors.json` configuration file (copy the sample if needed: `cp sample-data/competitors.json competitors.json`). Do not track this file in Git to keep your competitor targets private.
 
-### Running a Collection Pipeline
+### Using the Interactive Dashboard
+The easiest way to collect data is via the built-in UI:
+1. Navigate to `http://localhost:8000/dashboard`
+2. Use the dropdown to select a competitor.
+3. Click **Start Collection** to trigger the background pipeline.
+4. Watch the progress bar advance through Discovery, Parsing, and Storage stages.
+5. Click **View Extracted JSON** or **Download CSV** once complete.
 
-Use the bundled `scripts/collect.py` tool to trigger scraping pipelines manually:
+### Running via Command Line
+Alternatively, use the bundled `scripts/collect.py` tool to trigger scraping pipelines manually:
 
 ```bash
 # Ensure your virtual environment is activated
