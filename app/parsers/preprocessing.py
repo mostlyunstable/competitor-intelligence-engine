@@ -79,6 +79,8 @@ class Preprocessor:
         if not soup.find():
             return html  # no valid HTML found
 
+        self._expose_accessible_text(soup)
+
         for _ in range(self._MAX_PASSES):
             changed = False
             changed |= self._remove_tags(soup)
@@ -207,3 +209,34 @@ class Preprocessor:
                 children[0].decompose()
                 changed = True
         return changed
+
+    @staticmethod
+    def _expose_accessible_text(soup: BeautifulSoup) -> bool:
+        """Expose aria-label and alt text as real text nodes for downstream extraction."""
+        count = 0
+        
+        # Expose aria-label
+        for el in soup.find_all(attrs={"aria-label": True}):
+            label = el.get("aria-label", "")
+            if isinstance(label, list):
+                label = " ".join(label)
+            label = label.strip()
+            if label and label not in el.get_text():
+                span = soup.new_tag("span", **{"class": "a11y-exposed-label"})
+                span.string = f" {label} "
+                el.append(span)
+                count += 1
+                
+        # Expose image alt text
+        for img in soup.find_all("img", alt=True):
+            alt_text = img.get("alt", "")
+            if isinstance(alt_text, list):
+                alt_text = " ".join(alt_text)
+            alt_text = alt_text.strip()
+            if alt_text:
+                span = soup.new_tag("span", **{"class": "a11y-exposed-alt"})
+                span.string = f" {alt_text} "
+                img.insert_after(span)
+                count += 1
+                
+        return count > 0

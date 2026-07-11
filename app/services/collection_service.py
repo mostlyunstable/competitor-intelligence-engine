@@ -35,7 +35,7 @@ MODULE_COLLECTORS: dict[str, Any] = {
 class CollectionService:
     def __init__(self) -> None:
         self._collectors: dict[str, Any] = {}
-        self._active_crawls: set[int] = set()
+        self._active_crawls: dict[int, float] = {}
         self._crawls_lock = asyncio.Lock()
 
     def _get_collector(self, module: str) -> Any:
@@ -53,7 +53,7 @@ class CollectionService:
                     "status": "failed",
                     "error": f"Collection is already running for competitor {competitor_id}",
                 }
-            self._active_crawls.add(competitor_id)
+            self._active_crawls[competitor_id] = datetime.now(UTC).timestamp()
 
         start_time = time.time()
         log = logger.bind(competitor_id=competitor_id)
@@ -183,7 +183,7 @@ class CollectionService:
         finally:
             registry.clear()
             async with self._crawls_lock:
-                self._active_crawls.discard(competitor_id)
+                self._active_crawls.pop(competitor_id, None)
 
     async def _load_competitor(self, competitor_id: int) -> dict[str, Any]:
         """Load competitor configuration in a short-lived session."""

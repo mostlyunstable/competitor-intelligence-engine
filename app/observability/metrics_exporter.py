@@ -27,13 +27,13 @@ class MetricsExporter:
                 stats["contribution_percentage"] = 0.0
 
         # 1. parser_metrics.json (per page metrics)
-        self._write_json("parser_metrics.json", registry.page_metrics)
+        self._write_json("parser_metrics.json", list(registry.page_metrics))
 
         # 2. strategy_metrics.json
         self._write_json("strategy_metrics.json", registry.strategy_stats)
 
         # 3. entity_metrics.json (all tracked entities)
-        self._write_json("entity_metrics.json", registry.entity_metrics)
+        self._write_json("entity_metrics.json", list(registry.entity_metrics))
 
         # 4. duplicate_analysis.json
         dupes = {}

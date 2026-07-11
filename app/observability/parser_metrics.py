@@ -3,11 +3,13 @@ from typing import Any
 from app.observability.entity_profiler import EntityProfiler
 
 
+from collections import deque
+
 class ProfilerRegistry:
     def __init__(self) -> None:
         self.strategy_stats: dict[str, Any] = {}
-        self.page_metrics: list[dict[str, Any]] = []
-        self.entity_metrics: list[Any] = []
+        self.page_metrics: deque[dict[str, Any]] = deque(maxlen=1000)
+        self.entity_metrics: deque[Any] = deque(maxlen=10000)
         self.global_stats = {
             "total_pages": 0,
             "total_html_size": 0,

@@ -61,7 +61,7 @@ class LLMSettings(BaseModel):
 
 
 class StealthSettings(BaseModel):
-    enabled: bool = Field(default=False)
+    enabled: bool = Field(default=True)
     proxy_url: str = Field(default="")
     proxy_urls: list[str] = Field(default_factory=list)
 

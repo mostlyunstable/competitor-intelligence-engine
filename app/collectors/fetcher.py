@@ -205,9 +205,9 @@ class PlaywrightRenderer:
         from app.configuration.settings import get_settings
 
         if get_settings().stealth.enabled:
-            from playwright_stealth import stealth_async
+            from playwright_stealth import Stealth
 
-            await stealth_async(page)
+            await Stealth().apply_stealth_async(page)
 
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
@@ -443,7 +443,7 @@ class HybridFetcher:
 
     def __init__(self) -> None:
         self._settings = get_settings().collector
-        self._client: httpx.AsyncClient | None = None
+        self._clients: dict[str, httpx.AsyncClient] = {}
         self._analyzer = PageAnalyzer()
         self._renderer: PlaywrightRenderer | None = None
         self._domain_limiters: dict[str, RateLimiter] = {}
@@ -464,30 +464,34 @@ class HybridFetcher:
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create httpx client."""
-        if self._client is None or self._client.is_closed:
-            import random
-            from app.configuration.settings import get_settings
+        import random
+        from app.configuration.settings import get_settings
+        
+        settings = get_settings()
+        proxy = None
+        proxy_key = "default"
+        if settings.stealth.enabled:
+            proxy_str = ""
+            if settings.stealth.proxy_urls:
+                proxy_str = random.choice(settings.stealth.proxy_urls)
+            elif settings.stealth.proxy_url:
+                proxy_str = settings.stealth.proxy_url
             
-            settings = get_settings()
-            proxy = None
-            if settings.stealth.enabled:
-                proxy_str = ""
-                if settings.stealth.proxy_urls:
-                    proxy_str = random.choice(settings.stealth.proxy_urls)
-                elif settings.stealth.proxy_url:
-                    proxy_str = settings.stealth.proxy_url
-                
-                if proxy_str:
-                    proxy = proxy_str
-            
-            self._client = httpx.AsyncClient(
+            if proxy_str:
+                proxy = proxy_str
+                proxy_key = proxy_str
+        
+        client = self._clients.get(proxy_key)
+        if client is None or client.is_closed:
+            client = httpx.AsyncClient(
                 timeout=httpx.Timeout(self._settings.collection_timeout),
                 headers={"User-Agent": self._settings.user_agent},
                 follow_redirects=True,
                 verify=True,
                 proxy=proxy,
             )
-        return self._client
+            self._clients[proxy_key] = client
+        return client
 
     async def _get_renderer(self) -> PlaywrightRenderer:
         """Get or create Playwright renderer."""
@@ -616,7 +620,7 @@ class HybridFetcher:
             page_type=static_result.page_type,
         )
 
-        if not analysis["needs_rendering"]:
+        if not analysis["needs_rendering"] and static_result.status_code not in (401, 403, 429):
             return static_result
 
         logger.info("playwright_fallback_triggered", url=url, score=analysis["score"])
@@ -839,11 +843,16 @@ class HybridFetcher:
         )
 
     async def close(self) -> None:
-        """Clean up all resources."""
-        if self._client and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
-
+        """Close resources."""
+        import asyncio
+        close_tasks = []
+        for client in self._clients.values():
+            if not client.is_closed:
+                close_tasks.append(client.aclose())
+        if close_tasks:
+            await asyncio.gather(*close_tasks, return_exceptions=True)
+        self._clients.clear()
+        
         if self._renderer:
             await self._renderer.close()
             self._renderer = None

@@ -113,7 +113,10 @@ class CollectionScheduler:
             CollectionFrequency.WEEKLY: 604800,
         }
         interval = interval_map.get(frequency, 86400)
-        elapsed = (now - last_log.start_time).total_seconds()
+        start_time = last_log.start_time
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=UTC)
+        elapsed = (now - start_time).total_seconds()
         return elapsed >= interval
 
     @property

@@ -228,10 +228,10 @@ All errors follow RFC 7807 Problem Details format:
         """,
         version="1.0.0",
         openapi_tags=OPENAPI_TAGS,
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan,
-        openapi_url="/openapi.json" if settings.debug else None,
+        openapi_url="/openapi.json",
     )
 
     app.add_middleware(
@@ -254,6 +254,11 @@ All errors follow RFC 7807 Problem Details format:
     app.include_router(monitoring_router)
     app.include_router(apm_router)
 
+    from fastapi.responses import RedirectResponse
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return RedirectResponse(url="/dashboard")
+
     _configure_logging(settings.log_level)
 
     return app
@@ -261,6 +266,7 @@ All errors follow RFC 7807 Problem Details format:
 
 def _configure_logging(log_level: str) -> None:
     import logging
+    from app.observability.log_buffer import global_log_buffer
 
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
     structlog.configure(
@@ -270,6 +276,7 @@ def _configure_logging(log_level: str) -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.dev.set_exc_info,
             structlog.processors.TimeStamper(fmt="iso"),
+            global_log_buffer.add_log,
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(numeric_level),

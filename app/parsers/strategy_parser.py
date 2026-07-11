@@ -290,6 +290,8 @@ class StrategyParser:
             if field_name in output and field_name in scored:
                 for i, item in enumerate(output[field_name]):
                     if i < len(scored[field_name]):
-                        item["provenance"] = scored[field_name][i]
+                        prov = scored[field_name][i].copy()
+                        prov.pop("value", None)
+                        item["provenance"] = prov
 
         return dict(output)
