@@ -120,6 +120,16 @@ DASHBOARD_HTML = """
             background-size: 200% 100%;
             animation: shimmer 2s infinite linear;
         }
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes toastOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .toast-in { animation: toastIn 0.3s ease-out forwards; }
+        .toast-out { animation: toastOut 0.3s ease-in forwards; }
     </style>
 </head>
 <body class="bg-background text-on-surface">
@@ -158,8 +168,8 @@ DASHBOARD_HTML = """
         <span class="font-h3 text-h3 text-on-surface">Utservio Data Engine Ops</span>
         <div class="h-4 w-[1px] bg-outline-variant"></div>
         <div class="flex gap-stack-md">
-            <span class="font-label-md text-label-md text-primary font-bold">Status: Healthy</span>
-            <span class="font-label-md text-label-md text-on-surface-variant opacity-70">Uptime: 99.9%</span>
+            <span class="font-label-md text-label-md text-primary font-bold" id="header-status">Status: Checking...</span>
+            <span class="font-label-md text-label-md text-on-surface-variant opacity-70" id="header-uptime">Uptime: --</span>
         </div>
     </div>
 </header>
@@ -281,6 +291,7 @@ DASHBOARD_HTML = """
                     <div class="border-t border-outline-variant pt-stack-sm">
                         <p class="font-label-sm text-label-sm text-outline">Target URL</p>
                         <p class="font-body-md text-body-md font-mono truncate text-on-surface-variant" id="target-url">No competitor selected</p>
+                        <p class="font-label-sm text-label-sm text-outline opacity-50 mt-1" id="last-collected"></p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-gutter">
@@ -357,11 +368,12 @@ DASHBOARD_HTML = """
                                     <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Pricing</th>
                                     <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Articles</th>
                                     <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Socials</th>
+                                    <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center w-16"></th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-outline-variant/30" id="summary-table-body">
                                 <tr>
-                                    <td class="px-stack-md py-12 text-center text-outline italic font-body-md text-body-md opacity-60" colspan="5">
+                                    <td class="px-stack-md py-12 text-center text-outline italic font-body-md text-body-md opacity-60" colspan="6">
                                         Loading competitor buffer data...
                                     </td>
                                 </tr>
@@ -374,7 +386,7 @@ DASHBOARD_HTML = """
                 <div class="flex-1 flex flex-col min-h-[300px]">
                     <div class="flex justify-between items-end mb-stack-sm">
                         <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Collection Audit Trail</h2>
-                        <span class="font-mono text-[10px] text-primary bg-primary-container px-2 py-0.5 rounded-full font-bold" id="stream-status">LIVE_STREAM: ACTIVE</span>
+                        <span class="font-mono text-[10px] text-primary bg-primary-container px-2 py-0.5 rounded-full font-bold" id="stream-status">IDLE</span>
                     </div>
                     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl flex-1 overflow-hidden flex flex-col shadow-soft">
                         <table class="w-full text-left border-collapse">
@@ -416,10 +428,10 @@ DASHBOARD_HTML = """
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex items-center justify-between shadow-soft">
                 <div class="flex items-center gap-stack-sm">
-                    <span class="material-symbols-outlined text-primary/60" data-icon="wifi_tethering">wifi_tethering</span>
-                    <span class="font-label-md text-label-md text-on-surface">Proxies Active</span>
+                    <span class="material-symbols-outlined text-primary/60" data-icon="bolt">bolt</span>
+                    <span class="font-label-md text-label-md text-on-surface">Active Crawls</span>
                 </div>
-                <span class="font-mono text-mono text-outline" id="telemetry-proxies">--</span>
+                <span class="font-mono text-mono text-outline" id="telemetry-crawls">0</span>
             </div>
         </section>
 
@@ -445,6 +457,9 @@ DASHBOARD_HTML = """
                 </div>
             </div>
         </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-20 right-6 z-[60] flex flex-col gap-2"></div>
 
 </main>
 
@@ -476,6 +491,29 @@ DASHBOARD_HTML = """
     let shownLiveLogs = new Set();
     let lastLogCount = 0;
     let activeCompetitorId = null;
+    const pageLoadTime = Date.now();
+
+    // Toast notification utility
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const colors = { success: 'bg-emerald-600', error: 'bg-error', info: 'bg-primary' };
+        const toast = document.createElement('div');
+        toast.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg font-label-md text-label-md flex items-center gap-2 toast-in`;
+        toast.innerHTML = `<span class="material-symbols-outlined text-[18px]">check_circle</span> ${message}`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.remove('toast-in');
+            toast.classList.add('toast-out');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // HTML escaping utility (XSS prevention)
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
 
     async function loadCompetitors() {
         try {
@@ -515,13 +553,31 @@ DASHBOARD_HTML = """
             triggerBtn.removeAttribute('disabled');
             viewJsonBtn.removeAttribute('disabled');
             exportCsvBtn.removeAttribute('disabled');
+            // Show last collected time
+            const lc = competitorsMap[id].last_collected;
+            const lcEl = document.getElementById('last-collected');
+            if (lc) {
+                const ago = timeAgo(new Date(lc));
+                lcEl.textContent = `Last collected: ${ago}`;
+            } else {
+                lcEl.textContent = 'Never collected';
+            }
         } else {
             targetUrlEl.textContent = 'No competitor selected';
             triggerBtn.setAttribute('disabled', 'true');
             viewJsonBtn.setAttribute('disabled', 'true');
             exportCsvBtn.setAttribute('disabled', 'true');
+            document.getElementById('last-collected').textContent = '';
         }
     });
+
+    function timeAgo(date) {
+        const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+        if (seconds < 60) return 'just now';
+        if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+        if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+        return Math.floor(seconds / 86400) + 'd ago';
+    }
 
     addCompBtn.addEventListener('click', async () => {
         const name = document.getElementById('new-comp-name').value;
@@ -560,6 +616,8 @@ DASHBOARD_HTML = """
             // Auto-select the newly added competitor
             compSelect.value = newComp.id;
             compSelect.dispatchEvent(new Event('change'));
+
+            showToast(`${newComp.name} added successfully`);
             
         } catch(e) {
             console.error(e);
@@ -574,9 +632,9 @@ DASHBOARD_HTML = """
             const res = await fetch(`/api/dashboard/extracted/${id}?t=${Date.now()}`);
             const data = await res.json();
             if (data.data && data.data.pricing && data.data.pricing.length > 0) {
-                let csv = "Tier,Price,Currency,Billing\\n";
+                let csv = "Tier,Price,Currency,Billing\n";
                 data.data.pricing.forEach(p => {
-                    csv += `"${p.tier_name || ''}","${p.price || ''}","${p.currency || ''}","${p.billing_period || ''}"\\n`;
+                    csv += `"${(p.tier_name || '').replace(/"/g, '""')}","${p.price || ''}","${p.currency || ''}","${p.billing_period || ''}"\n`;
                 });
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = window.URL.createObjectURL(blob);
@@ -596,6 +654,18 @@ DASHBOARD_HTML = """
 
     closeModalBtn.addEventListener('click', () => {
         jsonModal.classList.add('hidden');
+    });
+
+    // Close modal on Escape key or backdrop click
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !jsonModal.classList.contains('hidden')) {
+            jsonModal.classList.add('hidden');
+        }
+    });
+    jsonModal.addEventListener('click', (e) => {
+        if (e.target === jsonModal) {
+            jsonModal.classList.add('hidden');
+        }
     });
 
     viewJsonBtn.addEventListener('click', async () => {
@@ -628,6 +698,7 @@ DASHBOARD_HTML = """
         document.getElementById('collect-status').textContent = 'Discovery';
         document.getElementById('collect-progress').textContent = '10%';
         document.getElementById('progress-bar').style.width = '10%';
+        document.getElementById('stream-status').textContent = 'LIVE_STREAM: ACTIVE';
 
         // Update steps styling
         updatePipelineSteps('discovery');
@@ -695,6 +766,7 @@ DASHBOARD_HTML = """
         updatePipelineSteps('none');
         shownLiveLogs.clear();
         lastLogCount = 0;
+        document.getElementById('stream-status').textContent = 'IDLE';
     }
 
     async function pollActiveCrawl(id) {
@@ -743,9 +815,9 @@ DASHBOARD_HTML = """
                                     args.push(`${k}=${v}`);
                                 }
                             }
-                            let argsStr = args.length > 0 ? ` <span class="text-stone-500 ml-2">${args.join(' ')}</span>` : '';
+                            let argsStr = args.length > 0 ? ` <span class="text-stone-500 ml-2">${escapeHtml(args.join(' '))}</span>` : '';
                             
-                            logsContainer.innerHTML = `<div class="${color} font-mono text-[13px] border-b border-stone-800/40 py-1"><span class="text-stone-500">[${time}]</span> [${lvl}] ${msg}${argsStr}</div>` + logsContainer.innerHTML;
+                            logsContainer.innerHTML = `<div class="${color} font-mono text-[13px] border-b border-stone-800/40 py-1"><span class="text-stone-500">[${escapeHtml(time)}]</span> [${escapeHtml(lvl)}] ${escapeHtml(msg)}${argsStr}</div>` + logsContainer.innerHTML;
                         });
                         lastLogCount = logsData.length;
                     }
@@ -796,6 +868,29 @@ DASHBOARD_HTML = """
                 document.getElementById('sub-services').textContent = "Services synced";
                 document.getElementById('sub-pricing').textContent = "Pricing synced";
                 document.getElementById('sub-db-writes').textContent = "Synchronized";
+
+                // Dynamic error subtitle
+                const errCount = stats.errors || 0;
+                const subErrors = document.getElementById('sub-errors');
+                if (errCount === 0) {
+                    subErrors.textContent = 'Stable';
+                    subErrors.className = 'font-label-sm text-label-sm text-emerald-600 font-bold';
+                } else {
+                    subErrors.textContent = 'Needs attention';
+                    subErrors.className = 'font-label-sm text-label-sm text-error font-bold';
+                }
+
+                // Dynamic header status and uptime
+                const allHealthy = stats.db_status === 'connected' && stats.api_status === 'healthy';
+                const headerStatus = document.getElementById('header-status');
+                headerStatus.textContent = allHealthy ? 'Status: Healthy' : 'Status: Degraded';
+                headerStatus.className = allHealthy
+                    ? 'font-label-md text-label-md text-primary font-bold'
+                    : 'font-label-md text-label-md text-error font-bold';
+                const uptimeSeconds = Math.floor((Date.now() - pageLoadTime) / 1000);
+                const uptimeH = Math.floor(uptimeSeconds / 3600);
+                const uptimeM = Math.floor((uptimeSeconds % 3600) / 60);
+                document.getElementById('header-uptime').textContent = `Uptime: ${uptimeH}h ${uptimeM}m`;
 
                 // Health indicators
                 const dbInd = document.getElementById('health-db-indicator');
@@ -852,7 +947,7 @@ DASHBOARD_HTML = """
                 if (summary.length === 0) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td class="px-stack-md py-12 text-center text-outline italic font-body-md text-body-md opacity-60" colspan="5">
+                            <td class="px-stack-md py-12 text-center text-outline italic font-body-md text-body-md opacity-60" colspan="6">
                                 No extraction data currently held in database.
                             </td>
                         </tr>
@@ -861,11 +956,16 @@ DASHBOARD_HTML = """
                     summary.forEach(row => {
                         tableBody.innerHTML += `
                             <tr class="hover:bg-surface-container-low transition-colors">
-                                <td class="px-stack-md py-3 font-body-md font-semibold">${row.name}</td>
+                                <td class="px-stack-md py-3 font-body-md font-semibold">${escapeHtml(row.name)}</td>
                                 <td class="px-stack-md py-3 text-center font-mono text-primary font-bold">${row.services_count}</td>
                                 <td class="px-stack-md py-3 text-center font-mono text-primary font-bold">${row.pricing_count}</td>
                                 <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.content_count}</td>
                                 <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.socials_count}</td>
+                                <td class="px-stack-md py-3 text-center">
+                                    <button onclick="deleteCompetitor(${row.id}, '${escapeHtml(row.name)}')" class="text-outline hover:text-error transition-colors" title="Delete">
+                                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                                    </button>
+                                </td>
                             </tr>
                         `;
                     });
@@ -888,12 +988,13 @@ DASHBOARD_HTML = """
                     logs.forEach(log => {
                         const statusText = log.success ? '<span class="text-emerald-500 font-bold">SUCCESS</span>' : '<span class="text-red-500 font-bold">FAILED</span>';
                         const timeStr = log.start_time ? log.start_time.replace('T', ' ').substring(0, 19) : 'Unknown';
-                        const errorsStr = log.errors && log.errors.length > 0 ? log.errors.join(', ') : 'None';
+                        const errorsStr = log.errors && log.errors.length > 0 ? escapeHtml(log.errors.join(', ')) : 'None';
+                        const compName = competitorsMap[log.competitor_id] ? escapeHtml(competitorsMap[log.competitor_id].name) : `#${log.competitor_id}`;
 
                         logsContainer.innerHTML += `
                             <div class="text-stone-300 font-mono text-[13px] border-b border-stone-800/40 py-1">
-                                <span class="text-stone-500">[${timeStr}]</span>
-                                Competitor #${log.competitor_id} | Status: ${statusText} | Dur: ${log.duration_seconds || 0}s | Recs: ${log.records_collected}
+                                <span class="text-stone-500">[${escapeHtml(timeStr)}]</span>
+                                ${compName} | Status: ${statusText} | Dur: ${log.duration_seconds || 0}s | Recs: ${log.records_collected}
                                 ${log.success ? '' : `<br/><span class="text-red-400 pl-4">Errors: ${errorsStr}</span>`}
                             </div>
                         `;
@@ -911,13 +1012,32 @@ DASHBOARD_HTML = """
                 const tel = await telRes.json();
                 document.getElementById('telemetry-cpu').textContent = tel.cpu_percent + '%';
                 document.getElementById('telemetry-mem').textContent = tel.memory_mb + 'MB / ' + tel.memory_total_gb + 'GB';
-                const proxiesEl = document.getElementById('telemetry-proxies');
-                if (proxiesEl) {
-                    proxiesEl.textContent = tel.proxies_active;
+                const crawlsEl = document.getElementById('telemetry-crawls');
+                if (crawlsEl) {
+                    crawlsEl.textContent = tel.active_crawls;
                 }
             }
         } catch (e) {
             console.error("Dashboard refresh telemetry failed", e);
+        }
+    }
+
+    // Delete competitor
+    async function deleteCompetitor(id, name) {
+        if (!confirm(`Delete "${name}" and all its data? This cannot be undone.`)) return;
+        try {
+            const res = await fetch(`/api/dashboard/competitors/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast(`${name} deleted`);
+                delete competitorsMap[id];
+                await loadCompetitors();
+                compSelect.dispatchEvent(new Event('change'));
+                refreshData();
+            } else {
+                showToast('Delete failed', 'error');
+            }
+        } catch (e) {
+            showToast('Delete failed', 'error');
         }
     }
 
@@ -948,7 +1068,25 @@ async def get_dashboard_competitors(session: AsyncSession = Depends(get_session)
     stmt = select(Competitor).order_by(Competitor.name)
     result = await session.execute(stmt)
     competitors = result.scalars().all()
-    return [{"id": c.id, "name": c.name, "website_url": c.website_url} for c in competitors]
+    
+    out = []
+    for c in competitors:
+        # Get the most recent successful collection time
+        last_log_stmt = (
+            select(CollectionLog.start_time)
+            .where(CollectionLog.competitor_id == c.id)
+            .where(CollectionLog.success.is_(True))
+            .order_by(CollectionLog.start_time.desc())
+            .limit(1)
+        )
+        last_collected = await session.scalar(last_log_stmt)
+        out.append({
+            "id": c.id,
+            "name": c.name,
+            "website_url": c.website_url,
+            "last_collected": last_collected.isoformat() if last_collected else None,
+        })
+    return out
 
 @router.post("/api/dashboard/competitors")
 async def create_dashboard_competitor(
@@ -975,6 +1113,22 @@ async def create_dashboard_competitor(
         raise HTTPException(status_code=409, detail="A competitor with this name or URL already exists.")
     await session.refresh(comp)
     return {"id": comp.id, "name": comp.name, "website_url": comp.website_url}
+
+@router.delete("/api/dashboard/competitors/{competitor_id}")
+async def delete_dashboard_competitor(
+    competitor_id: int,
+    session: AsyncSession = Depends(get_session)
+) -> dict[str, str]:
+    """Deletes a competitor and all associated data (CASCADE)."""
+    from fastapi import HTTPException
+    stmt = select(Competitor).where(Competitor.id == competitor_id)
+    result = await session.execute(stmt)
+    comp = result.scalar_one_or_none()
+    if not comp:
+        raise HTTPException(status_code=404, detail="Competitor not found")
+    await session.delete(comp)
+    await session.commit()
+    return {"status": "deleted", "message": f"Competitor {competitor_id} deleted"}
 
 
 @router.get("/api/dashboard/stats")
@@ -1040,47 +1194,39 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
 async def get_dashboard_summary(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
-    """Generates counts of extracted modules per competitor."""
-    stmt = select(Competitor).order_by(Competitor.name)
+    """Generates counts of extracted modules per competitor in a single efficient query."""
+    from sqlalchemy import outerjoin, literal_column
+    from sqlalchemy.orm import aliased
+    
+    stmt = (
+        select(
+            Competitor.id,
+            Competitor.name,
+            func.count(func.distinct(CompetitorService.id)).label("services_count"),
+            func.count(func.distinct(CompetitorPricing.id)).label("pricing_count"),
+            func.count(func.distinct(CompetitorContent.id)).label("content_count"),
+            func.count(func.distinct(CompetitorSocial.id)).label("socials_count"),
+        )
+        .outerjoin(CompetitorService, Competitor.id == CompetitorService.competitor_id)
+        .outerjoin(CompetitorPricing, Competitor.id == CompetitorPricing.competitor_id)
+        .outerjoin(CompetitorContent, Competitor.id == CompetitorContent.competitor_id)
+        .outerjoin(CompetitorSocial, Competitor.id == CompetitorSocial.competitor_id)
+        .group_by(Competitor.id, Competitor.name)
+        .order_by(Competitor.name)
+    )
     result = await session.execute(stmt)
-    competitors = result.scalars().all()
-
-    summary = []
-    for c in competitors:
-        # Services
-        s_count = await session.scalar(
-            select(func.count())
-            .select_from(CompetitorService)
-            .where(CompetitorService.competitor_id == c.id)
-        )
-        # Pricing
-        p_count = await session.scalar(
-            select(func.count())
-            .select_from(CompetitorPricing)
-            .where(CompetitorPricing.competitor_id == c.id)
-        )
-        # Content
-        c_count = await session.scalar(
-            select(func.count())
-            .select_from(CompetitorContent)
-            .where(CompetitorContent.competitor_id == c.id)
-        )
-        # Social
-        soc_count = await session.scalar(
-            select(func.count())
-            .select_from(CompetitorSocial)
-            .where(CompetitorSocial.competitor_id == c.id)
-        )
-        summary.append(
-            {
-                "name": c.name,
-                "services_count": s_count or 0,
-                "pricing_count": p_count or 0,
-                "content_count": c_count or 0,
-                "socials_count": soc_count or 0,
-            }
-        )
-    return summary
+    rows = result.all()
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "services_count": row.services_count,
+            "pricing_count": row.pricing_count,
+            "content_count": row.content_count,
+            "socials_count": row.socials_count,
+        }
+        for row in rows
+    ]
 
 
 @router.get("/api/dashboard/logs")
@@ -1127,7 +1273,7 @@ async def get_dashboard_telemetry() -> dict[str, Any]:
         "cpu_percent": psutil.cpu_percent(),
         "memory_mb": int(mem_info.rss / 1024 / 1024),
         "memory_total_gb": int(mem_total / 1024 / 1024 / 1024),
-        "proxies_active": 0
+        "active_crawls": len(collection_service._active_crawls)
     }
 
 @router.post("/api/dashboard/collect/{competitor_id}/cancel")
