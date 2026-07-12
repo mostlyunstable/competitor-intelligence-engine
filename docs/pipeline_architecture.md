@@ -4,7 +4,7 @@ Here is the updated, simplified pipeline flow after ripping out the redundant DO
 
 ```mermaid
 graph TD
-    subgraph "1. Ingestion Layer"
+    subgraph Ingestion_Layer [1. Ingestion Layer]
         A[Redis Task Queue] -->|Pop URL Task| B{Is SPA?}
         B -->|No| C[httpx AsyncClient]
         B -->|Yes| D[Playwright Headless]
@@ -12,22 +12,22 @@ graph TD
         D --> E
     end
 
-    subgraph "2. Parsing Engine (Streamlined)"
+    subgraph Parsing_Engine [2. Parsing Engine]
         E --> F[DOM Block Segmenter]
         F --> G[JsonLdStrategy]
-        G --> H{Confidence > 0.8?}
+        G --> H{Confidence OK?}
         
-        H -->|No| I[LLMFallbackService Llama 3 API]
+        H -->|No| I[LLM Fallback API]
         I --> J[Parsed Result]
         H -->|Yes| J
     end
 
-    subgraph "3. Post-Processing"
+    subgraph Post_Processing [3. Post-Processing]
         J --> K[Entity Resolver Deduplication]
         K --> L[Relationship Engine]
     end
 
-    subgraph "4. Persistence Layer"
+    subgraph Persistence_Layer [4. Persistence Layer]
         L --> M[PostgreSQL AsyncPG]
         M --> N[Real-Time Dashboard UI]
     end
