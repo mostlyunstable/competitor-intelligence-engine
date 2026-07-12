@@ -305,6 +305,10 @@ DASHBOARD_HTML = """
                             <span class="material-symbols-outlined text-[18px]">play_arrow</span>
                             Live Collection
                         </button>
+                        <button id="stop-btn" class="hidden py-3 px-4 bg-error text-white font-label-md text-label-md rounded-lg hover:brightness-105 transition-all flex items-center justify-center gap-2 shadow-md shadow-error/20">
+                            <span class="material-symbols-outlined text-[18px]">stop</span>
+                            Stop
+                        </button>
                     </div>
                     <div class="flex gap-unit w-full mt-2">
                         <button id="view-json-btn" disabled class="flex-1 py-3 bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-highest disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-outline-variant">
@@ -329,12 +333,12 @@ DASHBOARD_HTML = """
                         <span class="font-label-sm text-label-sm text-on-surface-variant" id="health-scheduler-text">Scheduler: Checking</span>
                     </div>
                     <div class="flex items-center gap-unit p-2 bg-surface-container-low rounded-lg">
-                        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <span class="font-label-sm text-label-sm text-on-surface-variant">Playwright: Ready</span>
+                        <div class="w-2 h-2 rounded-full" id="health-playwright-indicator" style="background-color: rgb(139, 126, 118);"></div>
+                        <span class="font-label-sm text-label-sm text-on-surface-variant" id="health-playwright-text">Playwright: Checking</span>
                     </div>
                     <div class="flex items-center gap-unit p-2 bg-surface-container-low rounded-lg">
-                        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <span class="font-label-sm text-label-sm text-on-surface-variant">API: Healthy</span>
+                        <div class="w-2 h-2 rounded-full" id="health-api-indicator" style="background-color: rgb(139, 126, 118);"></div>
+                        <span class="font-label-sm text-label-sm text-on-surface-variant" id="health-api-text">API: Checking</span>
                     </div>
                 </div>
             </div>
@@ -461,6 +465,7 @@ DASHBOARD_HTML = """
     const compSelect = document.getElementById('competitor-select');
     const targetUrlEl = document.getElementById('target-url');
     const triggerBtn = document.getElementById('trigger-btn');
+    const stopBtn = document.getElementById('stop-btn');
     const viewJsonBtn = document.getElementById('view-json-btn');
     const exportCsvBtn = document.getElementById('export-csv-btn');
     const addCompBtn = document.getElementById('add-comp-btn');
@@ -470,6 +475,7 @@ DASHBOARD_HTML = """
     let activeInterval = null;
     let shownLiveLogs = new Set();
     let lastLogCount = 0;
+    let activeCompetitorId = null;
 
     async function loadCompetitors() {
         try {
@@ -615,7 +621,10 @@ DASHBOARD_HTML = """
         const id = compSelect.value;
         if (!id) return;
 
+        activeCompetitorId = id;
         triggerBtn.setAttribute('disabled', 'true');
+        stopBtn.classList.remove('hidden');
+        stopBtn.classList.add('flex');
         document.getElementById('collect-status').textContent = 'Discovery';
         document.getElementById('collect-progress').textContent = '10%';
         document.getElementById('progress-bar').style.width = '10%';
@@ -634,6 +643,18 @@ DASHBOARD_HTML = """
             console.error("Trigger collection error", e);
             resetCollectionState();
         }
+    });
+
+    // Stop Collection
+    stopBtn.addEventListener('click', async () => {
+        if (!activeCompetitorId) return;
+        stopBtn.setAttribute('disabled', 'true');
+        try {
+            await fetch(`/api/dashboard/collect/${activeCompetitorId}/cancel`, { method: 'POST' });
+        } catch (e) {
+            console.error("Cancel failed", e);
+        }
+        resetCollectionState();
     });
 
     function updatePipelineSteps(stage) {
@@ -667,6 +688,10 @@ DASHBOARD_HTML = """
         document.getElementById('collect-progress').textContent = '0%';
         document.getElementById('progress-bar').style.width = '0%';
         triggerBtn.removeAttribute('disabled');
+        stopBtn.classList.add('hidden');
+        stopBtn.classList.remove('flex');
+        stopBtn.removeAttribute('disabled');
+        activeCompetitorId = null;
         updatePipelineSteps('none');
         shownLiveLogs.clear();
         lastLogCount = 0;
@@ -737,7 +762,7 @@ DASHBOARD_HTML = """
                     shownLiveLogs.add('store');
                     const logsContainer = document.getElementById('logs-container');
                     const now = new Date().toISOString().substring(11,19);
-                    logsContainer.innerHTML = `<div class="text-blue-400 font-mono text-[13px] border-b border-stone-800/40 py-1"><span class="text-stone-500">[${now}]</span> [INFO] Successfully committed transaction to SQLite!</div>` + logsContainer.innerHTML;
+                    logsContainer.innerHTML = `<div class="text-blue-400 font-mono text-[13px] border-b border-stone-800/40 py-1"><span class="text-stone-500">[${now}]</span> [INFO] Successfully committed transaction to database.</div>` + logsContainer.innerHTML;
                 }
 
                 setTimeout(() => {
@@ -791,6 +816,26 @@ DASHBOARD_HTML = """
                 } else {
                     schInd.style.backgroundColor = 'rgb(245, 158, 11)';
                     schTxt.textContent = "Scheduler: Idle";
+                }
+
+                const pwInd = document.getElementById('health-playwright-indicator');
+                const pwTxt = document.getElementById('health-playwright-text');
+                if (stats.playwright_status === 'ready') {
+                    pwInd.style.backgroundColor = 'rgb(16, 185, 129)';
+                    pwTxt.textContent = "Playwright: Ready";
+                } else {
+                    pwInd.style.backgroundColor = 'rgb(239, 68, 68)';
+                    pwTxt.textContent = "Playwright: Error";
+                }
+
+                const apiInd = document.getElementById('health-api-indicator');
+                const apiTxt = document.getElementById('health-api-text');
+                if (stats.api_status === 'healthy') {
+                    apiInd.style.backgroundColor = 'rgb(16, 185, 129)';
+                    apiTxt.textContent = "API: Healthy";
+                } else {
+                    apiInd.style.backgroundColor = 'rgb(239, 68, 68)';
+                    apiTxt.textContent = "API: Error";
                 }
             }
         } catch (e) {
@@ -910,6 +955,7 @@ async def create_dashboard_competitor(
     payload: dict[str, Any],
     session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
+    from sqlalchemy.exc import IntegrityError
     from app.database.models import Competitor, CollectionFrequency
     
     comp = Competitor(
@@ -921,7 +967,12 @@ async def create_dashboard_competitor(
         tags=[]
     )
     session.add(comp)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=409, detail="A competitor with this name or URL already exists.")
     await session.refresh(comp)
     return {"id": comp.id, "name": comp.name, "website_url": comp.website_url}
 
@@ -956,6 +1007,14 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
             "elapsed": time.time() - start_time,
         }
 
+    # Check Playwright availability
+    playwright_status = "error"
+    try:
+        import playwright
+        playwright_status = "ready"
+    except ImportError:
+        pass
+
     return {
         "urls_discovered": urls_count or 0,
         "pages_crawled": pages_count or 0,
@@ -970,7 +1029,7 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
         + (logs_count or 0),
         "errors": errors_count or 0,
         "scheduler_status": "active" if scheduler.is_running else "idle",
-        "playwright_status": "ready",
+        "playwright_status": playwright_status,
         "db_status": "connected",
         "api_status": "healthy",
         "active_collection": active_collection,
@@ -1068,8 +1127,15 @@ async def get_dashboard_telemetry() -> dict[str, Any]:
         "cpu_percent": psutil.cpu_percent(),
         "memory_mb": int(mem_info.rss / 1024 / 1024),
         "memory_total_gb": int(mem_total / 1024 / 1024 / 1024),
-        "proxies_active": 4
+        "proxies_active": 0
     }
+
+@router.post("/api/dashboard/collect/{competitor_id}/cancel")
+async def cancel_dashboard_collect(competitor_id: int) -> dict[str, str]:
+    """Cancels a running collection by removing it from the active crawls tracker."""
+    async with collection_service._crawls_lock:
+        collection_service._active_crawls.pop(competitor_id, None)
+    return {"status": "cancelled", "message": f"Collection for competitor {competitor_id} cancelled"}
 
 @router.get("/api/dashboard/live_logs/{competitor_id}")
 async def get_dashboard_live_logs(competitor_id: int) -> list[dict[str, Any]]:
