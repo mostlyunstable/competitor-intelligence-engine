@@ -1,7 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Response
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, Response, HTTPException, status
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,9 +22,6 @@ from app.services.collection_service import collection_service
 
 import os
 import secrets
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi import APIRouter, BackgroundTasks, Depends, Response, HTTPException, status
 
 router = APIRouter(tags=["dashboard"])
 

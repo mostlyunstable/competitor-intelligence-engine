@@ -211,32 +211,32 @@
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-gutter">
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Competitors Monitored</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-monitored">--</p>
+                <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-monitored">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-monitored">Loading...</p>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Active Collections</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-crawls">--</p>
+                <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-crawls">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-crawls">Loading...</p>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Services Extracted</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-services">--</p>
+                <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-services">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-services">Loading...</p>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Pricing Extracted</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-pricing">--</p>
+                <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-pricing">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-pricing">Loading...</p>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Database Entries</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-db-writes">--</p>
+                <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-db-writes">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-db-writes">Loading...</p>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft border-l-4 border-l-error/30">
                 <p class="font-label-sm text-label-sm text-outline">Errors</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-errors">--</p>
+                <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-errors">--</p>
                 <p class="font-label-sm text-label-sm text-error font-bold" id="sub-errors">Stable</p>
             </div>
         </section>
@@ -341,7 +341,7 @@
                 <!-- Competitor Management -->
                 <div>
                     <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-stack-sm font-semibold">Competitor Management</h2>
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-soft">
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-y-auto shadow-soft max-h-[500px]">
                         <table class="w-full text-left border-collapse">
                             <thead class="bg-surface-container-low border-b border-outline-variant">
                                 <tr>
@@ -355,8 +355,8 @@
                             </thead>
                             <tbody class="divide-y divide-outline-variant/30" id="summary-table-body">
                                 <tr>
-                                    <td class="px-stack-md py-12 text-center text-outline italic font-body-md text-body-md opacity-60" colspan="6">
-                                        Loading competitor buffer data...
+                                    <td class="px-stack-md py-6 text-center" colspan="6">
+                                        <div class="h-6 skeleton rounded w-full max-w-[400px] mx-auto"></div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -641,7 +641,7 @@
             if (!id || !competitorsMap[id]) {
                 modal.close();
                 modal.classList.add('hidden');
-                alert("Please select a competitor first");
+                showToast("Please select a competitor first", 'error');
                 return;
             }
             const comp = competitorsMap[id];
@@ -700,7 +700,7 @@
             showToast(id ? 'Competitor updated' : 'Competitor added');
             
         } catch (e) {
-            alert("Error saving competitor: " + e.message);
+            showToast("Error saving competitor: " + e.message, 'error');
         }
     });
 
@@ -741,10 +741,10 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
             } else {
-                alert("No pricing data found to export for this competitor.");
+                showToast("No pricing data found to export for this competitor.", 'error');
             }
         } catch (e) {
-            alert("Export failed.");
+            showToast("Export failed.", 'error');
         }
     });
 
@@ -872,19 +872,6 @@
         openCompetitorModal(false);
     }
 
-    async function deleteCompetitor(id, name) {
-        if (!confirm(`Are you sure you want to delete ${name}? This cannot be undone.`)) return;
-        try {
-            const response = await fetch(`/api/dashboard/competitors/${id}`, { method: 'DELETE' });
-            if (!response.ok) throw new Error(await response.text());
-            
-            await loadCompetitors();
-            refreshData();
-            showToast('Competitor deleted');
-        } catch (e) {
-            alert("Error deleting: " + e.message);
-        }
-    }
 
     async function pollActiveCrawl(id) {
         try {
@@ -973,6 +960,11 @@
             const resStats = await fetch(`/api/dashboard/stats?t=${timestamp}`);
             if (resStats.ok) {
                 const stats = await resStats.json();
+                ['metric-monitored', 'metric-crawls', 'metric-services', 'metric-pricing', 'metric-db-writes', 'metric-errors'].forEach(id => {
+                    const el = document.getElementById(id);
+                    el.classList.remove('skeleton', 'text-transparent', 'rounded', 'w-fit');
+                });
+                
                 document.getElementById('metric-monitored').textContent = stats.competitors_monitored;
                 document.getElementById('metric-crawls').textContent = stats.active_collection ? 1 : 0;
                 document.getElementById('metric-services').textContent = stats.services_extracted;
