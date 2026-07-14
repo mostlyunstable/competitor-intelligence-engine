@@ -122,6 +122,7 @@ async def delete_dashboard_competitor(
 @router.get("/api/dashboard/stats")
 async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     """Computes aggregated database statistics and pipeline status."""
+    competitors_count = await session.scalar(select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True)))
     urls_count = await session.scalar(select(func.count()).select_from(CompetitorSource))
     pages_count = await session.scalar(select(func.count()).select_from(CompetitorPage))
     services_count = await session.scalar(select(func.count()).select_from(CompetitorService))
@@ -158,6 +159,7 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
         pass
 
     return {
+        "competitors_monitored": competitors_count or 0,
         "urls_discovered": urls_count or 0,
         "pages_crawled": pages_count or 0,
         "services_extracted": services_count or 0,

@@ -210,14 +210,14 @@
         <!-- Metric Cards -->
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-gutter">
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
-                <p class="font-label-sm text-label-sm text-outline">URLs Discovered</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-urls">--</p>
-                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-urls">Loading...</p>
+                <p class="font-label-sm text-label-sm text-outline">Competitors Monitored</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-monitored">--</p>
+                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-monitored">Loading...</p>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
-                <p class="font-label-sm text-label-sm text-outline">Pages Crawled</p>
-                <p class="font-h2 text-h2 text-on-surface" id="metric-pages">--</p>
-                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-pages">Loading...</p>
+                <p class="font-label-sm text-label-sm text-outline">Active Collections</p>
+                <p class="font-h2 text-h2 text-on-surface" id="metric-crawls">--</p>
+                <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-crawls">Loading...</p>
             </div>
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Services Extracted</p>
@@ -246,13 +246,20 @@
             <div class="lg:col-span-4 flex flex-col gap-stack-sm">
                 <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Controls & Target</h2>
                 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-soft flex flex-col gap-unit mb-stack-sm">
-                    <label class="block font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Add New Competitor</label>
-                    <input type="text" id="new-comp-name" placeholder="Name (e.g. Acme Corp)" class="w-full bg-surface-container border border-outline-variant rounded-lg px-4 py-2 text-on-surface focus:outline-none focus:border-primary min-w-0">
-                    <input type="text" id="new-comp-url" placeholder="URL (e.g. https://acme.com)" class="w-full bg-surface-container border border-outline-variant rounded-lg px-4 py-2 text-on-surface focus:outline-none focus:border-primary min-w-0">
-                    <button id="add-comp-btn" class="w-full py-2.5 px-6 bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2 border border-outline-variant mt-2">
-                        <span class="material-symbols-outlined text-[18px]">add</span>
-                        Add
-                    </button>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Competitor Profile</label>
+                        <button id="manage-comps-btn" onclick="openCompetitorModal()" class="text-primary hover:underline font-label-sm flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[16px]">edit</span> Edit
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-unit">
+                        <button onclick="openCompetitorModal(true)" class="py-2 px-4 bg-surface-container text-on-surface font-label-md rounded-lg hover:bg-surface-container-high transition-all flex items-center justify-center gap-2 border border-outline-variant border-dashed">
+                            <span class="material-symbols-outlined text-[18px]">add</span> Add New
+                        </button>
+                        <button onclick="window.location.href='/api/dashboard/compare/csv'" class="py-2 px-4 bg-primary text-white font-label-md rounded-lg hover:brightness-105 transition-all flex items-center justify-center gap-2 shadow-soft">
+                            <span class="material-symbols-outlined text-[18px]">download</span> Compare CSV
+                        </button>
+                    </div>
                 </div>
 
                 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md flex flex-col gap-stack-md shadow-soft">
@@ -331,9 +338,9 @@
 
             <!-- Summary & Logs -->
             <div class="lg:col-span-8 flex flex-col gap-stack-lg">
-                <!-- Extraction Summary -->
+                <!-- Competitor Management -->
                 <div>
-                    <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-stack-sm font-semibold">Extraction Summary</h2>
+                    <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-stack-sm font-semibold">Competitor Management</h2>
                     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-soft">
                         <table class="w-full text-left border-collapse">
                             <thead class="bg-surface-container-low border-b border-outline-variant">
@@ -414,6 +421,66 @@
             <p class="font-label-sm text-label-sm text-outline uppercase tracking-[0.2em] opacity-40">designed and developed by mayank kumar</p>
         </footer>
     </div>
+
+
+    <!-- Competitor Management Modal -->
+    <dialog id="competitor-modal" class="bg-transparent p-0 m-auto backdrop:bg-black/60 backdrop:backdrop-blur-sm z-[100] w-full max-w-2xl hidden">
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-2xl flex flex-col w-full text-on-surface">
+            <div class="flex justify-between items-center p-stack-md border-b border-outline-variant">
+                <h2 class="font-h3 text-h3 text-on-surface flex items-center gap-2" id="comp-modal-title">
+                    <span class="material-symbols-outlined text-primary">domain</span>
+                    Add Competitor
+                </h2>
+                <button type="button" onclick="document.getElementById('competitor-modal').close(); document.getElementById('competitor-modal').classList.add('hidden');" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors">
+                    <span class="material-symbols-outlined text-outline">close</span>
+                </button>
+            </div>
+            <form id="competitor-form" class="p-stack-md flex flex-col gap-stack-md">
+                <input type="hidden" id="comp-id">
+                <div class="grid grid-cols-2 gap-gutter">
+                    <div class="flex flex-col gap-1">
+                        <label class="font-label-sm text-outline">Name</label>
+                        <input type="text" id="comp-name" required class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="font-label-sm text-outline">Website URL</label>
+                        <input type="url" id="comp-url" required class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-gutter">
+                    <div class="flex flex-col gap-1">
+                        <label class="font-label-sm text-outline">Collection Frequency</label>
+                        <select id="comp-frequency" class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
+                            <option value="hourly">Hourly</option>
+                            <option value="daily" selected>Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 mt-6">
+                        <input type="checkbox" id="comp-enabled" checked class="w-4 h-4 text-primary bg-surface-container border-outline-variant rounded focus:ring-primary focus:ring-2">
+                        <label class="font-label-md">Enable Monitoring</label>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="font-label-sm text-outline">Modules (Hold Ctrl/Cmd to select multiple)</label>
+                    <select id="comp-modules" multiple class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary h-24">
+                        <option value="discovery" selected>Discovery</option>
+                        <option value="company" selected>Company Info</option>
+                        <option value="services" selected>Services</option>
+                        <option value="pricing" selected>Pricing</option>
+                        <option value="content" selected>Content/Blog</option>
+                        <option value="social" selected>Social</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-4 border-t border-outline-variant">
+                    <button type="button" id="comp-delete-btn" class="hidden px-4 py-2 bg-error/10 text-error rounded-lg hover:bg-error hover:text-white transition-colors">Delete</button>
+                    <div class="flex-1"></div>
+                    <button type="button" onclick="document.getElementById('competitor-modal').close(); document.getElementById('competitor-modal').classList.add('hidden');" class="px-4 py-2 border border-outline-variant text-on-surface rounded-lg hover:bg-surface-container transition-colors">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:brightness-105 transition-colors shadow-soft">Save</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
 
         <!-- JSON Modal -->
         <div id="json-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-stack-lg">
@@ -554,50 +621,105 @@
         return Math.floor(seconds / 86400) + 'd ago';
     }
 
-    addCompBtn.addEventListener('click', async () => {
-        const name = document.getElementById('new-comp-name').value;
-        const url = document.getElementById('new-comp-url').value;
-        if (!name || !url) {
-            alert("Please provide both name and url");
-            return;
-        }
+    // Modal Logic
+    function openCompetitorModal(isNew = false) {
+        const modal = document.getElementById('competitor-modal');
+        const form = document.getElementById('competitor-form');
+        const delBtn = document.getElementById('comp-delete-btn');
+        const title = document.getElementById('comp-modal-title');
         
-        addCompBtn.textContent = 'Adding...';
-        try {
-            const response = await fetch('/api/dashboard/competitors', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({name, website_url: url})
-            });
-            
-            if (!response.ok) {
-                let errMsg = response.statusText;
-                try {
-                    const errData = await response.json();
-                    errMsg = errData.detail || errMsg;
-                } catch(e) {}
-                alert("Failed to add competitor: " + errMsg);
-                addCompBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">add</span> Add';
+        form.reset();
+        modal.classList.remove('hidden');
+        modal.showModal();
+        
+        if (isNew) {
+            title.innerHTML = '<span class="material-symbols-outlined text-primary">domain</span> Add Competitor';
+            document.getElementById('comp-id').value = '';
+            delBtn.classList.add('hidden');
+        } else {
+            const id = compSelect.value;
+            if (!id || !competitorsMap[id]) {
+                modal.close();
+                modal.classList.add('hidden');
+                alert("Please select a competitor first");
                 return;
             }
+            const comp = competitorsMap[id];
+            title.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Competitor';
+            document.getElementById('comp-id').value = comp.id;
+            document.getElementById('comp-name').value = comp.name;
+            document.getElementById('comp-url').value = comp.website_url;
+            document.getElementById('comp-frequency').value = comp.collection_frequency || 'daily';
+            document.getElementById('comp-enabled').checked = comp.enabled;
             
-            const newComp = await response.json();
+            const mods = Array.from(document.getElementById('comp-modules').options);
+            mods.forEach(opt => opt.selected = comp.modules.includes(opt.value));
+            
+            delBtn.classList.remove('hidden');
+        }
+    }
+
+    document.getElementById('competitor-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('comp-id').value;
+        const name = document.getElementById('comp-name').value;
+        const url = document.getElementById('comp-url').value;
+        const frequency = document.getElementById('comp-frequency').value;
+        const enabled = document.getElementById('comp-enabled').checked;
+        const modules = Array.from(document.getElementById('comp-modules').selectedOptions).map(o => o.value);
+        
+        const payload = { name, website_url: url, collection_frequency: frequency, enabled, modules };
+        
+        try {
+            let response;
+            if (id) {
+                // Update
+                response = await fetch(`/api/dashboard/competitors/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                // Create
+                response = await fetch('/api/dashboard/competitors', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+            }
+            
+            if (!response.ok) throw new Error(await response.text());
+            
+            const savedComp = await response.json();
+            await loadCompetitors();
+            compSelect.value = savedComp.id;
+            compSelect.dispatchEvent(new Event('change'));
+            
+            document.getElementById('competitor-modal').close();
+            document.getElementById('competitor-modal').classList.add('hidden');
+            showToast(id ? 'Competitor updated' : 'Competitor added');
+            
+        } catch (e) {
+            alert("Error saving competitor: " + e.message);
+        }
+    });
+
+    document.getElementById('comp-delete-btn').addEventListener('click', async () => {
+        const id = document.getElementById('comp-id').value;
+        if (!id) return;
+        if (!confirm("Are you sure you want to delete this competitor? This cannot be undone.")) return;
+        
+        try {
+            const response = await fetch(`/api/dashboard/competitors/${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error(await response.text());
             
             await loadCompetitors();
-            
-            document.getElementById('new-comp-name').value = '';
-            document.getElementById('new-comp-url').value = '';
-            
-            // Auto-select the newly added competitor
-            compSelect.value = newComp.id;
-            compSelect.dispatchEvent(new Event('change'));
-
-            showToast(`${newComp.name} added successfully`);
-            
-        } catch(e) {
-            console.error(e);
+            document.getElementById('competitor-modal').close();
+            document.getElementById('competitor-modal').classList.add('hidden');
+            showToast('Competitor deleted');
+        } catch (e) {
+            alert("Error deleting: " + e.message);
         }
-        addCompBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">add</span> Add';
     });
 
     exportCsvBtn.addEventListener('click', async () => {
@@ -744,6 +866,26 @@
         document.getElementById('stream-status').textContent = 'IDLE';
     }
 
+    function editCompetitorFromList(id) {
+        compSelect.value = id;
+        compSelect.dispatchEvent(new Event('change'));
+        openCompetitorModal(false);
+    }
+
+    async function deleteCompetitor(id, name) {
+        if (!confirm(`Are you sure you want to delete ${name}? This cannot be undone.`)) return;
+        try {
+            const response = await fetch(`/api/dashboard/competitors/${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error(await response.text());
+            
+            await loadCompetitors();
+            refreshData();
+            showToast('Competitor deleted');
+        } catch (e) {
+            alert("Error deleting: " + e.message);
+        }
+    }
+
     async function pollActiveCrawl(id) {
         try {
             const res = await fetch('/api/dashboard/stats');
@@ -831,15 +973,15 @@
             const resStats = await fetch(`/api/dashboard/stats?t=${timestamp}`);
             if (resStats.ok) {
                 const stats = await resStats.json();
-                document.getElementById('metric-urls').textContent = stats.urls_discovered;
-                document.getElementById('metric-pages').textContent = stats.pages_crawled;
+                document.getElementById('metric-monitored').textContent = stats.competitors_monitored;
+                document.getElementById('metric-crawls').textContent = stats.active_collection ? 1 : 0;
                 document.getElementById('metric-services').textContent = stats.services_extracted;
                 document.getElementById('metric-pricing').textContent = stats.pricing_extracted;
                 document.getElementById('metric-db-writes').textContent = stats.database_writes;
                 document.getElementById('metric-errors').textContent = stats.errors;
 
-                document.getElementById('sub-urls').textContent = "Sources updated";
-                document.getElementById('sub-pages').textContent = "Buffer matches active";
+                document.getElementById('sub-monitored').textContent = "Enabled targets";
+                document.getElementById('sub-crawls').textContent = "Currently running";
                 document.getElementById('sub-services').textContent = "Services synced";
                 document.getElementById('sub-pricing').textContent = "Pricing synced";
                 document.getElementById('sub-db-writes').textContent = "Synchronized";
@@ -937,6 +1079,9 @@
                                 <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.content_count}</td>
                                 <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.socials_count}</td>
                                 <td class="px-stack-md py-3 text-center">
+                                    <button onclick="editCompetitorFromList(${row.id})" class="text-outline hover:text-primary transition-colors mr-2" title="Edit">
+                                        <span class="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
                                     <button onclick="deleteCompetitor(${row.id}, '${escapeHtml(row.name)}')" class="text-outline hover:text-error transition-colors" title="Delete">
                                         <span class="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
