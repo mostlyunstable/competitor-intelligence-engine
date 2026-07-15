@@ -111,3 +111,10 @@ competitors.json
 # Alembic
 # ================================
 migrations/versions/*.pyc
+node_modules/
+.env
+__pycache__/
+*.pyc
+.venv/
+storage/
+*.db
