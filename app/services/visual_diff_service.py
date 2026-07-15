@@ -31,7 +31,7 @@ class VisualDiffService:
         if not self.hashes_file.exists():
             return {}
         try:
-            return cast(dict[str, str], json.loads(self.hashes_file.read_text()))
+            return cast("dict[str, str]", json.loads(self.hashes_file.read_text()))
         except json.JSONDecodeError:
             return {}
 

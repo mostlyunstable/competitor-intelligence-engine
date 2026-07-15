@@ -274,7 +274,7 @@ class RedisQueueBackend(QueueBackend):
 
         message = self._processing.pop(message_id)
         message.retry_count += 1
-        
+
         try:
             redis = self._get_redis()
             if requeue and message.retry_count < message.max_retries:

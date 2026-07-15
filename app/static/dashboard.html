@@ -5,7 +5,8 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>DataEngine Ops - Competitor Intelligence</title>
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries">
+</script>
     <!-- Google Fonts: Editorial Serif (Playfair Display) & Manrope -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
     <!-- Material Symbols -->
@@ -16,30 +17,30 @@
           theme: {
             extend: {
               "colors": {
-                      "primary": "#c2652a", // Sahara Clay
+                      "primary": "#3b82f6",
                       "on-primary": "#ffffff",
-                      "primary-container": "#fdf3eb",
-                      "on-primary-container": "#4a2108",
-                      "surface": "#faf8f6", // Warm Cream
+                      "primary-container": "#dbeafe",
+                      "on-primary-container": "#1e3a8a",
+                      "surface": "#ffffff",
                       "surface-container-lowest": "#ffffff",
-                      "surface-container-low": "#f7f3f0",
-                      "surface-container": "#f1ece8",
-                      "surface-container-high": "#ebe4df",
-                      "surface-container-highest": "#e5ddd6",
-                      "on-surface": "#2c2826",
-                      "on-surface-variant": "#5a524e",
-                      "outline": "#8b7e76",
-                      "outline-variant": "#d5cdc8",
-                      "background": "#faf8f6",
-                      "error": "#ba1a1a",
-                      "secondary": "#735c4c",
-                      "secondary-container": "#fceee5"
+                      "surface-container-low": "#f8fafc",
+                      "surface-container": "#f1f5f9",
+                      "surface-container-high": "#e2e8f0",
+                      "surface-container-highest": "#cbd5e1",
+                      "on-surface": "#000000",
+                      "on-surface-variant": "#475569",
+                      "outline": "#000000",
+                      "outline-variant": "#000000",
+                      "background": "#f8fafc",
+                      "error": "#ef4444",
+                      "secondary": "#000000",
+                      "secondary-container": "#e2e8f0"
               },
               "borderRadius": {
-                      "DEFAULT": "0.5rem",
-                      "lg": "0.75rem",
-                      "xl": "1rem",
-                      "full": "9999px"
+                      "DEFAULT": "0px",
+                      "lg": "0px",
+                      "xl": "0px",
+                      "full": "0px"
               },
               "spacing": {
                       "stack-md": "16px",
@@ -77,7 +78,8 @@
             },
           },
         }
-    </script>
+    
+</script>
     <style>
         body { font-family: 'Manrope', sans-serif; -webkit-font-smoothing: antialiased; }
         h1, h2, h3 { font-family: 'Playfair Display', serif; }
@@ -105,17 +107,109 @@
         }
         .toast-in { animation: toastIn 0.3s ease-out forwards; }
         .toast-out { animation: toastOut 0.3s ease-in forwards; }
+    
+        /* Profile Explorer */
+        .profile-dialog {
+            width: 90vw;
+            max-width: 1200px;
+            height: 90vh;
+            max-height: 90vh;
+            background: var(--surface);
+            color: var(--on-surface);
+            border-2: 4px solid var(--outline);
+            box-shadow: 12px 12px 0px 0px var(--outline);
+            padding: 0;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .profile-dialog[open] {
+            display: flex;
+        }
+        .profile-dialog::backdrop {
+            background: rgba(0, 0, 0, 0.7);
+        }
+        .profile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--stack-md);
+            border-bottom: 4px solid var(--outline);
+            background: var(--surface-container);
+        }
+        .profile-tabs {
+            display: flex;
+            border-bottom: 2px solid var(--outline);
+            background: var(--surface-container-low);
+            overflow-x: auto;
+        }
+        .profile-tab {
+            padding: var(--stack-sm) var(--stack-md);
+            font-weight: bold;
+            font-family: 'Space Grotesk', sans-serif;
+            text-transform: uppercase;
+            border-right: 2px solid var(--outline);
+            border-bottom: 4px solid transparent;
+            cursor: pointer;
+            transition: all 150ms ease;
+            white-space: nowrap;
+        }
+        .profile-tab:hover {
+            background: var(--primary-container);
+        }
+        .profile-tab.active {
+            border-bottom: 4px solid var(--primary);
+            background: var(--surface);
+            color: var(--primary);
+        }
+        .profile-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--stack-md);
+            background: var(--surface);
+        }
+        .tab-pane {
+            display: none;
+        }
+        .tab-pane.active {
+            display: block;
+        }
+        .json-viewer {
+            background: #111;
+            color: #0f0;
+            padding: var(--stack-md);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            border-2: 2px solid var(--outline);
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: var(--stack-md);
+        }
+        .data-card {
+            border-2: 2px solid var(--outline);
+            padding: var(--stack-sm);
+            background: var(--surface-container-low);
+        }
+        .data-card h4 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: bold;
+            margin-bottom: var(--stack-sm);
+            border-bottom: 2px solid var(--outline);
+            padding-bottom: 4px;
+        }
     </style>
+
 </head>
 <body class="bg-background text-on-surface">
 <!-- SideNavBar -->
-<aside class="fixed left-0 top-0 h-full w-[280px] bg-surface-container-lowest border-r border-outline-variant flex flex-col p-stack-md gap-stack-sm z-50">
+<aside class="fixed left-0 top-0 h-full w-[280px] bg-surface-container-lowest border-r border-black flex flex-col p-stack-md gap-stack-sm z-50">
     <div class="mb-stack-lg px-2">
-        <h1 class="text-h3 font-bold text-primary italic">Utservio Data Engine</h1>
-        <p class="font-label-sm text-label-sm text-outline opacity-70">v2.4.0-stable</p>
+        <div class="flex justify-between items-center"><h1 class="font-mono text-2xl font-black tracking-tighter text-black uppercase">UTSERVIO</h1><p class="font-mono text-[10px] text-gray-500">v2.4.0</p></div>
     </div>
     <nav class="flex-1 flex flex-col gap-unit">
-        <a class="flex items-center gap-stack-sm p-stack-sm bg-secondary-container text-on-primary-container rounded-lg font-semibold shadow-sm duration-200" href="/dashboard">
+        <a class="flex items-center gap-stack-sm p-stack-sm bg-secondary-container text-on-primary-container rounded-lg font-semibold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] duration-200" href="/dashboard">
             <span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
             <span class="font-body-md text-body-md">Dashboard</span>
         </a>
@@ -124,7 +218,7 @@
             <span class="font-body-md text-body-md">API Swagger Docs</span>
         </a>
     </nav>
-    <div class="pt-stack-md border-t border-outline-variant">
+    <div class="pt-stack-md border-t border-black">
         <div class="flex items-center gap-stack-sm px-2">
             <div class="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center">
                 <span class="material-symbols-outlined text-primary/70" data-icon="engineering">engineering</span>
@@ -138,9 +232,9 @@
 </aside>
 
 <!-- TopNavBar -->
-<header class="fixed top-0 right-0 w-[calc(100%-280px)] h-16 bg-surface-container-lowest/80 backdrop-blur-md border-b border-outline-variant flex justify-between items-center px-container-padding z-40 transition-all">
+<header class="fixed top-0 right-0 w-[calc(100%-280px)] h-16 bg-surface-container-lowest/80 backdrop-blur-md border-b border-black flex justify-between items-center px-container-padding z-40 transition-all">
     <div class="flex items-center gap-gutter">
-        <span class="font-h3 text-h3 text-on-surface">Utservio Data Engine Ops</span>
+        <span class="font-bold text-lg text-black tracking-tight uppercase border-b-2 border-black pb-1">Data Engine Operations</span>
         <div class="h-4 w-[1px] bg-outline-variant"></div>
         <div class="flex gap-stack-md">
             <span class="font-label-md text-label-md text-primary font-bold" id="header-status">Status: Checking...</span>
@@ -156,10 +250,10 @@
         <!-- Pipeline Status -->
         <section>
             <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-[0.1em] mb-stack-sm font-semibold">Pipeline Status</h2>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-soft flex items-center justify-between overflow-x-auto">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between overflow-x-auto">
                 <!-- Step 1 -->
                 <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-discovery">
-                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                    <div class="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center text-outline">
                         <span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
                     </div>
                     <span class="font-label-sm text-label-sm text-outline">Discovery</span>
@@ -167,7 +261,7 @@
                 <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-discovery"></div>
                 <!-- Step 2 -->
                 <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-fetch">
-                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                    <div class="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center text-outline">
                         <span class="material-symbols-outlined text-[20px]" data-icon="cloud_download">cloud_download</span>
                     </div>
                     <span class="font-label-sm text-label-sm text-outline">Fetch</span>
@@ -175,7 +269,7 @@
                 <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-fetch"></div>
                 <!-- Step 3 -->
                 <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-parse">
-                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                    <div class="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center text-outline">
                         <span class="material-symbols-outlined text-[20px]" data-icon="code">code</span>
                     </div>
                     <span class="font-label-sm text-label-sm text-outline">Parse</span>
@@ -183,7 +277,7 @@
                 <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-parse"></div>
                 <!-- Step 4 -->
                 <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-normalize">
-                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                    <div class="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center text-outline">
                         <span class="material-symbols-outlined text-[20px]" data-icon="equalizer">equalizer</span>
                     </div>
                     <span class="font-label-sm text-label-sm text-outline">Normalize</span>
@@ -191,7 +285,7 @@
                 <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-normalize"></div>
                 <!-- Step 5 -->
                 <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-validate">
-                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                    <div class="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center text-outline">
                         <span class="material-symbols-outlined text-[20px]" data-icon="verified">verified</span>
                     </div>
                     <span class="font-label-sm text-label-sm text-outline">Validate</span>
@@ -199,7 +293,7 @@
                 <div class="flex-1 h-[1px] bg-outline-variant mx-unit min-w-[20px]" id="line-validate"></div>
                 <!-- Step 6 -->
                 <div class="flex flex-col items-center gap-unit min-w-[80px]" id="step-store">
-                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
+                    <div class="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center text-outline">
                         <span class="material-symbols-outlined text-[20px]" data-icon="database">database</span>
                     </div>
                     <span class="font-label-sm text-label-sm text-outline">Store</span>
@@ -209,32 +303,32 @@
 
         <!-- Metric Cards -->
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-gutter">
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex flex-col gap-unit shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Competitors Monitored</p>
                 <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-monitored">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-monitored">Loading...</p>
             </div>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex flex-col gap-unit shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Active Collections</p>
                 <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-crawls">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-crawls">Loading...</p>
             </div>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex flex-col gap-unit shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Services Extracted</p>
                 <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-services">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-services">Loading...</p>
             </div>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex flex-col gap-unit shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Pricing Extracted</p>
                 <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-pricing">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-pricing">Loading...</p>
             </div>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft hover:shadow-md transition-shadow">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex flex-col gap-unit shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-md transition-shadow">
                 <p class="font-label-sm text-label-sm text-outline">Database Entries</p>
                 <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-db-writes">--</p>
                 <p class="font-label-sm text-label-sm text-outline opacity-50" id="sub-db-writes">Loading...</p>
             </div>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex flex-col gap-unit shadow-soft border-l-4 border-l-error/30">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex flex-col gap-unit shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border-l-4 border-l-error/30">
                 <p class="font-label-sm text-label-sm text-outline">Errors</p>
                 <p class="font-h2 text-h2 text-transparent skeleton rounded w-fit" id="metric-errors">--</p>
                 <p class="font-label-sm text-label-sm text-error font-bold" id="sub-errors">Stable</p>
@@ -245,7 +339,7 @@
             <!-- Current Collection & Controls -->
             <div class="lg:col-span-4 flex flex-col gap-stack-sm">
                 <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Controls & Target</h2>
-                <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-soft flex flex-col gap-unit mb-stack-sm">
+                <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col gap-unit mb-stack-sm">
                     <div class="flex justify-between items-center mb-2">
                         <label class="block font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Competitor Profile</label>
                         <button id="manage-comps-btn" onclick="openCompetitorModal()" class="text-primary hover:underline font-label-sm flex items-center gap-1">
@@ -253,24 +347,24 @@
                         </button>
                     </div>
                     <div class="grid grid-cols-2 gap-unit">
-                        <button onclick="openCompetitorModal(true)" class="py-2 px-4 bg-surface-container text-on-surface font-label-md rounded-lg hover:bg-surface-container-high transition-all flex items-center justify-center gap-2 border border-outline-variant border-dashed">
+                        <button onclick="openCompetitorModal(true)" class="py-2 px-4 bg-surface-container text-on-surface font-label-md rounded-lg hover:bg-surface-container-high transition-all flex items-center justify-center gap-2 border-2 border-black border-dashed">
                             <span class="material-symbols-outlined text-[18px]">add</span> Add New
                         </button>
-                        <button onclick="window.location.href='/api/dashboard/compare/csv'" class="py-2 px-4 bg-primary text-white font-label-md rounded-lg hover:brightness-105 transition-all flex items-center justify-center gap-2 shadow-soft">
+                        <button onclick="window.location.href='/api/dashboard/compare/csv'" class="py-2 px-4 bg-primary text-white font-label-md rounded-lg hover:brightness-105 transition-all flex items-center justify-center gap-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                             <span class="material-symbols-outlined text-[18px]">download</span> Compare CSV
                         </button>
                     </div>
                 </div>
 
-                <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md flex flex-col gap-stack-md shadow-soft">
+                <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-md flex flex-col gap-stack-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                     <div>
                         <label for="competitor-select" class="font-label-sm text-label-sm text-outline block mb-1">Select Competitor</label>
-                        <select id="competitor-select" class="w-full bg-surface-container border border-outline-variant rounded-lg p-2 font-body-md text-body-md focus:outline-none focus:ring-1 focus:ring-primary">
+                        <select id="competitor-select" class="w-full bg-surface-container border-2 border-black rounded-lg p-2 font-body-md text-body-md focus:outline-none focus:ring-1 focus:ring-primary">
                             <option value="">-- Choose Competitor --</option>
                         </select>
                     </div>
 
-                    <div class="border-t border-outline-variant pt-stack-sm">
+                    <div class="border-t border-black pt-stack-sm">
                         <p class="font-label-sm text-label-sm text-outline">Target URL</p>
                         <p class="font-body-md text-body-md font-mono truncate text-on-surface-variant" id="target-url">No competitor selected</p>
                         <p class="font-label-sm text-label-sm text-outline opacity-50 mt-1" id="last-collected"></p>
@@ -304,11 +398,11 @@
                         </button>
                     </div>
                     <div class="flex gap-unit w-full mt-2">
-                        <button id="view-json-btn" disabled class="flex-1 py-3 bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-highest disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-outline-variant">
+                        <button id="view-json-btn" disabled class="flex-1 py-3 bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-highest disabled:opacity-50 transition-all flex items-center justify-center gap-2 border-2 border-black">
                             <span class="material-symbols-outlined text-[18px]">data_object</span>
                             View JSON
                         </button>
-                        <button id="export-csv-btn" disabled class="flex-1 py-3 bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-highest disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-outline-variant">
+                        <button id="export-csv-btn" disabled class="flex-1 py-3 bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-highest disabled:opacity-50 transition-all flex items-center justify-center gap-2 border-2 border-black">
                             <span class="material-symbols-outlined text-[18px]">download</span>
                             Export CSV
                         </button>
@@ -316,7 +410,7 @@
                 </div>
 
                 <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mt-stack-md font-semibold">System Health</h2>
-                <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm grid grid-cols-2 gap-unit shadow-soft">
+                <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm grid grid-cols-2 gap-unit shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                     <div class="flex items-center gap-unit p-2 bg-surface-container-low rounded-lg">
                         <div class="w-2 h-2 rounded-full" id="health-db-indicator" style="background-color: rgb(139, 126, 118);"></div>
                         <span class="font-label-sm text-label-sm text-on-surface-variant" id="health-db-text">DB: Checking</span>
@@ -341,9 +435,9 @@
                 <!-- Competitor Management -->
                 <div>
                     <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-stack-sm font-semibold">Competitor Management</h2>
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-y-auto shadow-soft max-h-[500px]">
+                    <div class="bg-surface-container-lowest border-2 border-black rounded-xl overflow-y-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-[500px]">
                         <table class="w-full text-left border-collapse">
-                            <thead class="bg-surface-container-low border-b border-outline-variant">
+                            <thead class="bg-surface-container-low border-b border-black">
                                 <tr>
                                     <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase">Competitor Name</th>
                                     <th class="px-stack-md py-3 font-label-sm text-label-sm text-outline uppercase text-center">Services</th>
@@ -370,9 +464,9 @@
                         <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider font-semibold">Collection Audit Trail</h2>
                         <span class="font-mono text-[10px] text-primary bg-primary-container px-2 py-0.5 rounded-full font-bold" id="stream-status">IDLE</span>
                     </div>
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl flex-1 overflow-hidden flex flex-col shadow-soft">
+                    <div class="bg-surface-container-lowest border-2 border-black rounded-xl flex-1 overflow-hidden flex flex-col shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                         <table class="w-full text-left border-collapse">
-                            <thead class="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
+                            <thead class="bg-surface-container-low border-b border-black sticky top-0 z-10">
                                 <tr>
                                     <th class="px-stack-md py-2 font-label-sm text-label-sm text-outline uppercase w-36">Time Started</th>
                                     <th class="px-stack-md py-2 font-label-sm text-label-sm text-outline uppercase w-24">Success</th>
@@ -394,21 +488,21 @@
 
         <!-- Infrastructure Telemetry -->
         <section class="grid grid-cols-1 md:grid-cols-3 gap-gutter mt-stack-md">
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex items-center justify-between shadow-soft">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <div class="flex items-center gap-stack-sm">
                     <span class="material-symbols-outlined text-primary/60" data-icon="memory">memory</span>
                     <span class="font-label-md text-label-md text-on-surface">Engine CPU</span>
                 </div>
                 <span class="font-mono text-mono text-outline" id="telemetry-cpu">0.0%</span>
             </div>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex items-center justify-between shadow-soft">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <div class="flex items-center gap-stack-sm">
                     <span class="material-symbols-outlined text-primary/60" data-icon="dns">dns</span>
                     <span class="font-label-md text-label-md text-on-surface">Node Memory</span>
                 </div>
                 <span class="font-mono text-mono text-outline" id="telemetry-mem">--MB / --GB</span>
             </div>
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-sm flex items-center justify-between shadow-soft">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-sm flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <div class="flex items-center gap-stack-sm">
                     <span class="material-symbols-outlined text-primary/60" data-icon="bolt">bolt</span>
                     <span class="font-label-md text-label-md text-on-surface">Active Crawls</span>
@@ -417,7 +511,7 @@
             </div>
         </section>
 
-        <footer class="mt-stack-lg pt-stack-md border-t border-outline-variant/30 flex justify-center">
+        <footer class="mt-stack-lg pt-stack-md border-t border-black/30 flex justify-center">
             <p class="font-label-sm text-label-sm text-outline uppercase tracking-[0.2em] opacity-40">designed and developed by mayank kumar</p>
         </footer>
     </div>
@@ -425,8 +519,8 @@
 
     <!-- Competitor Management Modal -->
     <dialog id="competitor-modal" class="bg-transparent p-0 m-auto backdrop:bg-black/60 backdrop:backdrop-blur-sm z-[100] w-full max-w-2xl hidden">
-        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-2xl flex flex-col w-full text-on-surface">
-            <div class="flex justify-between items-center p-stack-md border-b border-outline-variant">
+        <div class="bg-surface-container-lowest border-2 border-black rounded-xl shadow-2xl flex flex-col w-full text-on-surface">
+            <div class="flex justify-between items-center p-stack-md border-b border-black">
                 <h2 class="font-h3 text-h3 text-on-surface flex items-center gap-2" id="comp-modal-title">
                     <span class="material-symbols-outlined text-primary">domain</span>
                     Add Competitor
@@ -440,30 +534,30 @@
                 <div class="grid grid-cols-2 gap-gutter">
                     <div class="flex flex-col gap-1">
                         <label class="font-label-sm text-outline">Name</label>
-                        <input type="text" id="comp-name" required class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
+                        <input type="text" id="comp-name" required class="bg-surface-container border-2 border-black rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
                     </div>
                     <div class="flex flex-col gap-1">
                         <label class="font-label-sm text-outline">Website URL</label>
-                        <input type="url" id="comp-url" required class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
+                        <input type="url" id="comp-url" required class="bg-surface-container border-2 border-black rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-gutter">
                     <div class="flex flex-col gap-1">
                         <label class="font-label-sm text-outline">Collection Frequency</label>
-                        <select id="comp-frequency" class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
+                        <select id="comp-frequency" class="bg-surface-container border-2 border-black rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary">
                             <option value="hourly">Hourly</option>
                             <option value="daily" selected>Daily</option>
                             <option value="weekly">Weekly</option>
                         </select>
                     </div>
                     <div class="flex items-center gap-2 mt-6">
-                        <input type="checkbox" id="comp-enabled" checked class="w-4 h-4 text-primary bg-surface-container border-outline-variant rounded focus:ring-primary focus:ring-2">
+                        <input type="checkbox" id="comp-enabled" checked class="w-4 h-4 text-primary bg-surface-container border-black rounded focus:ring-primary focus:ring-2">
                         <label class="font-label-md">Enable Monitoring</label>
                     </div>
                 </div>
                 <div class="flex flex-col gap-1">
                     <label class="font-label-sm text-outline">Modules (Hold Ctrl/Cmd to select multiple)</label>
-                    <select id="comp-modules" multiple class="bg-surface-container border border-outline-variant rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary h-24">
+                    <select id="comp-modules" multiple class="bg-surface-container border-2 border-black rounded-lg p-2 text-on-surface focus:outline-none focus:border-primary h-24">
                         <option value="discovery" selected>Discovery</option>
                         <option value="company" selected>Company Info</option>
                         <option value="services" selected>Services</option>
@@ -472,11 +566,11 @@
                         <option value="social" selected>Social</option>
                     </select>
                 </div>
-                <div class="flex justify-end gap-2 pt-4 border-t border-outline-variant">
+                <div class="flex justify-end gap-2 pt-4 border-t border-black">
                     <button type="button" id="comp-delete-btn" class="hidden px-4 py-2 bg-error/10 text-error rounded-lg hover:bg-error hover:text-white transition-colors">Delete</button>
                     <div class="flex-1"></div>
-                    <button type="button" onclick="document.getElementById('competitor-modal').close(); document.getElementById('competitor-modal').classList.add('hidden');" class="px-4 py-2 border border-outline-variant text-on-surface rounded-lg hover:bg-surface-container transition-colors">Cancel</button>
-                    <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:brightness-105 transition-colors shadow-soft">Save</button>
+                    <button type="button" onclick="document.getElementById('competitor-modal').close(); document.getElementById('competitor-modal').classList.add('hidden');" class="px-4 py-2 border-2 border-black text-on-surface rounded-lg hover:bg-surface-container transition-colors">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:brightness-105 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">Save</button>
                 </div>
             </form>
         </div>
@@ -484,8 +578,8 @@
 
         <!-- JSON Modal -->
         <div id="json-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-stack-lg">
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
-                <div class="flex justify-between items-center p-stack-md border-b border-outline-variant">
+            <div class="bg-surface-container-lowest border-2 border-black rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
+                <div class="flex justify-between items-center p-stack-md border-b border-black">
                     <h2 class="font-h3 text-h3 text-on-surface flex items-center gap-2">
                         <span class="material-symbols-outlined text-primary">data_object</span>
                         Extracted JSON Data
@@ -505,7 +599,61 @@
 
 </main>
 
+
+    <!-- Profile Explorer Modal -->
+    <dialog id="profile-modal" class="profile-dialog transition-brutal">
+        <div class="profile-header">
+            <div class="flex items-center gap-4">
+                <h2 id="profile-title" class="text-display-sm font-display font-black uppercase tracking-tight">Competitor Profile</h2>
+                <div id="profile-loading" class="hidden">
+                    <span class="material-symbols-outlined animate-spin">refresh</span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="downloadProfileJson()" class="btn-secondary px-4 py-2 border-2 border-black font-bold uppercase hover:bg-surface-container-low flex items-center gap-2 transition-brutal">
+                    <span class="material-symbols-outlined">download</span> JSON
+                </button>
+                <button onclick="closeProfileExplorer()" class="text-on-surface hover:text-error transition-brutal">
+                    <span class="material-symbols-outlined text-[32px]">close</span>
+                </button>
+            </div>
+        </div>
+        <div class="profile-tabs">
+            <div class="profile-tab active" onclick="switchProfileTab('tab-overview')">Overview</div>
+            <div class="profile-tab" onclick="switchProfileTab('tab-services')">Services & Pricing</div>
+            <div class="profile-tab" onclick="switchProfileTab('tab-team')">Team & Reviews</div>
+            <div class="profile-tab" onclick="switchProfileTab('tab-history')">History</div>
+            <div class="profile-tab" onclick="switchProfileTab('tab-json')">Structured JSON</div>
+        </div>
+        <div class="profile-content relative">
+            <div id="tab-overview" class="tab-pane active">
+                <div class="data-grid" id="profile-overview-grid"></div>
+            </div>
+            <div id="tab-services" class="tab-pane">
+                <div class="data-grid" id="profile-services-grid"></div>
+                <h3 class="font-display font-bold text-xl mt-6 mb-4 border-b-2 border-black pb-2">Pricing</h3>
+                <div class="data-grid" id="profile-pricing-grid"></div>
+            </div>
+            <div id="tab-team" class="tab-pane">
+                <h3 class="font-display font-bold text-xl mb-4 border-b-2 border-black pb-2">Team</h3>
+                <div class="data-grid" id="profile-team-grid"></div>
+                <h3 class="font-display font-bold text-xl mt-6 mb-4 border-b-2 border-black pb-2">Reviews</h3>
+                <div class="data-grid" id="profile-reviews-grid"></div>
+            </div>
+            <div id="tab-history" class="tab-pane">
+                <div id="profile-history-container" class="flex flex-col gap-4"></div>
+            </div>
+            <div id="tab-json" class="tab-pane">
+                <div class="flex justify-between mb-2">
+                    <h3 class="font-display font-bold text-lg">Raw Extracted Payload</h3>
+                    <button onclick="copyProfileJson()" class="text-primary font-bold hover:underline">Copy to Clipboard</button>
+                </div>
+                <pre id="profile-json-viewer" class="json-viewer"></pre>
+            </div>
+        </div>
+    </dialog>
 <script>
+
     // Micro-interactions
     document.querySelectorAll('button, a').forEach(el => {
         el.addEventListener('mousedown', () => {
@@ -830,18 +978,19 @@
         stages.forEach(s => {
             const el = document.getElementById(`step-${s}`);
             const line = document.getElementById(`line-${s}`);
-            if (s === stage) {
+                const icon = el.querySelector('span').getAttribute('data-icon') || el.querySelector('span').textContent.trim();
+                if (s === stage) {
                 el.innerHTML = `
                     <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
-                        <span class="material-symbols-outlined text-[20px]">${el.querySelector('span').getAttribute('data-icon')}</span>
+                        <span class="material-symbols-outlined text-[20px]" data-icon="${icon}">${icon}</span>
                     </div>
                     <span class="font-label-md text-label-md text-primary font-bold capitalize">${s}</span>
                 `;
                 if (line) line.className = "flex-1 h-[2px] bg-primary mx-unit min-w-[20px]";
             } else {
                 el.innerHTML = `
-                    <div class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-outline">
-                        <span class="material-symbols-outlined text-[20px]">${el.querySelector('span').getAttribute('data-icon')}</span>
+                    <div class="w-10 h-10 rounded-full border-2 border-black flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-[20px]" data-icon="${icon}">${icon}</span>
                     </div>
                     <span class="font-label-sm text-label-sm text-outline capitalize">${s}</span>
                 `;
@@ -1071,10 +1220,10 @@
                                 <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.content_count}</td>
                                 <td class="px-stack-md py-3 text-center font-mono text-on-surface-variant">${row.socials_count}</td>
                                 <td class="px-stack-md py-3 text-center">
-                                    <button onclick="editCompetitorFromList(${row.id})" class="text-outline hover:text-primary transition-colors mr-2" title="Edit">
+                                    <button onclick="event.stopPropagation(); editCompetitorFromList(${row.id})" class="text-outline hover:text-primary transition-colors mr-2" title="Edit">
                                         <span class="material-symbols-outlined text-[18px]">edit</span>
                                     </button>
-                                    <button onclick="deleteCompetitor(${row.id}, '${escapeHtml(row.name)}')" class="text-outline hover:text-error transition-colors" title="Delete">
+                                    <button onclick="event.stopPropagation(); deleteCompetitor(${row.id}, '${escapeHtml(row.name)}')" class="text-outline hover:text-error transition-colors" title="Delete">
                                         <span class="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </td>
@@ -1106,7 +1255,7 @@
                         logsContainer.innerHTML += `
                             <div class="text-stone-300 font-mono text-[13px] border-b border-stone-800/40 py-1">
                                 <span class="text-stone-500">[${escapeHtml(timeStr)}]</span>
-                                ${compName} | Status: ${statusText} | Dur: ${log.duration_seconds || 0}s | Recs: ${log.records_collected}
+                                ${escapeHtml(compName)} | Status: ${statusText} | Dur: ${log.duration_seconds || 0}s | Recs: ${log.records_collected}
                                 ${log.success ? '' : `<br/><span class="text-red-400 pl-4">Errors: ${errorsStr}</span>`}
                             </div>
                         `;
@@ -1134,29 +1283,268 @@
         }
     }
 
-    // Delete competitor
-    async function deleteCompetitor(id, name) {
-        if (!confirm(`Delete "${name}" and all its data? This cannot be undone.`)) return;
-        try {
-            const res = await fetch(`/api/dashboard/competitors/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                showToast(`${name} deleted`);
-                delete competitorsMap[id];
-                await loadCompetitors();
-                compSelect.dispatchEvent(new Event('change'));
-                refreshData();
-            } else {
-                showToast('Delete failed', 'error');
-            }
-        } catch (e) {
-            showToast('Delete failed', 'error');
-        }
-    }
+
 
     // Init
     loadCompetitors();
     refreshData();
+    
+
+
+    
+        // Hook into the existing refresh loop
+        const originalRefresh = refreshData;
+        refreshData = async function() {
+            await originalRefresh();
+            if (typeof fetchFeed === 'function') {
+                fetchFeed();
+            }
+            
+            // Update System Health
+            fetch('/api/dashboard/stats').then(r=>r.json()).then(data => {
+                const total = data.total_competitors;
+                const err = data.errors_count;
+                const active = data.active_crawls || 0;
+                const elJobs = document.getElementById('health-active-jobs');
+                if (elJobs) elJobs.innerText = active;
+                
+                // Success rate calculation
+                const rate = total > 0 ? ((1 - (err/Math.max(1, total*10))) * 100).toFixed(0) : 100;
+                const elRate = document.getElementById('health-success-rate');
+                if (elRate) elRate.innerText = rate + '%';
+                
+                const sysHealth = document.getElementById('sys-health');
+                if (sysHealth) {
+                    let health = 100;
+                    if (total > 0) {
+                        health = Math.max(0, 100 - (err / total) * 100);
+                    }
+                    sysHealth.innerText = Math.round(health) + '%';
+                }
+            }).catch(e => console.error(e));
+        };
+
+        // Hook into logs rendering to re-apply filters
+        const originalRefreshData = refreshData;
+        refreshData = async function() {
+            await originalRefreshData();
+            if (typeof applyLogFilters === 'function') {
+                setTimeout(applyLogFilters, 500); // Give it time to render logs
+            }
+        };
+
     setInterval(refreshData, 5000);
+
+        // ======= TABLE SORTING =======
+        let currentSortCol = -1;
+        let sortAsc = true;
+        
+        function sortTable(n) {
+            const table = document.querySelector("#competitors-table-body").parentElement;
+            let rows, switching, i, x, y, shouldSwitch;
+            switching = true;
+            
+            if (currentSortCol === n) {
+                sortAsc = !sortAsc;
+            } else {
+                sortAsc = true;
+                currentSortCol = n;
+            }
+
+            while (switching) {
+                switching = false;
+                rows = document.getElementById("competitors-table-body").rows;
+                for (i = 0; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[n];
+                    y = rows[i + 1].getElementsByTagName("TD")[n];
+                    
+                    let xVal = x.innerText.toLowerCase();
+                    let yVal = y.innerText.toLowerCase();
+                    
+                    // Parse numbers if possible
+                    if (!isNaN(parseInt(xVal)) && !isNaN(parseInt(yVal))) {
+                        xVal = parseInt(xVal);
+                        yVal = parseInt(yVal);
+                    }
+
+                    if (sortAsc) {
+                        if (xVal > yVal) { shouldSwitch = true; break; }
+                    } else {
+                        if (xVal < yVal) { shouldSwitch = true; break; }
+                    }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                }
+            }
+        }
+        
+        // ======= LOG FILTERING =======
+        function applyLogFilters() {
+            
+            const filterEl = document.getElementById('filter-errors-only');
+            if (!filterEl) return;
+            const errorsOnly = filterEl.checked;
+            const searchStr = document.getElementById('filter-logs-input').value.toLowerCase();
+            const logsContainer = document.getElementById('logs-container');
+            const lines = logsContainer.children;
+            
+            for (let line of lines) {
+                const text = line.innerText.toLowerCase();
+                let show = true;
+                
+                if (errorsOnly && !text.includes('failed') && !text.includes('error')) {
+                    show = false;
+                }
+                if (searchStr && !text.includes(searchStr)) {
+                    show = false;
+                }
+                
+                line.style.display = show ? '' : 'none';
+            }
+        }
+        
+        // Wrap the old viewProfile to inject analytics
+        if (typeof viewProfile === 'undefined') { window.viewProfile = async function(id){}; }
+        const originalViewProfile = viewProfile;
+        viewProfile = async function(id) {
+            await originalViewProfile(id);
+            
+            // Populate Analytics Tab
+            const comp = competitorsMap[id];
+            
+            // Calculate health based on logs
+            fetch('/api/dashboard/logs?limit=100').then(r=>r.json()).then(logs => {
+                const compLogs = logs.filter(l => l.competitor_id === id);
+                if (compLogs.length > 0) {
+                    const successes = compLogs.filter(l => l.success).length;
+                    const health = Math.round((successes / compLogs.length) * 100);
+                    document.getElementById('modal-health-score').innerText = health + '%';
+                    
+                    const lastSuccess = compLogs.find(l => l.success);
+                    const lastFailure = compLogs.find(l => !l.success);
+                    
+                    document.getElementById('modal-last-success').innerText = lastSuccess ? new Date(lastSuccess.start_time).toLocaleString() : 'Never';
+                    document.getElementById('modal-last-failure').innerText = lastFailure ? new Date(lastFailure.start_time).toLocaleString() : 'Never';
+                    
+                    document.getElementById('modal-timeline').innerHTML = compLogs.map(l => `
+                        <div class="border-l-2 ${l.success ? 'border-emerald-500' : 'border-red-500'} pl-4 py-2 bg-surface">
+                            <span class="text-xs text-on-surface/50">${new Date(l.start_time).toLocaleString()}</span>
+                            <p class="${l.success ? 'text-emerald-500' : 'text-red-500'}">${l.success ? 'Collection Succeeded' : 'Collection Failed: ' + (l.errors ? l.errors.join(', ') : 'Unknown Error')}</p>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('modal-health-score').innerText = '--%';
+                    document.getElementById('modal-timeline').innerHTML = '<p class="text-on-surface/50 italic">No activity history.</p>';
+                }
+            });
+        };
+async function fetchFeed() {
+            try {
+                const res = await fetch('/api/dashboard/feed');
+                const data = await res.json();
+                
+                const container = document.getElementById('intelligence-feed');
+                if (!container) return;
+                if (data.length === 0) {
+                    container.innerHTML = '<p class="text-on-surface/50 text-center italic mt-8">No recent activity.</p>';
+                    return;
+                }
+                
+                container.innerHTML = data.map(item => {
+                    let icon = 'info';
+                    let color = 'text-primary';
+                    if (item.type === 'pricing_update') { icon = 'sell'; color = 'text-green-500'; }
+                    if (item.type === 'collection_failure') { icon = 'warning'; color = 'text-red-500'; }
+                    if (item.type === 'collection_success') { icon = 'check_circle'; }
+                    
+                    const time = new Date(item.timestamp).toLocaleTimeString();
+                    
+                    return `
+                        <div class="flex gap-4 items-start border-l-2 border-black pl-4 py-1">
+                            <span class="material-symbols-outlined ${color} text-lg">${icon}</span>
+                            <div>
+                                <p class="text-on-surface">${item.message}</p>
+                                <p class="text-on-surface/50 text-xs mt-1">${escapeHtml(time)}</p>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Failed to fetch feed:", e);
+            }
+        }
+
+        // ======= TABLE FILTERING =======
+        function filterTable(query) {
+            const tbody = document.getElementById('competitors-table-body');
+            const rows = tbody.getElementsByTagName('tr');
+            const lowerQuery = query.toLowerCase();
+            
+            for (let row of rows) {
+                if (row.innerText.toLowerCase().includes(lowerQuery)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        }
+
+        // ======= COLLECTION CONTROLS =======
+        async function forceCollect(id) {
+            event.stopPropagation();
+            alert('Collection Triggered!');
+            await fetch(`/api/dashboard/collect/${id}`, { method: 'POST' });
+            refreshData();
+        }
+        
+        async function cancelCollect(id) {
+            event.stopPropagation();
+            alert('Collection Cancelled!');
+            await fetch(`/api/dashboard/collect/${id}/cancel`, { method: 'POST' });
+            refreshData();
+        }
+        
+        
+        async function deleteCompetitor(id) {
+            event.stopPropagation();
+            if (confirm("Are you sure you want to permanently delete this competitor and all its data? This cannot be undone.")) {
+                await fetch(`/api/competitors/${id}`, { method: 'DELETE' });
+                showToast('Competitor Deleted', 'error');
+                refreshData();
+            }
+        }
+        async function toggleMonitor(id, enabled) {
+            event.stopPropagation();
+            const comp = competitorsMap[id];
+            await fetch('/api/dashboard/competitors', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: id, name: comp.name, enabled: enabled })
+            });
+            refreshData();
+        }
+
+        // Run immediately
+        fetchFeed();
+    
 </script>
+
+    <!-- Global Search Modal -->
+    <div id="search-modal" class="fixed inset-0 bg-surface/95 z-50 hidden flex-col p-8 font-mono">
+        <div class="max-w-4xl mx-auto w-full">
+            <div class="flex justify-between items-center mb-4 border-b-4 border-black pb-2">
+                <h2 class="text-3xl font-display font-bold uppercase tracking-widest text-primary">Intelligence Search</h2>
+                <button onclick="closeSearch()" class="text-on-surface hover:text-primary material-symbols-outlined text-4xl">close</button>
+            </div>
+            <input type="text" id="global-search-input" oninput="performGlobalSearch(this.value)" placeholder="Search capabilities, pricing, companies... (Cmd+K)" class="w-full bg-surface-container border-4 border-black p-6 text-2xl text-on-surface focus:outline-none focus:border-primary placeholder-on-surface/50 mb-8 font-display" autocomplete="off">
+            <div id="search-results-container" class="space-y-4 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
+                <p class="text-on-surface/50 text-xl text-center italic">Start typing to search...</p>
+            </div>
+        </div>
+    </div>
+    
 </body>
 </html>

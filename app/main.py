@@ -234,6 +234,20 @@ All errors follow RFC 7807 Problem Details format:
         openapi_url="/openapi.json",
     )
 
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request
+
+    class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            response = await call_next(request)
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:"
+            return response
+
+    app.add_middleware(SecurityHeadersMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.debug else [],
@@ -242,7 +256,7 @@ All errors follow RFC 7807 Problem Details format:
         allow_headers=["*"],
     )
 
-    app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=300)
 
     app.include_router(health.router)
     app.include_router(competitors.router)
@@ -266,6 +280,7 @@ All errors follow RFC 7807 Problem Details format:
 
 def _configure_logging(log_level: str) -> None:
     import logging
+
     from app.observability.log_buffer import global_log_buffer
 
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)

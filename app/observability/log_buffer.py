@@ -1,7 +1,8 @@
-from collections import deque
-from typing import Any
 import threading
-from datetime import datetime, UTC
+from collections import deque
+from datetime import UTC, datetime
+from typing import Any
+
 
 class LogBuffer:
     def __init__(self, max_len: int = 500):
@@ -20,7 +21,7 @@ class LogBuffer:
     def get_logs_for_competitor(self, competitor_id: int) -> list[dict[str, Any]]:
         with self.lock:
             return [
-                log for log in self.buffer 
+                log for log in self.buffer
                 if log.get("competitor_id") == competitor_id
             ]
 

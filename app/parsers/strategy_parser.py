@@ -10,7 +10,29 @@ from app.parsers.page_segmenter import PageSegment
 from app.parsers.preprocessing import Preprocessor
 from app.parsers.relationships import RelationshipEngine
 from app.parsers.resolution import EntityResolver
-from app.parsers.strategies import JsonLdStrategy
+from app.parsers.strategies import (
+    AssetExtractionStrategy,
+    BreadcrumbExtractionStrategy,
+    CardExtractionStrategy,
+    FaqExtractionStrategy,
+    FormExtractionStrategy,
+    GenericCssPatternStrategy,
+    GenericDomHeuristicStrategy,
+    JsonLdStrategy,
+    ListExtractionStrategy,
+    LocationExtractionStrategy,
+    MediaExtractionStrategy,
+    MetadataStrategy,
+    MicrodataStrategy,
+    MultiPassStrategy,
+    RegexPatternStrategy,
+    ReviewExtractionStrategy,
+    SchemaOrgStrategy,
+    SemanticHtmlStrategy,
+    TableExtractionStrategy,
+    TeamExtractionStrategy,
+    TrustSignalExtractionStrategy,
+)
 from app.parsers.strategy import ParsedResult, ParsingStrategy, _reset_calculator
 from app.utilities.performance import cached_parse
 
@@ -21,7 +43,27 @@ _SEGMENT_HEAD = "head"
 # sequence and returns the richest possible merged result.  The remaining
 # single-concern strategies act as supplementary gap-fillers.
 DEFAULT_STRATEGIES: list[ParsingStrategy] = [
-    JsonLdStrategy(),
+    MultiPassStrategy(),  # Pass 1-6 combined (highest confidence)
+    JsonLdStrategy(),  # supplementary JSON-LD
+    SchemaOrgStrategy(),  # supplementary Schema.org
+    MicrodataStrategy(),  # supplementary microdata
+    TableExtractionStrategy(),  # HTML table extraction
+    FormExtractionStrategy(),  # HTML form extraction
+    FaqExtractionStrategy(),  # FAQ extraction
+    BreadcrumbExtractionStrategy(),  # Breadcrumb extraction
+    SemanticHtmlStrategy(),  # supplementary semantic HTML
+    CardExtractionStrategy(),  # card/plan/review extraction
+    ListExtractionStrategy(),  # structured list extraction
+    LocationExtractionStrategy(),  # locations and coverage areas
+    TeamExtractionStrategy(),  # team and leadership
+    ReviewExtractionStrategy(),  # reviews and testimonials
+    TrustSignalExtractionStrategy(),  # trust signals and badges
+    AssetExtractionStrategy(),  # assets and documents
+    MediaExtractionStrategy(),  # image/video/document extraction
+    GenericDomHeuristicStrategy(),
+    GenericCssPatternStrategy(),
+    RegexPatternStrategy(),
+    MetadataStrategy(),
 ]
 
 

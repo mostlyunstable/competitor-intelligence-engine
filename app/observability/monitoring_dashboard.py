@@ -135,9 +135,11 @@ async def _get_system_health(session: AsyncSession) -> dict[str, Any]:
         from app.collectors.base import get_shared_fetcher
 
         fetcher = get_shared_fetcher()
-        client_ok = fetcher._client is not None and not (
-            fetcher._client.is_closed if fetcher._client else True
-        )
+        client_ok = True
+        for client in fetcher._clients.values():
+            if client.is_closed:
+                client_ok = False
+                break
         checks["fetcher"] = {
             "status": "healthy" if client_ok else "degraded",
             "cache_entries": fetcher.cache_layer.size,

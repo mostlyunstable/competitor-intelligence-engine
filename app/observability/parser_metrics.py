@@ -1,9 +1,8 @@
+from collections import deque
 from typing import Any
 
 from app.observability.entity_profiler import EntityProfiler
 
-
-from collections import deque
 
 class ProfilerRegistry:
     def __init__(self) -> None:

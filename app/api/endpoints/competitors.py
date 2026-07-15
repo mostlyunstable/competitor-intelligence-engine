@@ -1,7 +1,8 @@
 from enum import StrEnum
 
 from fastapi import APIRouter, Depends, HTTPException, Security
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, field_validator, HttpUrl
+from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import verify_api_key
@@ -26,6 +27,25 @@ class CompetitorCreate(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=255, description="Competitor name")
     website_url: HttpUrl = Field(..., description="Competitor website URL")
+
+    @field_validator("website_url")
+    @classmethod
+    def validate_url(cls, v: Any) -> Any:
+        url = str(v)
+        # Basic SSRF prevention
+        import socket
+        from urllib.parse import urlparse
+        try:
+            domain = urlparse(url).hostname
+            if domain:
+                ip = socket.gethostbyname(domain)
+                if ip.startswith("127.") or ip.startswith("169.254.") or ip.startswith("10.") or ip.startswith("192.168."):
+                    raise ValueError("Internal or private IPs are strictly forbidden (SSRF Protection).")
+        except Exception as e:
+            if "Internal" in str(e):
+                raise
+        return v
+
     enabled: bool = Field(True, description="Enable automatic collection")
     collection_frequency: CollectionFrequency = Field(
         CollectionFrequency.DAILY,

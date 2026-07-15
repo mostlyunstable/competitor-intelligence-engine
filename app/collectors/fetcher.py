@@ -151,10 +151,11 @@ class PlaywrightRenderer:
     async def _ensure_browser(self) -> Any:
         """Ensure browser is initialized."""
         if self._playwright is None:
+            import random
+
             from playwright.async_api import async_playwright
 
             from app.configuration.settings import get_settings
-            import random
 
             settings = get_settings()
             proxy = None
@@ -164,7 +165,7 @@ class PlaywrightRenderer:
                     proxy_str = random.choice(settings.stealth.proxy_urls)
                 elif settings.stealth.proxy_url:
                     proxy_str = settings.stealth.proxy_url
-                
+
                 if proxy_str:
                     proxy = {"server": proxy_str}
 
@@ -465,8 +466,9 @@ class HybridFetcher:
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create httpx client."""
         import random
+
         from app.configuration.settings import get_settings
-        
+
         settings = get_settings()
         proxy = None
         proxy_key = "default"
@@ -476,11 +478,11 @@ class HybridFetcher:
                 proxy_str = random.choice(settings.stealth.proxy_urls)
             elif settings.stealth.proxy_url:
                 proxy_str = settings.stealth.proxy_url
-            
+
             if proxy_str:
                 proxy = proxy_str
                 proxy_key = proxy_str
-        
+
         client = self._clients.get(proxy_key)
         if client is None or client.is_closed:
             client = httpx.AsyncClient(
@@ -852,7 +854,7 @@ class HybridFetcher:
         if close_tasks:
             await asyncio.gather(*close_tasks, return_exceptions=True)
         self._clients.clear()
-        
+
         if self._renderer:
             await self._renderer.close()
             self._renderer = None
