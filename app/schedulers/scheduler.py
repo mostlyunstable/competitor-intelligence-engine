@@ -9,7 +9,6 @@ from app.configuration.settings import get_settings
 from app.database.connection import db_manager
 from app.database.models import CollectionFrequency, CollectionLog
 from app.database.repositories.competitor_repository import CompetitorRepository
-from app.services.collection_service import collection_service
 
 logger = structlog.get_logger(__name__)
 
@@ -19,6 +18,7 @@ class CollectionScheduler:
         self._running = False
         self._task: asyncio.Task[None] | None = None
         self._interval_seconds: int = 60
+        self._paused: bool = False
 
     async def start(self) -> None:
         if self._running:
@@ -31,6 +31,7 @@ class CollectionScheduler:
             return
 
         self._running = True
+        self._paused = False
         self._interval_seconds = settings.scheduler.check_interval_seconds
         self._task = asyncio.create_task(self._run_loop())
         logger.info("scheduler_started", interval=self._interval_seconds)
@@ -44,43 +45,47 @@ class CollectionScheduler:
             self._task = None
         logger.info("scheduler_stopped")
 
+    async def pause(self) -> None:
+        self._paused = True
+        logger.info("scheduler_paused")
+
+    async def resume(self) -> None:
+        self._paused = False
+        logger.info("scheduler_resumed")
+
     async def _run_loop(self) -> None:
         while self._running:
             try:
-                await self._check_and_collect()
+                if not self._paused:
+                    await self._check_and_publish()
             except Exception:
                 logger.exception("scheduler_check_failed")
             await asyncio.sleep(self._interval_seconds)
 
-    async def _check_and_collect(self) -> None:
-        due_competitor_ids: list[tuple[int, str, str]] = []
+    async def _check_and_publish(self) -> None:
+        """Check for due competitors and publish collection jobs to the queue."""
+        due_competitors: list[tuple[int, str, str]] = []
         try:
             async with db_manager.session() as session:
                 comp_repo = CompetitorRepository(session)
 
                 now = datetime.now(UTC)
                 for freq in CollectionFrequency:
-                    competitors = await comp_repo.get_by_frequency(freq)
+                    competitors = await comp_repo.get_by_frequency(freq.value)
                     for comp in competitors:
                         if not comp.enabled:
                             continue
 
                         last_log = await self._get_last_collection_log(session, comp.id)
                         if last_log and not self._should_collect(last_log, freq, now):
-                            logger.debug(
-                                "skipping_competitor_not_due",
-                                competitor_id=comp.id,
-                                name=comp.name,
-                                frequency=freq.value,
-                            )
                             continue
 
-                        due_competitor_ids.append((comp.id, comp.name, freq.value))
+                        due_competitors.append((comp.id, comp.name, freq.value))
         except Exception:
             logger.exception("scheduler_check_cycle_failed")
             return
 
-        for comp_id, comp_name, freq_val in due_competitor_ids:
+        for comp_id, comp_name, freq_val in due_competitors:
             logger.info(
                 "scheduling_collection",
                 competitor_id=comp_id,
@@ -88,12 +93,31 @@ class CollectionScheduler:
                 frequency=freq_val,
             )
             try:
-                await collection_service.collect_competitor(comp_id)
+                await self._publish_collection_job(comp_id)
             except Exception:
                 logger.exception(
-                    "scheduled_collection_failed",
+                    "publish_collection_job_failed",
                     competitor_id=comp_id,
                 )
+
+    async def _publish_collection_job(self, competitor_id: int) -> None:
+        """Publish a collection job to the message queue."""
+        from app.main import message_queue
+
+        if message_queue is not None:
+            from app.messagequeue.queue import MessageType
+
+            await message_queue.publish(
+                message_type=MessageType.COLLECTION,
+                payload={"competitor_id": competitor_id},
+                metadata={"source": "scheduler"},
+            )
+            logger.info("collection_job_published", competitor_id=competitor_id)
+        else:
+            from app.services.collection_service import collection_service
+
+            logger.warning("queue_unavailable_executing_directly", competitor_id=competitor_id)
+            await collection_service.collect_competitor(competitor_id)
 
     async def _get_last_collection_log(self, session: Any, competitor_id: int) -> Any:
         from app.database.repositories.collection_log_repository import CollectionLogRepository
@@ -121,7 +145,7 @@ class CollectionScheduler:
 
     @property
     def is_running(self) -> bool:
-        return self._running
+        return self._running and not self._paused
 
 
 scheduler = CollectionScheduler()
