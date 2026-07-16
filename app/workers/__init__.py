@@ -1,14 +1,10 @@
 """Worker system for consuming queue messages and executing collections."""
 
-from __future__ import annotations
-
 import asyncio
-import signal
+import contextlib
 from typing import Any
 
 import structlog
-
-from app.messagequeue.queue import MessageType, QueueMessage
 
 logger = structlog.get_logger(__name__)
 
@@ -37,10 +33,8 @@ class CollectionWorker:
         self._running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
         logger.info(
             "worker_stopped",

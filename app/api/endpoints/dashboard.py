@@ -6,13 +6,12 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import BaseModel, Field
-from sqlalchemy import cast, func, select, String
+from pydantic import BaseModel
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_session
-from app.database.connection import db_manager
 from app.database.models import (
     CollectionFrequency,
     CollectionLog,
@@ -23,7 +22,6 @@ from app.database.models import (
     CompetitorService,
     CompetitorSocial,
     CompetitorSource,
-    CompetitorTechStack,
     RawStorage,
 )
 from app.schedulers.scheduler import scheduler
@@ -65,21 +63,15 @@ async def get_dashboard(response: Response) -> str:
     return "app/static/dashboard.html"
 
 
-@router.get("/api/dashboard/stats")
-async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
-    """Computes aggregated database statistics and pipeline status."""
-    competitors_count = await session.scalar(
-        select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True))
-    )
-    urls_count = await session.scalar(select(func.count()).select_from(CompetitorSource))
-    pages_count = await session.scalar(select(func.count()).select_from(CompetitorPage))
-    services_count = await session.scalar(select(func.count()).select_from(CompetitorService))
-    pricing_count = await session.scalar(select(func.count()).select_from(CompetitorPricing))
-    content_count = await session.scalar(select(func.count()).select_from(CompetitorContent))
-    social_count = await session.scalar(select(func.count()).select_from(CompetitorSocial))
-    logs_count = await session.scalar(select(func.count()).select_from(CollectionLog))
 
 
+
+class BulkAction(BaseModel):
+    competitor_ids: list[int]
+
+class BulkFrequencyUpdate(BaseModel):
+    competitor_ids: list[int]
+    frequency: CollectionFrequency
 @router.post("/api/dashboard/competitors/bulk/delete")
 async def bulk_delete(
     payload: BulkAction, session: AsyncSession = Depends(get_session)
@@ -168,19 +160,6 @@ async def duplicate_competitor(
     await session.refresh(new_comp)
     return {"id": new_comp.id, "name": new_comp.name, "status": "duplicated"}
 
-    # Active collection
-    active_collection = None
-    if collection_service._active_crawls:
-        import time
-
-        # Get first active crawl ID
-        active_id = next(iter(collection_service._active_crawls.keys()))
-        start_time = collection_service._active_crawls[active_id]
-        active_collection = {
-            "competitor_id": active_id,
-            "status": "active",
-            "elapsed": time.time() - start_time,
-        }
 
 # ─── Dashboard Stats & Overview ─────────────────────────────────────────────
 
@@ -220,12 +199,7 @@ async def get_dashboard_stats(
     active_crawls = len(collection_service._active_crawls)
 
     running_jobs = 0
-    try:
-        import importlib.util
-
-        playwright_status = "ready" if importlib.util.find_spec("playwright") else "error"
-    except Exception:
-        pass
+    running_jobs = 0
 
     return {
         "total_competitors": total_competitors,
@@ -340,8 +314,8 @@ async def get_feed(
 
 @router.get("/api/dashboard/logs")
 async def get_dashboard_logs(
-    limit: int = 50, competitor_id: int | None = None, session: AsyncSession = Depends(get_session)
-) -> list[dict[str, Any]]:
+    page: int = 1, page_size: int = 50, success: bool | None = None, competitor_id: int | None = None, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
     """Returns recent audit logs."""
     stmt = select(CollectionLog)
     if competitor_id is not None:
@@ -479,10 +453,11 @@ async def global_search(
     for r in latest_per_comp:
         data_str = str(r.extracted_data).lower()
         if q_lower in data_str:
-            comp_name = r.extracted_data.get("name", f"Competitor {r.competitor_id}")
+            extracted = r.extracted_data or {}
+            comp_name = extracted.get("name", f"Competitor {r.competitor_id}")
             match_context = "Found in profile"
-            if "services" in r.extracted_data:
-                for srv in r.extracted_data["services"]:
+            if "services" in extracted:
+                for srv in extracted["services"]:
                     if isinstance(srv, dict) and q_lower in str(srv).lower():
                         match_context = f"Service: {srv.get('name', 'Unknown')}"
                         break
@@ -495,30 +470,7 @@ async def global_search(
     return {"query": q, "results": matches, "total": len(matches)}
 
 
-# ─── Telemetry ──────────────────────────────────────────────────────────────
 
-
-@router.get("/api/dashboard/telemetry")
-async def get_dashboard_telemetry() -> dict[str, Any]:
-    try:
-        import psutil
-
-        process = psutil.Process()
-        mem_info = process.memory_info()
-        mem_total = psutil.virtual_memory().total
-        return {
-            "cpu_percent": psutil.cpu_percent(),
-            "memory_mb": int(mem_info.rss / 1024 / 1024),
-            "memory_total_gb": int(mem_total / 1024 / 1024 / 1024),
-            "active_crawls": len(collection_service._active_crawls),
-        }
-    except ImportError:
-        return {
-            "cpu_percent": 0,
-            "memory_mb": 0,
-            "memory_total_gb": 0,
-            "active_crawls": len(collection_service._active_crawls),
-        }
 
 
 # ─── Live Logs ──────────────────────────────────────────────────────────────
@@ -575,8 +527,6 @@ async def get_compare_csv(session: AsyncSession = Depends(get_session)) -> Any:
     import csv
     import io
 
-    from fastapi.responses import StreamingResponse
-    from sqlalchemy.orm import selectinload
 
     stmt = select(Competitor).options(selectinload(Competitor.pricing)).order_by(Competitor.name)
     result = await session.execute(stmt)
@@ -639,7 +589,6 @@ async def get_raw_html(competitor_id: int, session: AsyncSession = Depends(get_s
 @router.get("/api/dashboard/export/zip")
 async def export_zip(session: AsyncSession = Depends(get_session)) -> Any:
     import io
-    import json
     import zipfile
 
     from fastapi.responses import StreamingResponse
@@ -688,96 +637,4 @@ async def export_zip(session: AsyncSession = Depends(get_session)) -> Any:
     return response
 
 
-@router.get("/api/dashboard/search")
-async def global_search(q: str, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
-    from sqlalchemy import String, cast
 
-    from app.database.models import RawStorage
-
-    escaped_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    stmt = (
-        select(RawStorage)
-        .where(
-            RawStorage.extracted_data.isnot(None),
-            cast(RawStorage.extracted_data, String).ilike(f"%{escaped_q}%", escape="\\"),
-        )
-        .order_by(RawStorage.collected_at.desc())
-        .limit(100)
-    )
-    result = await session.execute(stmt)
-    raw_storages = result.scalars().all()
-
-    seen = set()
-    latest_per_comp = []
-    for r in raw_storages:
-        if r.competitor_id not in seen:
-            seen.add(r.competitor_id)
-            latest_per_comp.append(r)
-
-    matches = []
-    q_lower = q.lower()
-    for r in latest_per_comp:
-        data_str = str(r.extracted_data).lower()
-        if q_lower in data_str:
-            extracted = r.extracted_data or {}
-            comp_name = extracted.get("name", f"Competitor {r.competitor_id}")
-            # Try to find exactly what matched
-            match_context = "Found in profile"
-            if "services" in extracted:
-                for srv in extracted["services"]:
-                    if isinstance(srv, dict) and q_lower in str(srv).lower():
-                        match_context = f"Service: {srv.get('name', 'Unknown')}"
-                        break
-            matches.append(
-                {"competitor_id": r.competitor_id, "name": comp_name, "context": match_context}
-            )
-
-    return {"query": q, "results": matches}
-
-
-@router.get("/api/dashboard/feed")
-async def get_feed(session: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
-    # Get last 20 collection logs
-    log_stmt = (
-        select(CollectionLog, Competitor.name)
-        .join(Competitor, CollectionLog.competitor_id == Competitor.id)
-        .order_by(CollectionLog.start_time.desc())
-        .limit(20)
-    )
-    log_result = await session.execute(log_stmt)
-    logs = log_result.all()
-
-    # Get last 20 pricing changes
-    price_stmt = (
-        select(CompetitorPricing, Competitor.name)
-        .join(Competitor, CompetitorPricing.competitor_id == Competitor.id)
-        .order_by(CompetitorPricing.collected_at.desc())
-        .limit(20)
-    )
-    price_result = await session.execute(price_stmt)
-    prices = price_result.all()
-
-    feed = []
-    for log, comp_name in logs:
-        feed.append(
-            {
-                "type": "collection_success" if log.success else "collection_failure",
-                "message": f"{comp_name} collection {'succeeded' if log.success else 'failed'}",
-                "timestamp": log.start_time.isoformat() if log.start_time else "",
-                "competitor_id": log.competitor_id,
-            }
-        )
-
-    for price, comp_name in prices:
-        feed.append(
-            {
-                "type": "pricing_update",
-                "message": f"{comp_name} updated pricing for {price.service_name}: {price.base_price} {price.currency}",
-                "timestamp": price.collected_at.isoformat() if price.collected_at else "",
-                "competitor_id": price.competitor_id,
-            }
-        )
-
-    # Sort by timestamp desc
-    feed.sort(key=lambda x: x["timestamp"], reverse=True)
-    return feed[:20]

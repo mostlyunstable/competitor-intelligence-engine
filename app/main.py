@@ -13,6 +13,7 @@ from app.database.connection import db_manager
 from app.observability.monitoring_dashboard import router as monitoring_router
 from app.observability.prometheus_metrics import router as prometheus_router
 
+logger = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -22,23 +23,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.environment == "development" or settings.debug:
         await db_manager.create_tables()
 
-    from app.messagequeue import MessageQueue
-    from app.messagequeue.queue import InMemoryQueueBackend, MessageType
-
-    message_queue = MessageQueue()
-
-    async def _collection_handler(msg):
-        from app.services.collection_service import collection_service
-
-        competitor_id = msg.payload.get("competitor_id")
-        if competitor_id:
-            await collection_service.collect_competitor(competitor_id)
-            return True
-        return False
-
-    message_queue.set_handler(MessageType.COLLECTION, _collection_handler)
-
-    app.state.message_queue = message_queue
 
     from app.services.config_sync_service import config_sync_service
 
@@ -48,9 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     await scheduler.start()
 
-    from app.observability.alerting import setup_default_alerts
 
-    setup_default_alerts()
 
     logger.info(
         "app_started",

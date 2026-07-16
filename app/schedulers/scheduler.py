@@ -9,6 +9,7 @@ from app.configuration.settings import get_settings
 from app.database.connection import db_manager
 from app.database.models import CollectionFrequency, CollectionLog
 from app.database.repositories.competitor_repository import CompetitorRepository
+from app.services.collection_service import collection_service
 
 logger = structlog.get_logger(__name__)
 
@@ -105,24 +106,7 @@ class CollectionScheduler:
                     competitor_id=comp_id,
                 )
 
-    async def _publish_collection_job(self, competitor_id: int) -> None:
-        """Publish a collection job to the message queue."""
-        from app.main import message_queue
 
-        if message_queue is not None:
-            from app.messagequeue.queue import MessageType
-
-            await message_queue.publish(
-                message_type=MessageType.COLLECTION,
-                payload={"competitor_id": competitor_id},
-                metadata={"source": "scheduler"},
-            )
-            logger.info("collection_job_published", competitor_id=competitor_id)
-        else:
-            from app.services.collection_service import collection_service
-
-            logger.warning("queue_unavailable_executing_directly", competitor_id=competitor_id)
-            await collection_service.collect_competitor(competitor_id)
 
     async def _get_last_collection_log(self, session: Any, competitor_id: int) -> Any:
         from app.database.repositories.collection_log_repository import CollectionLogRepository
