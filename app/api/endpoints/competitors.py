@@ -34,13 +34,19 @@ class CompetitorCreate(BaseModel):
         url = str(v)
         # Basic SSRF prevention
         import socket
+        import ipaddress
         from urllib.parse import urlparse
         try:
             domain = urlparse(url).hostname
             if domain:
-                ip = socket.gethostbyname(domain)
-                if ip.startswith("127.") or ip.startswith("169.254.") or ip.startswith("10.") or ip.startswith("192.168."):
+                if domain in ["localhost", "0.0.0.0", "::1"]:
                     raise ValueError("Internal or private IPs are strictly forbidden (SSRF Protection).")
+                ip = socket.gethostbyname(domain)
+                ip_obj = ipaddress.ip_address(ip)
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified:
+                    raise ValueError("Internal or private IPs are strictly forbidden (SSRF Protection).")
+        except ValueError as e:
+            raise e
         except Exception as e:
             if "Internal" in str(e):
                 raise
