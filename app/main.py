@@ -31,8 +31,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.environment == "development" or settings.debug:
         await db_manager.create_tables()
 
-    from app.messagequeue import MessageQueue
-    from app.messagequeue.queue import MessageType
+    from app.messagequeue.queue import MessageQueue, MessageType
 
     message_queue = MessageQueue()
 
