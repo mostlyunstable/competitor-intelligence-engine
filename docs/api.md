@@ -358,7 +358,7 @@ All errors follow RFC 7807 Problem Details format:
 
 ## Rate Limiting
 
-- **Global**: 60 requests per minute per IP
+- **Global**: 300 requests per minute per IP
 - **Per-domain**: Configurable per competitor
 - **Crawl budget**: Per-competitor page/byte/time limits
 
