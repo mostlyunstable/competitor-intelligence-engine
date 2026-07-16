@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 
 from app.api.auth import verify_api_key
-from app.database.connection import db_manager
+from app.api.dependencies import get_session
 from app.database.models import (
     CollectionLog,
     Competitor,
@@ -20,16 +20,11 @@ from app.database.models import (
 from app.services.reporting_service import reporting_service
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/reports", tags=["reports"])
-
-
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with db_manager.session() as session:
-        yield session
 
 
 @router.get("/collection/{log_id}")

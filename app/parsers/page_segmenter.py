@@ -380,10 +380,13 @@ class PageSegment:
     depth: int = 0
     position: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
+    _cached_soup: BeautifulSoup | None = field(default=None, repr=False, compare=False)
 
-    # Convenience — render the segment back to HTML for sub-parsing
+    # Convenience — render the segment back to HTML for sub-parsing (cached)
     def to_soup(self) -> BeautifulSoup:
-        return BeautifulSoup(str(self.element), "html.parser")
+        if self._cached_soup is None:
+            self._cached_soup = BeautifulSoup(str(self.element), "html.parser")
+        return self._cached_soup
 
     def text_content(self) -> str:
         return self.element.get_text(" ", strip=True)
@@ -762,9 +765,16 @@ class PageSegmenter:
             if isinstance(child, Tag) and child.name in {"section", "article"}:
                 _add(child, depth=0)
 
-        # Sort by document order (position in soup)
-        all_tags = list(soup.find_all(True))
-        tag_order = {id(t): i for i, t in enumerate(all_tags)}
+        # Sort by document order (position in soup) using descendants generator
+        candidate_ids = {id(c[0]) for c in candidates}
+        tag_order: dict[int, int] = {}
+        for i, tag in enumerate(soup.descendants):
+            if isinstance(tag, Tag):
+                tid = id(tag)
+                if tid in candidate_ids:
+                    tag_order[tid] = i
+                    if len(tag_order) == len(candidate_ids):
+                        break
         candidates.sort(key=lambda x: tag_order.get(id(x[0]), 0))
 
         return candidates

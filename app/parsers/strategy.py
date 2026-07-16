@@ -386,16 +386,6 @@ class FieldedResult:
         )
         items.append(fv)
 
-    def raw(self, field_name: str) -> Any:
-        fv: FieldValue | None = getattr(self, field_name, None)
-        return fv.value if fv else None
-
-    def raw_social_links(self) -> dict[str, str]:
-        return {k: fv.value for k, fv in self.social_links.items()}
-
-    def raw_list(self, list_name: str) -> list[dict[str, Any]]:
-        return [fv.value for fv in getattr(self, list_name)]
-
     _LIST_FIELDS = (
         "services",
         "pricing",
@@ -636,10 +626,6 @@ class ParsedResult:
     # ------------------------------------------------------------------
     # New opt-in field-level metadata access
     # ------------------------------------------------------------------
-
-    def get_field_confidence(self, field_name: str) -> FieldValue | None:
-        """Return the FieldValue (with full provenance) for a scalar field."""
-        return getattr(self._fielded, field_name, None)
 
     def to_scored_dict(self) -> dict[str, Any]:
         """Return the full field-level confidence map for every extracted field."""

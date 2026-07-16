@@ -9,7 +9,7 @@ class LogBuffer:
         self.buffer: deque[dict[str, Any]] = deque(maxlen=max_len)
         self.lock = threading.Lock()
 
-    def add_log(self, _, __, event_dict: dict[str, Any]) -> dict[str, Any]:
+    def add_log(self, _: Any, __: Any, event_dict: dict[str, Any]) -> dict[str, Any]:
         """A structlog processor that captures logs."""
         log_entry = dict(event_dict)
         if "timestamp" not in log_entry:
@@ -20,9 +20,7 @@ class LogBuffer:
 
     def get_logs_for_competitor(self, competitor_id: int) -> list[dict[str, Any]]:
         with self.lock:
-            return [
-                log for log in self.buffer
-                if log.get("competitor_id") == competitor_id
-            ]
+            return [log for log in self.buffer if log.get("competitor_id") == competitor_id]
+
 
 global_log_buffer = LogBuffer()

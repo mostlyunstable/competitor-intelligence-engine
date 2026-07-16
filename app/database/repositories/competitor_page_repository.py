@@ -21,24 +21,6 @@ class CompetitorPageRepository(BaseRepository[CompetitorPage]):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_source(self, source_id: int) -> CompetitorPage | None:
-        stmt = (
-            select(CompetitorPage)
-            .where(CompetitorPage.source_id == source_id)
-            .order_by(CompetitorPage.collected_at.desc())
-        )
-        result = await self._session.execute(stmt)
-        return result.scalars().first()
-
-    async def get_latest_by_competitor(self, competitor_id: int) -> CompetitorPage | None:
-        stmt = (
-            select(CompetitorPage)
-            .where(CompetitorPage.competitor_id == competitor_id)
-            .order_by(CompetitorPage.id.desc())
-        )
-        result = await self._session.execute(stmt)
-        return result.scalars().first()
-
     async def get_by_hash(
         self, competitor_id: int, source_id: int | None, content_hash: str
     ) -> CompetitorPage | None:
@@ -90,3 +72,13 @@ class CompetitorPageRepository(BaseRepository[CompetitorPage]):
             metadata_=metadata,
             collection_status=collection_status,
         )
+
+    async def get_latest_by_competitor(self, competitor_id: int) -> CompetitorPage | None:
+        stmt = (
+            select(CompetitorPage)
+            .where(CompetitorPage.competitor_id == competitor_id)
+            .order_by(CompetitorPage.collected_at.desc(), CompetitorPage.id.desc())
+            .limit(1)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()

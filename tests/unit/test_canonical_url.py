@@ -34,7 +34,7 @@ class TestNormalizeUrl:
     def test_strips_trailing_slash(self) -> None:
         url = "https://example.com/page/"
         result = normalize_url(url)
-        assert not result.endswith("/") or result == "https://example.com/"
+        assert not result.endswith("/")
 
     def test_removes_duplicate_slashes(self) -> None:
         url = "https://example.com//page//sub"

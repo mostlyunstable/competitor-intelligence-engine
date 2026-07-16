@@ -1,4 +1,3 @@
-from typing import ClassVar
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -15,12 +14,6 @@ class MetadataStrategy(ParsingStrategy):
     @property
     def weight(self) -> float:
         return 0.10
-
-    SOCIAL_PLATFORMS: ClassVar[dict[str, str]] = {
-        "og:site_name": "",
-        "twitter:site": "twitter",
-        "twitter:creator": "twitter",
-    }
 
     def parse(self, soup: BeautifulSoup, url: str) -> ParsedResult:
         result = ParsedResult()

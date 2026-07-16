@@ -26,6 +26,7 @@ class CollectionFrequency(enum.StrEnum):
     HOURLY = "hourly"
     DAILY = "daily"
     WEEKLY = "weekly"
+    MONTHLY = "monthly"
 
 
 class CollectionStatus(enum.StrEnum):

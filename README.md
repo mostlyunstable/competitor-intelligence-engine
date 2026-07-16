@@ -1,5 +1,12 @@
 # Competitor Intelligence Engine
 
+[![CI](https://github.com/mostlyunstable/competitor-intelligence-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/mostlyunstable/competitor-intelligence-engine/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-312/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Imports: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
+
 An advanced, adaptive data collection engine that crawls competitor websites and stores structured data in PostgreSQL. Built for high-coverage extraction without the use of brittle CSS selectors.
 
 ## 🚀 Key Features

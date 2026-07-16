@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import structlog
 from fastapi import FastAPI
@@ -7,27 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.endpoints import collection, competitors, dashboard, health, metrics, reports
 from app.api.middleware import RateLimitMiddleware
-from app.configuration.secrets import setup_secrets
 from app.configuration.settings import Settings, get_settings
-from app.crawlfrontier import CrawlFrontier
 from app.database.connection import db_manager
-from app.messagequeue import MessageQueue
-from app.observability.apm_endpoint import router as apm_router
 from app.observability.monitoring_dashboard import router as monitoring_router
 from app.observability.prometheus_metrics import router as prometheus_router
-
-# Global crawl frontier
-crawl_frontier = CrawlFrontier()
-
-# Global message queue
-message_queue = MessageQueue()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Setup secrets
-    setup_secrets()
-
     await db_manager.connect()
 
     settings = get_settings()
@@ -76,88 +64,6 @@ OPENAPI_TAGS = [
     },
 ]
 
-OPENAPI_EXAMPLES = {
-    "CompetitorCreate": {
-        "summary": "Create a new competitor",
-        "description": "Register a new competitor website for monitoring",
-        "value": {
-            "name": "Example Corp",
-            "website_url": "https://example.com",
-            "industry": "Technology",
-            "collection_frequency": "daily",
-        },
-    },
-    "CompetitorResponse": {
-        "summary": "Competitor with extracted data",
-        "description": "Full competitor object with extracted services and pricing",
-        "value": {
-            "id": 1,
-            "name": "Example Corp",
-            "website_url": "https://example.com",
-            "industry": "Technology",
-            "collection_frequency": "daily",
-            "services": [
-                {
-                    "name": "Cloud Hosting",
-                    "description": "Managed cloud hosting service",
-                    "starting_price": 99.99,
-                    "currency": "USD",
-                }
-            ],
-            "pricing": [
-                {
-                    "service_name": "Cloud Hosting",
-                    "base_price": 99.99,
-                    "currency": "USD",
-                }
-            ],
-        },
-    },
-    "CollectionTrigger": {
-        "summary": "Trigger collection for a competitor",
-        "description": "Start a collection run for a specific competitor",
-        "value": {
-            "competitor_id": 1,
-            "full_collection": True,
-        },
-    },
-    "CollectionResponse": {
-        "summary": "Collection started",
-        "description": "Collection job has been queued",
-        "value": {
-            "status": "started",
-            "competitor_id": 1,
-            "job_id": "col_abc123",
-        },
-    },
-    "HealthResponse": {
-        "summary": "System health check",
-        "description": "Comprehensive health status of all subsystems",
-        "value": {
-            "status": "healthy",
-            "timestamp": "2026-07-09T10:00:00Z",
-            "subsystems": {
-                "database": {"status": "healthy", "latency_ms": 5},
-                "scheduler": {"status": "healthy", "active_jobs": 2},
-                "fetcher": {"status": "healthy", "cache_size": 150},
-                "crawls": {"status": "healthy", "active": 3},
-                "memory": {"status": "healthy", "rss_mb": 256},
-            },
-        },
-    },
-    "MetricsResponse": {
-        "summary": "Runtime metrics",
-        "description": "Prometheus-format metrics",
-        "value": {
-            "collections_total": 150,
-            "collections_failed": 3,
-            "avg_parse_time_ms": 250,
-            "avg_confidence": 0.85,
-            "entities_extracted": 1250,
-        },
-    },
-}
-
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     if settings is None:
@@ -179,7 +85,6 @@ Production-grade competitor intelligence data collection engine.
 - **Evidence Metadata**: DOM path, XPath, and HTML snippet for every extraction
 - **Hybrid Fetching**: Static HTML + JavaScript rendering via Playwright
 - **Incremental Crawling**: ETag/Last-Modified conditional requests
-- **Crawl Budget**: Per-competitor page/byte/time limits
 - **Structured Logging**: Production-ready observability via structlog
 - **Prometheus Metrics**: Runtime performance monitoring
 
@@ -211,7 +116,6 @@ Authorization: Bearer <your-api-token>
 
 - **Global**: 60 requests per minute
 - **Per-domain**: Configurable per competitor domain
-- **Crawl budget**: Per-competitor page/byte/time limits
 
 ### Error Handling
 
@@ -238,12 +142,14 @@ All errors follow RFC 7807 Problem Details format:
     from starlette.requests import Request
 
     class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next):
+        async def dispatch(self, request: Request, call_next: Any) -> Any:
             response = await call_next(request)
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-            response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:"
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:"
+            )
             return response
 
     app.add_middleware(SecurityHeadersMiddleware)
@@ -266,11 +172,11 @@ All errors follow RFC 7807 Problem Details format:
     app.include_router(reports.router)
     app.include_router(prometheus_router)
     app.include_router(monitoring_router)
-    app.include_router(apm_router)
 
     from fastapi.responses import RedirectResponse
+
     @app.get("/", include_in_schema=False)
-    async def root():
+    async def root() -> RedirectResponse:
         return RedirectResponse(url="/dashboard")
 
     _configure_logging(settings.log_level)
@@ -291,7 +197,7 @@ def _configure_logging(log_level: str) -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.dev.set_exc_info,
             structlog.processors.TimeStamper(fmt="iso"),
-            global_log_buffer.add_log,
+            global_log_buffer.add_log,  # type: ignore[list-item]
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(numeric_level),

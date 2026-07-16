@@ -1,8 +1,20 @@
 import json
+import time
+from typing import Any
 
 import structlog
 from bs4 import BeautifulSoup
-from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
+
+try:
+    from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
+
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    APIConnectionError = Exception  # type: ignore
+    APIStatusError = Exception  # type: ignore
+    APITimeoutError = Exception  # type: ignore
+    OpenAI = Any  # type: ignore
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.configuration.settings import get_settings
@@ -11,12 +23,11 @@ from app.parsers.strategy import ParsedResult
 logger = structlog.get_logger(__name__)
 
 
-import time
-
 _CIRCUIT_FAILURES = 0
 _CIRCUIT_OPEN_UNTIL = 0.0
 _MAX_FAILURES = 5
 _COOLDOWN_SECONDS = 60.0
+
 
 class LLMFallbackService:
     """
@@ -38,7 +49,7 @@ class LLMFallbackService:
         retry=retry_if_exception_type((APIConnectionError, APIStatusError, APITimeoutError)),
         reraise=True,
     )
-    def _call_llm_with_retry(self, client: OpenAI, prompt: str) -> str:
+    def _call_llm_with_retry(self, client: Any, prompt: str) -> str:
         """Call LLM with strict timeouts, token limits, and exponential backoff retries."""
         logger.info("llm_api_call_attempt")
         response = client.chat.completions.create(
@@ -69,7 +80,11 @@ class LLMFallbackService:
     ) -> ParsedResult:
         """Execute the LLM fallback on the page content and merge it into the result."""
         global _CIRCUIT_FAILURES, _CIRCUIT_OPEN_UNTIL
-        
+
+        if not OPENAI_AVAILABLE:
+            logger.info("llm_fallback_skipped_openai_not_installed", url=url)
+            return combined_result
+
         if not self.settings.enabled or not self.settings.api_key:
             return combined_result
 
@@ -139,7 +154,7 @@ class LLMFallbackService:
             # Merge the partial result with a moderate confidence weight
             combined_result.merge(partial, "llm_fallback", 0.40)
             logger.info("llm_extraction_success", url=url, model=self.settings.model_name)
-            
+
             # Reset circuit on success
             if _CIRCUIT_FAILURES > 0:
                 logger.info("llm_circuit_breaker_reset")
@@ -150,6 +165,10 @@ class LLMFallbackService:
             _CIRCUIT_FAILURES += 1
             if _CIRCUIT_FAILURES >= _MAX_FAILURES:
                 _CIRCUIT_OPEN_UNTIL = time.time() + _COOLDOWN_SECONDS
-                logger.error("llm_circuit_breaker_tripped", failures=_CIRCUIT_FAILURES, cooldown=_COOLDOWN_SECONDS)
+                logger.error(
+                    "llm_circuit_breaker_tripped",
+                    failures=_CIRCUIT_FAILURES,
+                    cooldown=_COOLDOWN_SECONDS,
+                )
 
         return combined_result

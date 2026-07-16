@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, TypeVar
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.connection import Base
@@ -21,11 +21,6 @@ class BaseRepository[T: Base]:
         stmt = select(self._model).offset(skip).limit(limit)
         result = await self._session.execute(stmt)
         return result.scalars().all()
-
-    async def count(self) -> int:
-        stmt = select(func.count()).select_from(self._model)
-        result = await self._session.execute(stmt)
-        return result.scalar_one()
 
     async def create(self, **kwargs: Any) -> T:
         instance = self._model(**kwargs)
@@ -55,7 +50,3 @@ class BaseRepository[T: Base]:
         await self._session.delete(instance)
         await self._session.flush()
         return True
-
-    async def exists(self, record_id: int) -> bool:
-        instance = await self.get_by_id(record_id)
-        return instance is not None

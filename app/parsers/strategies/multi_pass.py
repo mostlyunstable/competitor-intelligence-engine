@@ -118,14 +118,6 @@ _BLOG_KW = frozenset(["article", "blog", "post", "news", "update", "guide", "tip
 # ---------------------------------------------------------------------------
 
 
-def _first_set(*values: Any) -> Any:
-    """Return the first truthy value — used to keep higher-confidence data."""
-    for v in values:
-        if v:
-            return v
-    return None
-
-
 def _parse_price(text: str) -> tuple[float | None, str]:
     """Return (amount, currency_code) from arbitrary text."""
     m = _PRICE_RE.search(text.replace(",", ""))
@@ -975,8 +967,16 @@ class MultiPassStrategy(ParsingStrategy):
                 break
 
         # Pass 6 — Regex fallback (global, combined text)
-        _Pass6Regex().run(
-            BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), result, url
-        )
+        # Instead of serializing all segments to HTML and re-parsing,
+        # extract text and links from each segment's cached soup directly.
+        body_text = " ".join(seg.text_content() for seg in segments)
+        social_soup = BeautifulSoup("", "html.parser")
+        for seg in segments:
+            for a in seg.to_soup().select("a[href]"):
+                social_soup.append(a)
+        combined_soup = BeautifulSoup(body_text, "html.parser")
+        for a in social_soup.select("a[href]"):
+            combined_soup.append(a)
+        _Pass6Regex().run(combined_soup, result, url)
 
         return result

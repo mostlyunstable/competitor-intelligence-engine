@@ -88,7 +88,12 @@ class CollectionScheduler:
                 frequency=freq_val,
             )
             try:
-                await collection_service.collect_competitor(comp_id)
+                # Timeout of 30 minutes to prevent infinite hangs in one competitor affecting others
+                await asyncio.wait_for(
+                    collection_service.collect_competitor(comp_id), timeout=1800.0
+                )
+            except TimeoutError:
+                logger.error("scheduled_collection_timed_out", competitor_id=comp_id)
             except Exception:
                 logger.exception(
                     "scheduled_collection_failed",
@@ -107,10 +112,14 @@ class CollectionScheduler:
         if not last_log or not last_log.start_time:
             return True
 
+        if last_log.success is False:
+            return True
+
         interval_map = {
             CollectionFrequency.HOURLY: 3600,
             CollectionFrequency.DAILY: 86400,
             CollectionFrequency.WEEKLY: 604800,
+            CollectionFrequency.MONTHLY: 2592000,
         }
         interval = interval_map.get(frequency, 86400)
         start_time = last_log.start_time

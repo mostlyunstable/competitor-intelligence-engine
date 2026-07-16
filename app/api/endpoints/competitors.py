@@ -1,8 +1,8 @@
 from enum import StrEnum
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Security
-from pydantic import BaseModel, Field, field_validator, HttpUrl
-from typing import Any
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import verify_api_key
@@ -31,19 +31,38 @@ class CompetitorCreate(BaseModel):
     @field_validator("website_url")
     @classmethod
     def validate_url(cls, v: Any) -> Any:
-        url = str(v)
-        # Basic SSRF prevention
+        import ipaddress
         import socket
         from urllib.parse import urlparse
+
+        url = str(v)
+        parsed = urlparse(url)
+
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("Only http and https URLs are allowed.")
+
+        domain = parsed.hostname
+        if not domain:
+            raise ValueError("URL must have a valid hostname.")
+
         try:
-            domain = urlparse(url).hostname
-            if domain:
-                ip = socket.gethostbyname(domain)
-                if ip.startswith("127.") or ip.startswith("169.254.") or ip.startswith("10.") or ip.startswith("192.168."):
-                    raise ValueError("Internal or private IPs are strictly forbidden (SSRF Protection).")
-        except Exception as e:
-            if "Internal" in str(e):
-                raise
+            ip_str = socket.gethostbyname(domain)
+            ip = ipaddress.ip_address(ip_str)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_reserved
+                or ip.is_multicast
+            ):
+                raise ValueError(
+                    "Internal, reserved, or private IPs are forbidden (SSRF Protection)."
+                )
+        except ValueError:
+            raise
+        except socket.gaierror as err:
+            raise ValueError(f"Could not resolve hostname: {domain}") from err
+
         return v
 
     enabled: bool = Field(True, description="Enable automatic collection")

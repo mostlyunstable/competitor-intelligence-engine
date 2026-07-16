@@ -32,6 +32,12 @@ dependencies = [
     "imagehash>=4.3,<5",
     "Pillow>=10.0,<12",
     "redis>=5.0,<6",
+    "psutil>=6.0,<7",
+    "cryptography>=43.0,<45",
+    "aiofiles>=23.0,<25",
+    "apscheduler>=3.10,<4",
+    "playwright-stealth>=1.0,<2",
+    "tenacity>=8.0,<10",
 ]
 
 [project.optional-dependencies]
@@ -43,11 +49,17 @@ dev = [
     "mypy>=1.14,<2",
     "black>=24.10,<25",
     "aiosqlite>=0.20,<1",
+    "types-psutil>=6.0,<7",
+    "types-aiofiles>=23.0,<25",
+]
+llm = [
+    "openai>=1.0.0",
 ]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+exclude = ["scratch", "build", "dist", ".venv"]
 
 [tool.ruff.lint]
 select = [
@@ -86,7 +98,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["playwright_stealth", "redis.*"]
+module = ["playwright_stealth", "redis.*", "aiofiles.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

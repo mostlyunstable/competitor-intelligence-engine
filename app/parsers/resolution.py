@@ -117,6 +117,11 @@ _ABBREVIATIONS: dict[str, str] = {
 }
 
 
+_ABBR_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(rf"\b{re.escape(abbr)}\b"), expansion) for abbr, expansion in _ABBREVIATIONS.items()
+]
+
+
 def normalize(name: str, *, expand_abbrevs: bool = True) -> str:
     """Normalize a name for comparison.
 
@@ -130,9 +135,8 @@ def normalize(name: str, *, expand_abbrevs: bool = True) -> str:
     s = _WHITESPACE_RE.sub(" ", s).strip()
 
     if expand_abbrevs:
-        for abbr, expansion in _ABBREVIATIONS.items():
-            # Replace standalone abbreviation tokens
-            s = re.sub(rf"\b{re.escape(abbr)}\b", expansion, s)
+        for pattern, expansion in _ABBR_PATTERNS:
+            s = pattern.sub(expansion, s)
 
     # Tokenize, remove stop words and removable words
     tokens = s.split()
