@@ -232,7 +232,7 @@ class TeamExtractionStrategy(ParsingStrategy):
             return None
 
         # Wrap in a temporary container
-        wrapper = BeautifulSoup("", "html.parser").new_tag("div")
+        wrapper = BeautifulSoup("", "lxml").new_tag("div")
         for el in elements:
             wrapper.append(el)
         return wrapper

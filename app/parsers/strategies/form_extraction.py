@@ -247,7 +247,7 @@ class FormExtractionStrategy(ParsingStrategy):
                 sub = (
                     seg.to_soup()
                     if hasattr(seg, "to_soup")
-                    else BeautifulSoup(str(seg), "html.parser")
+                    else BeautifulSoup(str(seg), "lxml")
                 )
                 for form in sub.find_all("form"):
                     if _is_login_form(form):

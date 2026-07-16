@@ -39,13 +39,13 @@ class SemanticHtmlStrategy(ParsingStrategy):
         for seg in segments:
             self._extract_from_segment(seg, result, url)
         self._extract_emails(
-            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result
+            segments[0].to_soup() if segments else BeautifulSoup("", "lxml"), result
         )
         self._extract_phones(
-            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result
+            segments[0].to_soup() if segments else BeautifulSoup("", "lxml"), result
         )
         self._extract_social_links(
-            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result, url
+            segments[0].to_soup() if segments else BeautifulSoup("", "lxml"), result, url
         )
         return result
 

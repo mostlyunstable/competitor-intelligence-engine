@@ -33,13 +33,13 @@ class MicrodataStrategy(ParsingStrategy):
             for element in seg.element.select("[itemprop]"):
                 self._extract_itemprop(element, result, url)
         self._extract_emails(
-            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result
+            segments[0].to_soup() if segments else BeautifulSoup("", "lxml"), result
         )
         self._extract_phones(
-            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result
+            segments[0].to_soup() if segments else BeautifulSoup("", "lxml"), result
         )
         self._extract_prices(
-            segments[0].to_soup() if segments else BeautifulSoup("", "html.parser"), result
+            segments[0].to_soup() if segments else BeautifulSoup("", "lxml"), result
         )
         return result
 

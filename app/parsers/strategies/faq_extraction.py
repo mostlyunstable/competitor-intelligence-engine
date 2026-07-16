@@ -307,12 +307,12 @@ class FaqExtractionStrategy(ParsingStrategy):
         result = ParsedResult()
         for seg in segments:
             if isinstance(seg, Tag):
-                sub_result = self.parse(BeautifulSoup(str(seg), "html.parser"), url)
+                sub_result = self.parse(BeautifulSoup(str(seg), "lxml"), url)
             else:
                 sub = (
                     seg.to_soup()
                     if hasattr(seg, "to_soup")
-                    else BeautifulSoup(str(seg), "html.parser")
+                    else BeautifulSoup(str(seg), "lxml")
                 )
                 sub_result = self.parse(sub, url)
             result.content.extend(sub_result.content)

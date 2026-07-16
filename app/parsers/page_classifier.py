@@ -208,7 +208,7 @@ class PageClassifier:
             scores[best_type] = url_score[best_type]
             signals.append(f"url:{best_type}")
 
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
 
         heading_score = self._classify_by_headings(soup)
         if heading_score:

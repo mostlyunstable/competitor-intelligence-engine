@@ -33,7 +33,7 @@ class TechnographicCollector(BaseCollector):
                 return {"status": "failed", "error": "Empty response from Playwright"}
 
             html = result.html
-            soup = BeautifulSoup(html, "html.parser")
+            soup = BeautifulSoup(html, "lxml")
 
             # 1. Check script tags for known technology CDN domains
             scripts = [s.get("src", "") for s in soup.find_all("script") if s.get("src")]

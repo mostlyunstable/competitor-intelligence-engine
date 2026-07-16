@@ -166,7 +166,7 @@ class DiscoveryEngine:
             except Exception:
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-                    soup = BeautifulSoup(response.text, "html.parser")
+                    soup = BeautifulSoup(response.text, "lxml")
 
             for loc in soup.find_all("loc"):
                 if loc.string:
@@ -202,7 +202,7 @@ class DiscoveryEngine:
                 logger.debug("page_fetch_failed", url=url, status=response.status_code)
                 return urls
 
-            soup = BeautifulSoup(response.text, "html.parser")
+            soup = BeautifulSoup(response.text, "lxml")
 
             if self._settings.parse_nav:
                 nav_urls = self._extract_nav_links(soup, url)

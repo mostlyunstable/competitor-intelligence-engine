@@ -383,7 +383,7 @@ class PageSegment:
 
     # Convenience — render the segment back to HTML for sub-parsing
     def to_soup(self) -> BeautifulSoup:
-        return BeautifulSoup(str(self.element), "html.parser")
+        return BeautifulSoup(str(self.element), "lxml")
 
     def text_content(self) -> str:
         return self.element.get_text(" ", strip=True)
@@ -660,7 +660,7 @@ class PageSegmenter:
             return self._segment(html, url)
         except Exception:
             # Never crash the caller — return a single UNKNOWN segment
-            soup = BeautifulSoup(html, "html.parser")
+            soup = BeautifulSoup(html, "lxml")
             body = soup.body or soup
             return [
                 PageSegment(
@@ -672,7 +672,7 @@ class PageSegmenter:
             ]
 
     def _segment(self, html: str, url: str) -> list[PageSegment]:
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
         candidates = self._collect_candidates(soup)
 
         if not candidates:

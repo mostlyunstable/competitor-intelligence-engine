@@ -976,7 +976,7 @@ class MultiPassStrategy(ParsingStrategy):
 
         # Pass 6 — Regex fallback (global, combined text)
         _Pass6Regex().run(
-            BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), result, url
+            BeautifulSoup("".join(str(s.element) for s in segments), "lxml"), result, url
         )
 
         return result

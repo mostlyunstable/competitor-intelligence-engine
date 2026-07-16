@@ -85,7 +85,7 @@ class JsonLdStrategy(ParsingStrategy):
         if best_segment:
             return self.parse(best_segment.to_soup(), url)
         return self.parse(
-            BeautifulSoup("".join(str(s.element) for s in segments), "html.parser"), url
+            BeautifulSoup("".join(str(s.element) for s in segments), "lxml"), url
         )
 
     @staticmethod

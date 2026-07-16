@@ -115,7 +115,7 @@ class PageAnalyzer:
 
     def _check_js_frameworks(self, html: str) -> bool:
         """Check for JavaScript framework signatures."""
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
 
         script_tags = soup.find_all("script")
         script_contents = " ".join([str(s.string or "") for s in script_tags if s.string])
@@ -131,7 +131,7 @@ class PageAnalyzer:
 
     def _check_content_quality(self, html: str) -> bool:
         """Check for poor content quality indicators."""
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
 
         text_content = soup.get_text(strip=True)
         if len(text_content) < self._min_content_length:

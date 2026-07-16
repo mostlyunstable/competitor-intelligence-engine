@@ -22,7 +22,7 @@ class DiscoveryParser(BaseParser):
         }
 
     def _parse_sitemap_links(self, html: str, base_url: str) -> list[str]:
-        soup = self._soup(html)
+        soup = self._soup(html, parser="xml")
         links = []
         for loc in soup.select("urlset url loc"):
             if loc.string:

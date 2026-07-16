@@ -789,7 +789,7 @@ class ParsingStrategy(ABC):
             return ParsedResult()
         # Combine all segments back into a single soup for legacy strategies
         combined_html = "".join(str(seg.element) for seg in segments)
-        soup = BeautifulSoup(combined_html, "html.parser")
+        soup = BeautifulSoup(combined_html, "lxml")
         return self.parse(soup, url)
 
     def _evidence(self, tag: Tag | None) -> dict[str, str | None]:
@@ -797,7 +797,7 @@ class ParsingStrategy(ABC):
         return extract_evidence(tag)
 
     def _soup(self, html: str) -> BeautifulSoup:
-        return BeautifulSoup(html, "html.parser")
+        return BeautifulSoup(html, "lxml")
 
     def _text(self, soup: BeautifulSoup | Tag, selector: str) -> str | None:
         element = soup.select_one(selector)

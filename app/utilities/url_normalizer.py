@@ -156,7 +156,7 @@ def extract_canonical_url(html: str, page_url: str) -> str | None:
     """
     from bs4 import BeautifulSoup
 
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
 
     canonical_tag = soup.find("link", rel="canonical")
     if canonical_tag:

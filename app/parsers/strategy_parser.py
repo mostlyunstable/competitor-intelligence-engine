@@ -90,7 +90,7 @@ class StrategyParser:
         if self._preprocessor is not None:
             html = self._preprocessor.process(html)
 
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
 
         # Hardcoding competitor ID as 0 for generic parser loop
         self._observer.on_page_start(url, 0, len(html), len(soup.find_all(True)))
@@ -200,7 +200,7 @@ class StrategyParser:
 
     def get_segments(self, html: str, url: str = "") -> list[PageSegment]:
         """Return the raw PageSegment list for a page without running strategies."""
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
         blocks = list(self._segmenter.extract(soup))
         head = soup.find("head")
         if isinstance(head, Tag) and self._head_has_content(head):

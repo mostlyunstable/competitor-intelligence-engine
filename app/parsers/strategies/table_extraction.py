@@ -231,7 +231,7 @@ def _extract_features(cell: Tag) -> list[str]:
     parts: list[str] = _FEATURE_SEP_RE.split(html)
     features: list[str] = []
     for part in parts:
-        soup = BeautifulSoup(part, "html.parser")
+        soup = BeautifulSoup(part, "lxml")
         text = soup.get_text(" ", strip=True)
         if text and len(text) > 2:
             features.append(text)
@@ -297,7 +297,7 @@ class TableExtractionStrategy(ParsingStrategy):
                 sub = (
                     seg.to_soup()
                     if hasattr(seg, "to_soup")
-                    else BeautifulSoup(str(seg), "html.parser")
+                    else BeautifulSoup(str(seg), "lxml")
                 )
                 for table in sub.find_all("table"):
                     self._process_table(table, result, url)

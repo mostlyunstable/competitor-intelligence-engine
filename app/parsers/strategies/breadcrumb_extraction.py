@@ -217,12 +217,12 @@ class BreadcrumbExtractionStrategy(ParsingStrategy):
         result = ParsedResult()
         for seg in segments:
             if isinstance(seg, Tag):
-                sub = self.parse(BeautifulSoup(str(seg), "html.parser"), url)
+                sub = self.parse(BeautifulSoup(str(seg), "lxml"), url)
             else:
                 sub_soup = (
                     seg.to_soup()
                     if hasattr(seg, "to_soup")
-                    else BeautifulSoup(str(seg), "html.parser")
+                    else BeautifulSoup(str(seg), "lxml")
                 )
                 sub = self.parse(sub_soup, url)
             for svc in sub.services:

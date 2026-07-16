@@ -97,7 +97,7 @@ class DOMContextParser:
 
     def parse(self, html: str, url: str) -> dict[str, Any]:
         """Parse HTML and extract structured data from DOM context."""
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
 
         return {
             "services": self._extract_services(soup, url),

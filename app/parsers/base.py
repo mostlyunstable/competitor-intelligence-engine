@@ -11,8 +11,8 @@ class BaseParser(ABC):
     @abstractmethod
     def parse(self, html: str, url: str) -> dict[str, Any]: ...
 
-    def _soup(self, html: str) -> BeautifulSoup:
-        return BeautifulSoup(html, "html.parser")
+    def _soup(self, html: str, parser: str = "lxml") -> BeautifulSoup:
+        return BeautifulSoup(html, parser)
 
     def _text(self, soup: BeautifulSoup, selector: str) -> str | None:
         element = soup.select_one(selector)

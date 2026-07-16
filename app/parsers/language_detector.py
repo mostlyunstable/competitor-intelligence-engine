@@ -356,7 +356,7 @@ class LanguageDetector:
 
     def detect(self, html: str) -> LanguageResult:
         """Detect language of an HTML page."""
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
 
         lang = self._detect_from_html_tag(soup)
         if lang:

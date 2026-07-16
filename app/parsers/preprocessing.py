@@ -75,7 +75,7 @@ class Preprocessor:
 
     def process(self, html: str) -> str:
         """Apply all preprocessing steps and return clean HTML."""
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
         if not soup.find():
             return html  # no valid HTML found
 

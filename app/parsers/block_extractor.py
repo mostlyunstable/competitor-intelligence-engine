@@ -287,7 +287,7 @@ class DomBlockExtractor:
             return None
         if element.name == "div":
             return element
-        soup = BeautifulSoup("<div></div>", "html.parser")
+        soup = BeautifulSoup("<div></div>", "lxml")
         wrapper = soup.div
         if wrapper is None:
             return None
@@ -298,7 +298,7 @@ class DomBlockExtractor:
     def _wrap_sequence(elements: list[Tag]) -> Tag:
         """Wrap a sequence of sibling Tags in a single ``<div>``."""
         html = "".join(str(el) for el in elements)
-        soup = BeautifulSoup(f"<div>{html}</div>", "html.parser")
+        soup = BeautifulSoup(f"<div>{html}</div>", "lxml")
         return soup.div  # type: ignore[return-value]
 
     # ------------------------------------------------------------------
@@ -343,7 +343,7 @@ class DomBlockExtractor:
                 # Merge into the previous block
                 prev = merged[-1]
                 if prev.element.name != "div":
-                    soup = BeautifulSoup("<div></div>", "html.parser")
+                    soup = BeautifulSoup("<div></div>", "lxml")
                     wrapper = soup.div
                     if wrapper is not None:
                         wrapper.append(prev.element)
