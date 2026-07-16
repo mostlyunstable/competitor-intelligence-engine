@@ -1211,8 +1211,9 @@
                         </tr>
                     `;
                 } else {
+                    let rowsHtml = '';
                     summary.forEach(row => {
-                        tableBody.innerHTML += `
+                        rowsHtml += `
                             <tr class="hover:bg-surface-container-low transition-colors">
                                 <td class="px-stack-md py-3 font-body-md font-semibold">${escapeHtml(row.name)}</td>
                                 <td class="px-stack-md py-3 text-center font-mono text-primary font-bold">${row.services_count}</td>
@@ -1230,6 +1231,7 @@
                             </tr>
                         `;
                     });
+                    tableBody.innerHTML = rowsHtml;
                 }
             }
         } catch (e) {
@@ -1246,13 +1248,14 @@
                 if (logs.length === 0) {
                     logsContainer.innerHTML = '<div class="text-stone-500">No collection logs available.</div>';
                 } else {
+                    let logsHtml = '';
                     logs.forEach(log => {
                         const statusText = log.success ? '<span class="text-emerald-500 font-bold">SUCCESS</span>' : '<span class="text-red-500 font-bold">FAILED</span>';
                         const timeStr = log.start_time ? log.start_time.replace('T', ' ').substring(0, 19) : 'Unknown';
                         const errorsStr = log.errors && log.errors.length > 0 ? escapeHtml(log.errors.join(', ')) : 'None';
                         const compName = competitorsMap[log.competitor_id] ? escapeHtml(competitorsMap[log.competitor_id].name) : `#${log.competitor_id}`;
 
-                        logsContainer.innerHTML += `
+                        logsHtml += `
                             <div class="text-stone-300 font-mono text-[13px] border-b border-stone-800/40 py-1">
                                 <span class="text-stone-500">[${escapeHtml(timeStr)}]</span>
                                 ${escapeHtml(compName)} | Status: ${statusText} | Dur: ${log.duration_seconds || 0}s | Recs: ${log.records_collected}
@@ -1260,6 +1263,7 @@
                             </div>
                         `;
                     });
+                    logsContainer.innerHTML = logsHtml;
                 }
             }
         } catch (e) {
