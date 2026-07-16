@@ -1,15 +1,20 @@
+import json
 import os
 import secrets
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from sqlalchemy import func, select
+from pydantic import BaseModel, Field
+from sqlalchemy import cast, func, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_session
+from app.database.connection import db_manager
 from app.database.models import (
+    CollectionFrequency,
     CollectionLog,
     Competitor,
     CompetitorContent,
@@ -18,6 +23,8 @@ from app.database.models import (
     CompetitorService,
     CompetitorSocial,
     CompetitorSource,
+    CompetitorTechStack,
+    RawStorage,
 )
 from app.schedulers.scheduler import scheduler
 from app.services.collection_service import collection_service
@@ -54,10 +61,7 @@ def _resolve_storage_path(storage_uri: str | None) -> str | None:
 
 @router.get("/dashboard", response_class=FileResponse)
 async def get_dashboard(response: Response) -> str:
-    """Serves the live interactive dashboard UI from static file."""
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
     return "app/static/dashboard.html"
 
 
@@ -75,11 +79,94 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
     social_count = await session.scalar(select(func.count()).select_from(CompetitorSocial))
     logs_count = await session.scalar(select(func.count()).select_from(CollectionLog))
 
-    # Calculate error count
-    error_stmt = (
-        select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(False))
+
+@router.post("/api/dashboard/competitors/bulk/delete")
+async def bulk_delete(
+    payload: BulkAction, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    deleted = 0
+    for cid in payload.competitor_ids:
+        stmt = select(Competitor).where(Competitor.id == cid)
+        result = await session.execute(stmt)
+        comp = result.scalar_one_or_none()
+        if comp:
+            await session.delete(comp)
+            deleted += 1
+    await session.commit()
+    return {"deleted": deleted}
+
+
+@router.post("/api/dashboard/competitors/bulk/enable")
+async def bulk_enable(
+    payload: BulkAction, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    updated = 0
+    for cid in payload.competitor_ids:
+        stmt = select(Competitor).where(Competitor.id == cid)
+        result = await session.execute(stmt)
+        comp = result.scalar_one_or_none()
+        if comp:
+            comp.enabled = True
+            updated += 1
+    await session.commit()
+    return {"updated": updated}
+
+
+@router.post("/api/dashboard/competitors/bulk/disable")
+async def bulk_disable(
+    payload: BulkAction, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    updated = 0
+    for cid in payload.competitor_ids:
+        stmt = select(Competitor).where(Competitor.id == cid)
+        result = await session.execute(stmt)
+        comp = result.scalar_one_or_none()
+        if comp:
+            comp.enabled = False
+            updated += 1
+    await session.commit()
+    return {"updated": updated}
+
+
+@router.post("/api/dashboard/competitors/bulk/frequency")
+async def bulk_update_frequency(
+    payload: BulkFrequencyUpdate, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    updated = 0
+    for cid in payload.competitor_ids:
+        stmt = select(Competitor).where(Competitor.id == cid)
+        result = await session.execute(stmt)
+        comp = result.scalar_one_or_none()
+        if comp:
+            comp.collection_frequency = payload.frequency
+            updated += 1
+    await session.commit()
+    return {"updated": updated}
+
+
+@router.post("/api/dashboard/competitors/{competitor_id}/duplicate")
+async def duplicate_competitor(
+    competitor_id: int, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    stmt = select(Competitor).where(Competitor.id == competitor_id)
+    result = await session.execute(stmt)
+    comp = result.scalar_one_or_none()
+    if not comp:
+        raise HTTPException(status_code=404, detail="Competitor not found")
+
+    new_comp = Competitor(
+        name=f"{comp.name} (Copy)",
+        website_url=comp.website_url,
+        enabled=False,
+        collection_frequency=comp.collection_frequency,
+        modules=list(comp.modules) if comp.modules else [],
+        tags=list(comp.tags) if comp.tags else [],
+        notes=comp.notes,
     )
-    errors_count = await session.scalar(error_stmt)
+    session.add(new_comp)
+    await session.commit()
+    await session.refresh(new_comp)
+    return {"id": new_comp.id, "name": new_comp.name, "status": "duplicated"}
 
     # Active collection
     active_collection = None
@@ -95,8 +182,44 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
             "elapsed": time.time() - start_time,
         }
 
-    # Check Playwright availability
-    playwright_status = "error"
+# ─── Dashboard Stats & Overview ─────────────────────────────────────────────
+
+
+@router.get("/api/dashboard/stats")
+async def get_dashboard_stats(
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    total_competitors = await session.scalar(select(func.count()).select_from(Competitor)) or 0
+    active_competitors = await session.scalar(
+        select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True))
+    ) or 0
+    urls_count = await session.scalar(select(func.count()).select_from(CompetitorSource)) or 0
+    pages_count = await session.scalar(select(func.count()).select_from(CompetitorPage)) or 0
+    services_count = await session.scalar(select(func.count()).select_from(CompetitorService)) or 0
+    pricing_count = await session.scalar(select(func.count()).select_from(CompetitorPricing)) or 0
+    content_count = await session.scalar(select(func.count()).select_from(CompetitorContent)) or 0
+    social_count = await session.scalar(select(func.count()).select_from(CompetitorSocial)) or 0
+
+    total_logs = await session.scalar(select(func.count()).select_from(CollectionLog)) or 0
+    success_logs = await session.scalar(
+        select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(True))
+    ) or 0
+    failed_logs = await session.scalar(
+        select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(False))
+    ) or 0
+
+    success_rate = round((success_logs / total_logs * 100) if total_logs > 0 else 0, 1)
+
+    last_log_stmt = (
+        select(CollectionLog.start_time)
+        .order_by(CollectionLog.start_time.desc())
+        .limit(1)
+    )
+    last_collection = await session.scalar(last_log_stmt)
+
+    active_crawls = len(collection_service._active_crawls)
+
+    running_jobs = 0
     try:
         import importlib.util
 
@@ -105,24 +228,24 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
         pass
 
     return {
-        "competitors_monitored": competitors_count or 0,
-        "urls_discovered": urls_count or 0,
-        "pages_crawled": pages_count or 0,
-        "services_extracted": services_count or 0,
-        "pricing_extracted": pricing_count or 0,
-        "database_writes": (urls_count or 0)
-        + (pages_count or 0)
-        + (services_count or 0)
-        + (pricing_count or 0)
-        + (content_count or 0)
-        + (social_count or 0)
-        + (logs_count or 0),
-        "errors": errors_count or 0,
-        "scheduler_status": "active" if scheduler.is_running else "idle",
-        "playwright_status": playwright_status,
+        "total_competitors": total_competitors,
+        "active_competitors": active_competitors,
+        "collections_running": active_crawls,
+        "successful_collections": success_logs,
+        "failed_collections": failed_logs,
+        "total_collections": total_logs,
+        "success_rate": success_rate,
+        "queue_size": running_jobs,
+        "scheduler_status": "running" if scheduler.is_running else "stopped",
+        "last_collection": last_collection.isoformat() if last_collection else None,
+        "urls_discovered": urls_count,
+        "pages_crawled": pages_count,
+        "services_extracted": services_count,
+        "pricing_extracted": pricing_count,
+        "content_extracted": content_count,
+        "social_extracted": social_count,
         "db_status": "connected",
         "api_status": "healthy",
-        "active_collection": active_collection,
     }
 
 
@@ -130,12 +253,12 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)) -> d
 async def get_dashboard_summary(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
-    """Generates counts of extracted modules per competitor in a single efficient query."""
-
     stmt = (
         select(
             Competitor.id,
             Competitor.name,
+            Competitor.enabled,
+            Competitor.collection_frequency,
             func.count(func.distinct(CompetitorService.id)).label("services_count"),
             func.count(func.distinct(CompetitorPricing.id)).label("pricing_count"),
             func.count(func.distinct(CompetitorContent.id)).label("content_count"),
@@ -145,7 +268,7 @@ async def get_dashboard_summary(
         .outerjoin(CompetitorPricing, Competitor.id == CompetitorPricing.competitor_id)
         .outerjoin(CompetitorContent, Competitor.id == CompetitorContent.competitor_id)
         .outerjoin(CompetitorSocial, Competitor.id == CompetitorSocial.competitor_id)
-        .group_by(Competitor.id, Competitor.name)
+        .group_by(Competitor.id, Competitor.name, Competitor.enabled, Competitor.collection_frequency)
         .order_by(Competitor.name)
     )
     result = await session.execute(stmt)
@@ -154,6 +277,8 @@ async def get_dashboard_summary(
         {
             "id": row.id,
             "name": row.name,
+            "enabled": row.enabled,
+            "collection_frequency": row.collection_frequency.value if row.collection_frequency else "daily",
             "services_count": row.services_count,
             "pricing_count": row.pricing_count,
             "content_count": row.content_count,
@@ -161,6 +286,56 @@ async def get_dashboard_summary(
         }
         for row in rows
     ]
+
+
+# ─── Activity Feed ──────────────────────────────────────────────────────────
+
+
+@router.get("/api/dashboard/feed")
+async def get_feed(
+    limit: int = 20, session: AsyncSession = Depends(get_session)
+) -> list[dict[str, Any]]:
+    log_stmt = (
+        select(CollectionLog, Competitor.name)
+        .join(Competitor, CollectionLog.competitor_id == Competitor.id)
+        .order_by(CollectionLog.start_time.desc())
+        .limit(limit)
+    )
+    log_result = await session.execute(log_stmt)
+    logs = log_result.all()
+
+    price_stmt = (
+        select(CompetitorPricing, Competitor.name)
+        .join(Competitor, CompetitorPricing.competitor_id == Competitor.id)
+        .order_by(CompetitorPricing.collected_at.desc())
+        .limit(limit)
+    )
+    price_result = await session.execute(price_stmt)
+    prices = price_result.all()
+
+    feed = []
+    for log, comp_name in logs:
+        feed.append({
+            "type": "collection_success" if log.success else "collection_failure",
+            "message": f"{comp_name} collection {'succeeded' if log.success else 'failed'}",
+            "timestamp": log.start_time.isoformat() if log.start_time else "",
+            "competitor_id": log.competitor_id,
+            "duration_seconds": float(log.duration_seconds) if log.duration_seconds else None,
+        })
+
+    for price, comp_name in prices:
+        feed.append({
+            "type": "pricing_update",
+            "message": f"{comp_name} updated pricing for {price.service_name}: {price.base_price} {price.currency}",
+            "timestamp": price.collected_at.isoformat() if price.collected_at else "",
+            "competitor_id": price.competitor_id,
+        })
+
+    feed.sort(key=lambda x: x["timestamp"], reverse=True)
+    return feed[:limit]
+
+
+# ─── Collection Logs ────────────────────────────────────────────────────────
 
 
 @router.get("/api/dashboard/logs")
@@ -171,13 +346,25 @@ async def get_dashboard_logs(
     stmt = select(CollectionLog)
     if competitor_id is not None:
         stmt = stmt.where(CollectionLog.competitor_id == competitor_id)
-    stmt = stmt.order_by(CollectionLog.id.desc()).limit(limit)
+    if success is not None:
+        stmt = stmt.where(CollectionLog.success.is_(success))
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = await session.scalar(count_stmt) or 0
+
+    stmt = stmt.order_by(CollectionLog.id.desc())
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await session.execute(stmt)
     logs = result.scalars().all()
-    return [
-        {
+
+    enriched = []
+    for log in logs:
+        comp_stmt = select(Competitor.name).where(Competitor.id == log.competitor_id)
+        comp_name = await session.scalar(comp_stmt) or "Unknown"
+        enriched.append({
             "id": log.id,
             "competitor_id": log.competitor_id,
+            "competitor_name": comp_name,
             "start_time": log.start_time.isoformat() if log.start_time else None,
             "end_time": log.end_time.isoformat() if log.end_time else None,
             "success": log.success,
@@ -185,16 +372,24 @@ async def get_dashboard_logs(
             "records_collected": log.records_collected,
             "errors": log.errors or [],
             "retry_count": log.retry_count,
-        }
-        for log in logs
-    ]
+        })
+
+    return {
+        "logs": enriched,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": max(1, (total + page_size - 1) // page_size),
+    }
+
+
+# ─── Collection Control ─────────────────────────────────────────────────────
 
 
 @router.post("/api/dashboard/collect/{competitor_id}")
 async def trigger_dashboard_collect(
     competitor_id: int, background_tasks: BackgroundTasks
 ) -> dict[str, str]:
-    """Triggers standard collection in the background."""
     background_tasks.add_task(collection_service.collect_competitor, competitor_id)
     return {"status": "accepted", "message": "Collection triggered"}
 
@@ -217,7 +412,6 @@ async def get_dashboard_telemetry() -> dict[str, Any]:
 
 @router.post("/api/dashboard/collect/{competitor_id}/cancel")
 async def cancel_dashboard_collect(competitor_id: int) -> dict[str, str]:
-    """Cancels a running collection by removing it from the active crawls tracker."""
     async with collection_service._crawls_lock:
         collection_service._active_crawls.pop(competitor_id, None)
     return {
@@ -226,9 +420,112 @@ async def cancel_dashboard_collect(competitor_id: int) -> dict[str, str]:
     }
 
 
+
+@router.post("/api/dashboard/collect/{competitor_id}/retry")
+async def retry_dashboard_collect(
+    competitor_id: int, background_tasks: BackgroundTasks
+) -> dict[str, str]:
+    background_tasks.add_task(collection_service.collect_competitor, competitor_id)
+    return {"status": "accepted", "message": "Retry collection triggered"}
+
+
+# ─── Scheduler Control ──────────────────────────────────────────────────────
+
+
+@router.get("/api/dashboard/scheduler/status")
+async def get_scheduler_status() -> dict[str, Any]:
+    return {
+        "is_running": scheduler.is_running,
+        "status": "running" if scheduler.is_running else "stopped",
+        "interval_seconds": scheduler._interval_seconds,
+    }
+
+
+@router.post("/api/dashboard/scheduler/pause")
+async def pause_scheduler() -> dict[str, str]:
+    await scheduler.stop()
+    return {"status": "paused", "message": "Scheduler paused"}
+
+
+@router.post("/api/dashboard/scheduler/resume")
+async def resume_scheduler() -> dict[str, str]:
+    await scheduler.start()
+    return {"status": "resumed", "message": "Scheduler resumed"}
+
+
+# ─── Search ─────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/dashboard/search")
+async def global_search(
+    q: str, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    stmt = select(RawStorage).where(
+        RawStorage.extracted_data.isnot(None),
+        cast(RawStorage.extracted_data, String).ilike(f"%{q}%"),
+    ).order_by(RawStorage.collected_at.desc()).limit(100)
+    result = await session.execute(stmt)
+    raw_storages = result.scalars().all()
+
+    seen = set()
+    latest_per_comp = []
+    for r in raw_storages:
+        if r.competitor_id not in seen:
+            seen.add(r.competitor_id)
+            latest_per_comp.append(r)
+
+    matches = []
+    q_lower = q.lower()
+    for r in latest_per_comp:
+        data_str = str(r.extracted_data).lower()
+        if q_lower in data_str:
+            comp_name = r.extracted_data.get("name", f"Competitor {r.competitor_id}")
+            match_context = "Found in profile"
+            if "services" in r.extracted_data:
+                for srv in r.extracted_data["services"]:
+                    if isinstance(srv, dict) and q_lower in str(srv).lower():
+                        match_context = f"Service: {srv.get('name', 'Unknown')}"
+                        break
+            matches.append({
+                "competitor_id": r.competitor_id,
+                "name": comp_name,
+                "context": match_context,
+            })
+
+    return {"query": q, "results": matches, "total": len(matches)}
+
+
+# ─── Telemetry ──────────────────────────────────────────────────────────────
+
+
+@router.get("/api/dashboard/telemetry")
+async def get_dashboard_telemetry() -> dict[str, Any]:
+    try:
+        import psutil
+
+        process = psutil.Process()
+        mem_info = process.memory_info()
+        mem_total = psutil.virtual_memory().total
+        return {
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_mb": int(mem_info.rss / 1024 / 1024),
+            "memory_total_gb": int(mem_total / 1024 / 1024 / 1024),
+            "active_crawls": len(collection_service._active_crawls),
+        }
+    except ImportError:
+        return {
+            "cpu_percent": 0,
+            "memory_mb": 0,
+            "memory_total_gb": 0,
+            "active_crawls": len(collection_service._active_crawls),
+        }
+
+
+# ─── Live Logs ──────────────────────────────────────────────────────────────
+
+
 @router.get("/api/dashboard/live_logs/{competitor_id}")
 async def get_dashboard_live_logs(competitor_id: int) -> list[dict[str, Any]]:
-    """Returns real-time structlog events from the global buffer."""
     from app.observability.log_buffer import global_log_buffer
 
     return global_log_buffer.get_logs_for_competitor(competitor_id)
@@ -258,7 +555,6 @@ async def get_dashboard_extracted(
             if isinstance(v, list):
                 if k not in merged_data:
                     merged_data[k] = []
-                # Simple dedup for dicts in lists might be hard, but extending is fine for export
                 merged_data[k].extend(v)
             elif isinstance(v, dict):
                 if k not in merged_data:
@@ -269,6 +565,9 @@ async def get_dashboard_extracted(
                     merged_data[k] = v
 
     return {"data": merged_data, "collected_at": rows[-1].collected_at.isoformat()}
+
+
+# ─── Exports ────────────────────────────────────────────────────────────────
 
 
 @router.get("/api/dashboard/compare/csv")
@@ -334,6 +633,7 @@ async def get_raw_html(competitor_id: int, session: AsyncSession = Depends(get_s
     return FileResponse(
         storage_path, media_type="text/html", filename=f"competitor_{competitor_id}_raw.html"
     )
+
 
 
 @router.get("/api/dashboard/export/zip")

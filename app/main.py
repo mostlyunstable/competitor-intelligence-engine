@@ -22,6 +22,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.environment == "development" or settings.debug:
         await db_manager.create_tables()
 
+    from app.messagequeue import MessageQueue
+    from app.messagequeue.queue import InMemoryQueueBackend, MessageType
+
+    message_queue = MessageQueue()
+
+    async def _collection_handler(msg):
+        from app.services.collection_service import collection_service
+
+        competitor_id = msg.payload.get("competitor_id")
+        if competitor_id:
+            await collection_service.collect_competitor(competitor_id)
+            return True
+        return False
+
+    message_queue.set_handler(MessageType.COLLECTION, _collection_handler)
+
+    app.state.message_queue = message_queue
+
     from app.services.config_sync_service import config_sync_service
 
     await config_sync_service.sync_competitors()
@@ -30,38 +48,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     await scheduler.start()
 
+    from app.observability.alerting import setup_default_alerts
+
+    setup_default_alerts()
+
+    logger.info(
+        "app_started",
+        environment=settings.environment,
+        debug=settings.debug,
+        scheduler_enabled=settings.scheduler.enabled,
+    )
+
     yield
 
-    await scheduler.stop()
+    from app.schedulers.scheduler import scheduler as sched
+
+    await sched.stop()
     await db_manager.disconnect()
+    logger.info("app_stopped")
 
 
-# OpenAPI metadata with comprehensive examples
 OPENAPI_TAGS = [
-    {
-        "name": "Health",
-        "description": "System health checks and status monitoring",
-    },
-    {
-        "name": "Competitors",
-        "description": "CRUD operations for competitor management",
-    },
-    {
-        "name": "Collection",
-        "description": "Data collection pipeline triggers and monitoring",
-    },
-    {
-        "name": "Metrics",
-        "description": "Runtime metrics and performance monitoring",
-    },
-    {
-        "name": "Dashboard",
-        "description": "Dashboard data and analytics",
-    },
-    {
-        "name": "Reports",
-        "description": "Extraction reports and analytics",
-    },
+    {"name": "Health", "description": "System health checks and status monitoring"},
+    {"name": "Competitors", "description": "CRUD operations for competitor management"},
+    {"name": "Collection", "description": "Data collection pipeline triggers and monitoring"},
+    {"name": "Metrics", "description": "Runtime metrics and performance monitoring"},
+    {"name": "Dashboard", "description": "Dashboard data and analytics"},
+    {"name": "Reports", "description": "Extraction reports and analytics"},
 ]
 
 

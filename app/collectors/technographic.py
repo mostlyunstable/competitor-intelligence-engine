@@ -3,6 +3,7 @@ from typing import Any
 
 import structlog
 from bs4 import BeautifulSoup
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.collectors.base import BaseCollector
@@ -12,11 +13,7 @@ logger = structlog.get_logger(__name__)
 
 
 class TechnographicCollector(BaseCollector):
-    """Collects technology stack information from competitor websites.
-
-    Uses HybridFetcher with force_render=True to execute JavaScript and
-    detect client-side technologies (React, Vue, Next.js, Shopify globals, etc.).
-    """
+    """Collects technology stack information from competitor websites."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -24,7 +21,6 @@ class TechnographicCollector(BaseCollector):
     async def collect(
         self, competitor_id: int, url: str, *, session: AsyncSession, **kwargs: Any
     ) -> dict[str, Any]:
-        """Detect tech stack from headers, cookies, JS globals, and source code."""
         detected_tech: list[dict[str, Any]] = []
 
         try:
@@ -35,7 +31,6 @@ class TechnographicCollector(BaseCollector):
             html = result.html
             soup = BeautifulSoup(html, "html.parser")
 
-            # 1. Check script tags for known technology CDN domains
             scripts = [s.get("src", "") for s in soup.find_all("script") if s.get("src")]
             for src_val in scripts:
                 if not isinstance(src_val, str):
@@ -50,7 +45,6 @@ class TechnographicCollector(BaseCollector):
                 if "react" in src_lower:
                     detected_tech.append({"name": "React", "category": "Frontend Framework"})
 
-            # 2. Check meta tags
             generator = soup.find("meta", attrs={"name": "generator"})
             if generator:
                 gen_content = generator.get("content", "")
@@ -61,19 +55,29 @@ class TechnographicCollector(BaseCollector):
                     if "webflow" in content:
                         detected_tech.append({"name": "Webflow", "category": "CMS"})
 
-            # 3. Deduplicate by name
             unique_tech = {t["name"]: t for t in detected_tech}.values()
 
-            # 4. Save to database
+            saved = 0
             for tech in unique_tech:
-                stack_entry = CompetitorTechStack(
-                    competitor_id=competitor_id,
-                    technology_name=tech["name"],
-                    category=tech.get("category"),
-                    confidence=1.0,
-                    discovered_at=datetime.now(UTC),
+                existing_stmt = select(CompetitorTechStack).where(
+                    CompetitorTechStack.competitor_id == competitor_id,
+                    CompetitorTechStack.technology_name == tech["name"],
                 )
-                session.add(stack_entry)
+                existing = (await session.execute(existing_stmt)).scalar_one_or_none()
+
+                if existing:
+                    existing.confidence = 1.0
+                    existing.discovered_at = datetime.now(UTC)
+                else:
+                    stack_entry = CompetitorTechStack(
+                        competitor_id=competitor_id,
+                        technology_name=tech["name"],
+                        category=tech.get("category"),
+                        confidence=1.0,
+                        discovered_at=datetime.now(UTC),
+                    )
+                    session.add(stack_entry)
+                saved += 1
 
             return {
                 "status": "success",
