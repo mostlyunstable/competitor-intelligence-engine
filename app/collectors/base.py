@@ -1,5 +1,6 @@
 import time
 from abc import ABC, abstractmethod
+from contextvars import ContextVar
 from typing import Any
 
 import structlog
@@ -11,23 +12,22 @@ logger: Any = structlog.get_logger(__name__)
 
 _shared_fetcher: HybridFetcher | None = None
 
-# Shared deduplicators across all collectors.
-# Reset via reset_deduplicators() at the start of each collection run
-# to prevent unbounded memory growth.
-_url_deduplicator = URLDeduplicator()
-_content_deduplicator = ContentDeduplicator()
+# Context-isolated deduplicators for safe concurrent or interleaved collection runs.
+_url_deduplicator: ContextVar[URLDeduplicator | None] = ContextVar("url_dedup", default=None)
+_content_deduplicator: ContextVar[ContentDeduplicator | None] = ContextVar(
+    "content_dedup", default=None
+)
 
 
 def reset_deduplicators() -> None:
-    """Reset global deduplicators for a new collection run.
+    """Reset context-local deduplicators for a new collection run.
 
-    Must be called at the start of each competitor collection to prevent
-    the seen-URL sets and content-hash dicts from growing unboundedly
-    across the process lifetime.
+    Initializes new deduplicator instances for the current context to ensure
+    cross-competitor state isolation.
     """
-    _url_deduplicator.reset()
-    _content_deduplicator.reset()
-    logger.debug("deduplicators_reset")
+    _url_deduplicator.set(URLDeduplicator())
+    _content_deduplicator.set(ContentDeduplicator())
+    logger.debug("deduplicators_reset_for_context")
 
 
 def get_shared_fetcher() -> HybridFetcher:
@@ -47,8 +47,19 @@ def get_shared_fetcher() -> HybridFetcher:
 class BaseCollector(ABC):
     def __init__(self, fetcher: HybridFetcher | None = None) -> None:
         self._fetcher = fetcher or get_shared_fetcher()
-        self._url_deduplicator = _url_deduplicator
-        self._content_deduplicator = _content_deduplicator
+        # Set up isolated deduplicators for this context run
+        url_dedup = _url_deduplicator.get()
+        if url_dedup is None:
+            url_dedup = URLDeduplicator()
+            _url_deduplicator.set(url_dedup)
+
+        content_dedup = _content_deduplicator.get()
+        if content_dedup is None:
+            content_dedup = ContentDeduplicator()
+            _content_deduplicator.set(content_dedup)
+
+        self.url_deduplicator = url_dedup
+        self.content_deduplicator = content_dedup
 
     async def close(self) -> None:
         await self._fetcher.close()
@@ -61,19 +72,19 @@ class BaseCollector(ABC):
 
     def is_duplicate_url(self, url: str) -> bool:
         """Check if URL has been seen before."""
-        return self._url_deduplicator.is_duplicate(url)
+        return self.url_deduplicator.is_duplicate(url)
 
     def mark_url_seen(self, url: str) -> None:
         """Mark URL as seen."""
-        self._url_deduplicator.mark_seen(url)
+        self.url_deduplicator.mark_seen(url)
 
     def is_duplicate_content(self, content_hash: str, url: str) -> bool:
         """Check if content hash has been seen before for a different URL."""
-        return self._content_deduplicator.is_duplicate(content_hash, url)
+        return self.content_deduplicator.is_duplicate(content_hash, url)
 
     def mark_content_seen(self, content_hash: str, url: str) -> None:
         """Mark content hash as seen for a URL."""
-        self._content_deduplicator.register(content_hash, url)
+        self.content_deduplicator.register(content_hash, url)
 
     async def is_unchanged(self, competitor_id: int, url: str, html: str, session: Any) -> bool:
         from app.database.repositories.raw_storage_repository import RawStorageRepository

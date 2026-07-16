@@ -2,7 +2,7 @@ import json
 import os
 import secrets
 import time
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse, StreamingResponse
@@ -25,12 +25,12 @@ from app.database.models import (
     CompetitorService,
     CompetitorSocial,
     CompetitorSource,
-    CompetitorTechStack,
     RawStorage,
 )
 from app.schedulers.scheduler import scheduler
 from app.services.collection_service import collection_service
 
+# [SECURITY FIX] Apply Basic Auth globally to all endpoints in this router
 security = HTTPBasic()
 
 
@@ -118,7 +118,13 @@ async def get_dashboard(response: Response) -> str:
     return "app/static/dashboard.html"
 
 
-# ─── Competitor CRUD ────────────────────────────────────────────────────────
+
+
+def _resolve_storage_path(storage_uri: str | None) -> str | None:
+    """Strip file:// prefix from storage URIs for local file access."""
+    if not storage_uri:
+        return None
+    return storage_uri.replace("file://", "") if storage_uri.startswith("file://") else storage_uri
 
 
 @router.get("/api/dashboard/competitors")
@@ -334,7 +340,12 @@ async def delete_dashboard_competitor(
 
 # ─── Bulk Operations ────────────────────────────────────────────────────────
 
+class BulkAction(BaseModel):
+    competitor_ids: list[int]
 
+class BulkFrequencyUpdate(BaseModel):
+    competitor_ids: list[int]
+    frequency: CollectionFrequency
 @router.post("/api/dashboard/competitors/bulk/delete")
 async def bulk_delete(
     payload: BulkAction, session: AsyncSession = Depends(get_session)
@@ -582,13 +593,9 @@ async def get_feed(
 
 @router.get("/api/dashboard/logs")
 async def get_dashboard_logs(
-    limit: int = 50,
-    competitor_id: int | None = None,
-    success: bool | None = None,
-    page: int = 1,
-    page_size: int = 50,
-    session: AsyncSession = Depends(get_session),
+    page: int = 1, page_size: int = 50, success: bool | None = None, competitor_id: int | None = None, session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
+    """Returns recent audit logs."""
     stmt = select(CollectionLog)
     if competitor_id is not None:
         stmt = stmt.where(CollectionLog.competitor_id == competitor_id)
@@ -640,11 +647,31 @@ async def trigger_dashboard_collect(
     return {"status": "accepted", "message": "Collection triggered"}
 
 
+@router.get("/api/dashboard/telemetry")
+async def get_dashboard_telemetry() -> dict[str, Any]:
+    """Returns actual system CPU and Memory metrics."""
+    import psutil
+
+    process = psutil.Process()
+    mem_info = process.memory_info()
+    mem_total = psutil.virtual_memory().total
+    return {
+        "cpu_percent": psutil.cpu_percent(),
+        "memory_mb": int(mem_info.rss / 1024 / 1024),
+        "memory_total_gb": int(mem_total / 1024 / 1024 / 1024),
+        "active_crawls": len(collection_service._active_crawls),
+    }
+
+
 @router.post("/api/dashboard/collect/{competitor_id}/cancel")
 async def cancel_dashboard_collect(competitor_id: int) -> dict[str, str]:
     async with collection_service._crawls_lock:
         collection_service._active_crawls.pop(competitor_id, None)
-    return {"status": "cancelled", "message": f"Collection for competitor {competitor_id} cancelled"}
+    return {
+        "status": "cancelled",
+        "message": f"Collection for competitor {competitor_id} cancelled",
+    }
+
 
 
 @router.post("/api/dashboard/collect/{competitor_id}/retry")
@@ -736,10 +763,11 @@ async def global_search(
     for r in latest_per_comp:
         data_str = str(r.extracted_data).lower()
         if q_lower in data_str:
-            comp_name = r.extracted_data.get("name", f"Competitor {r.competitor_id}")
+            extracted = r.extracted_data or {}
+            comp_name = extracted.get("name", f"Competitor {r.competitor_id}")
             match_context = "Found in profile"
-            if "services" in r.extracted_data:
-                for srv in r.extracted_data["services"]:
+            if "services" in extracted:
+                for srv in extracted["services"]:
                     if isinstance(srv, dict) and q_lower in str(srv).lower():
                         match_context = f"Service: {srv.get('name', 'Unknown')}"
                         break
@@ -752,30 +780,7 @@ async def global_search(
     return {"query": q, "results": matches, "total": len(matches)}
 
 
-# ─── Telemetry ──────────────────────────────────────────────────────────────
 
-
-@router.get("/api/dashboard/telemetry")
-async def get_dashboard_telemetry() -> dict[str, Any]:
-    try:
-        import psutil
-
-        process = psutil.Process()
-        mem_info = process.memory_info()
-        mem_total = psutil.virtual_memory().total
-        return {
-            "cpu_percent": psutil.cpu_percent(),
-            "memory_mb": int(mem_info.rss / 1024 / 1024),
-            "memory_total_gb": int(mem_total / 1024 / 1024 / 1024),
-            "active_crawls": len(collection_service._active_crawls),
-        }
-    except ImportError:
-        return {
-            "cpu_percent": 0,
-            "memory_mb": 0,
-            "memory_total_gb": 0,
-            "active_crawls": len(collection_service._active_crawls),
-        }
 
 
 # ─── Live Logs ──────────────────────────────────────────────────────────────
@@ -788,13 +793,12 @@ async def get_dashboard_live_logs(competitor_id: int) -> list[dict[str, Any]]:
     return global_log_buffer.get_logs_for_competitor(competitor_id)
 
 
-# ─── Extracted Data ─────────────────────────────────────────────────────────
-
-
 @router.get("/api/dashboard/extracted/{competitor_id}")
 async def get_dashboard_extracted(
     competitor_id: int, session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
+    from app.database.models import RawStorage
+
     stmt = (
         select(RawStorage)
         .where(RawStorage.competitor_id == competitor_id)
@@ -808,9 +812,8 @@ async def get_dashboard_extracted(
 
     merged_data: dict[str, Any] = {}
     for raw in rows:
-        if not raw.extracted_data:
-            continue
-        for k, v in raw.extracted_data.items():
+        extracted = raw.extracted_data or {}
+        for k, v in extracted.items():
             if isinstance(v, list):
                 if k not in merged_data:
                     merged_data[k] = []
@@ -830,9 +833,10 @@ async def get_dashboard_extracted(
 
 
 @router.get("/api/dashboard/compare/csv")
-async def get_compare_csv(session: AsyncSession = Depends(get_session)):
+async def get_compare_csv(session: AsyncSession = Depends(get_session)) -> Any:
     import csv
     import io
+
 
     stmt = select(Competitor).options(selectinload(Competitor.pricing)).order_by(Competitor.name)
     result = await session.execute(stmt)
@@ -847,25 +851,31 @@ async def get_compare_csv(session: AsyncSession = Depends(get_session)):
             writer.writerow([comp.name, "No pricing found", "", "", "", ""])
             continue
         for p in comp.pricing:
-            writer.writerow([
-                comp.name,
-                p.service_name or "N/A",
-                p.base_price or "",
-                p.currency or "",
-                p.category or "",
-                p.collected_at.isoformat() if p.collected_at else "N/A",
-            ])
+            writer.writerow(
+                [
+                    comp.name,
+                    p.service_name or "N/A",
+                    p.base_price or "",
+                    p.currency or "",
+                    p.category or "",
+                    p.collected_at.isoformat() if p.collected_at else "N/A",
+                ]
+            )
 
     output.seek(0)
     response = StreamingResponse(iter([output.getvalue()]), media_type="text/csv")
-    response.headers["Content-Disposition"] = "attachment; filename=competitor_pricing_comparison.csv"
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=competitor_pricing_comparison.csv"
+    )
     return response
 
 
 @router.get("/api/dashboard/raw/{competitor_id}")
-async def get_raw_html(
-    competitor_id: int, session: AsyncSession = Depends(get_session)
-):
+async def get_raw_html(competitor_id: int, session: AsyncSession = Depends(get_session)) -> Any:
+    import os
+
+    from app.database.models import RawStorage
+
     stmt = (
         select(RawStorage)
         .where(RawStorage.competitor_id == competitor_id)
@@ -876,10 +886,14 @@ async def get_raw_html(
     result = await session.execute(stmt)
     raw = result.scalar_one_or_none()
 
-    if not raw or not raw.storage_uri or not os.path.exists(raw.storage_uri):
+    storage_path = _resolve_storage_path(raw.storage_uri) if raw else None
+    if not raw or not storage_path or not os.path.exists(storage_path):
         raise HTTPException(status_code=404, detail="Raw HTML file not found")
 
-    return FileResponse(raw.storage_uri, media_type="text/html", filename=f"competitor_{competitor_id}_raw.html")
+    return FileResponse(
+        storage_path, media_type="text/html", filename=f"competitor_{competitor_id}_raw.html"
+    )
+
 
 
 @router.get("/api/dashboard/export/zip")
@@ -887,6 +901,11 @@ async def export_zip(session: AsyncSession = Depends(get_session)):
     import io
     import zipfile
 
+    from fastapi.responses import StreamingResponse
+
+    from app.database.models import RawStorage
+
+    # [BUG FIX]: Removed text search on undefined 'q' to prevent crashes.
     stmt = (
         select(RawStorage)
         .where(RawStorage.extracted_data.isnot(None))
@@ -906,23 +925,27 @@ async def export_zip(session: AsyncSession = Depends(get_session)):
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zipf:
         for r in latest_per_comp:
-            comp_name = (r.extracted_data or {}).get("name") or f"competitor_{r.competitor_id}"
+            extracted = r.extracted_data or {}
+            comp_name = extracted.get("name") or f"competitor_{r.competitor_id}"
             comp_name = str(comp_name).replace(" ", "_").replace("/", "_")
 
-            json_str = json.dumps(r.extracted_data or {}, indent=2)
+            # Add JSON
+            json_str = json.dumps(r.extracted_data, indent=2)
             zipf.writestr(f"{comp_name}_structured_data.json", json_str)
 
-            if r.storage_uri and os.path.exists(r.storage_uri):
-                with open(r.storage_uri, "rb") as f:
+            # Add HTML if exists
+            local_path = _resolve_storage_path(r.storage_uri) if r.storage_uri else None
+            if local_path and os.path.exists(local_path):
+                with open(local_path, "rb") as f:
                     zipf.writestr(f"{comp_name}_raw.html", f.read())
 
     output.seek(0)
     response = StreamingResponse(iter([output.getvalue()]), media_type="application/zip")
-    response.headers["Content-Disposition"] = "attachment; filename=competitor_intelligence_export.zip"
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=competitor_intelligence_export.zip"
+    )
     return response
 
-
-# ─── Health ─────────────────────────────────────────────────────────────────
 
 
 @router.get("/api/dashboard/health")

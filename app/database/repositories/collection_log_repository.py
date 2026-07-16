@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,17 +23,8 @@ class CollectionLogRepository(BaseRepository[CollectionLog]):
         logs = await self.get_by_competitor(competitor_id, limit=1)
         return logs[0] if logs else None
 
-    async def get_recent(self, limit: int = 100) -> list[CollectionLog]:
+    async def get_recent(self, limit: int = 10) -> list[CollectionLog]:
         stmt = select(CollectionLog).order_by(CollectionLog.created_at.desc()).limit(limit)
-        result = await self._session.execute(stmt)
-        return list(result.scalars().all())
-
-    async def get_by_date_range(self, start: datetime, end: datetime) -> list[CollectionLog]:
-        stmt = (
-            select(CollectionLog)
-            .where(CollectionLog.start_time >= start, CollectionLog.start_time <= end)
-            .order_by(CollectionLog.start_time.desc())
-        )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
@@ -48,4 +37,4 @@ class CollectionLogRepository(BaseRepository[CollectionLog]):
             .where(CollectionLog.competitor_id == competitor_id)
         )
         result = await self._session.execute(stmt)
-        return result.scalar_one()
+        return result.scalar() or 0

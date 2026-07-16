@@ -146,7 +146,7 @@ class CollectionService:
 
             # --- Generate Operator Confidence Report ---
             total_fetched = sum(len(r) for r in results.values())
-            
+
             entities = {
                 "Pricing": 0,
                 "Services": 0,
@@ -154,7 +154,7 @@ class CollectionService:
                 "Social": 0,
                 "Company": 0,
             }
-            
+
             for mod_name, mod_results in results.items():
                 for res in mod_results:
                     if res.get("status") == "success":
@@ -184,7 +184,7 @@ class CollectionService:
                 "Export Status",
                 "CSV ✅",
                 "JSON ✅",
-                "ZIP ✅"
+                "ZIP ✅",
             ]
             report_str = "\n" + "\n".join(report_lines) + "\n"
             log.info("collection_report", report=report_str)
@@ -258,10 +258,15 @@ class CollectionService:
         """Save discovered URLs to the database in a short-lived session."""
         async with db_manager.session() as session:
             source_repo = CompetitorSourceRepository(session)
+
+            # Batch-fetch all existing URLs for this competitor in one query
+            existing_sources = await source_repo.get_by_competitor(competitor_id)
+            existing_url_map = {s.url: s for s in existing_sources}
+
             for d in discovered:
                 try:
                     async with session.begin_nested():
-                        existing = await source_repo.get_by_url(competitor_id, d.url)
+                        existing = existing_url_map.get(d.url)
                         if not existing:
                             await source_repo.create(
                                 competitor_id=competitor_id,

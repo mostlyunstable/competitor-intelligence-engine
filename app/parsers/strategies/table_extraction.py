@@ -447,9 +447,3 @@ class TableExtractionStrategy(ParsingStrategy):
 def _price_is_promo(text: str) -> bool:
     lower = text.lower()
     return any(kw in lower for kw in ("sale", "offer", "promo", "discount", "now", "save", "was"))
-
-
-class TestTableExtractionStrategy:
-    """Minimal self-test helpers."""
-
-    pass

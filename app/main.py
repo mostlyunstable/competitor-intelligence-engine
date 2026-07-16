@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import asyncio
 
@@ -9,9 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.endpoints import collection, competitors, dashboard, health, metrics, reports
 from app.api.middleware import RateLimitMiddleware
-from app.configuration.secrets import setup_secrets
 from app.configuration.settings import Settings, get_settings
 from app.database.connection import db_manager
+from app.observability.monitoring_dashboard import router as monitoring_router
+from app.observability.prometheus_metrics import router as prometheus_router
 
 logger = structlog.get_logger(__name__)
 
@@ -20,12 +22,9 @@ message_queue = None
 _queue_worker_task: asyncio.Task | None = None
 
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    global message_queue
-
-    setup_secrets()
-
     await db_manager.connect()
 
     settings = get_settings()
@@ -75,9 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     await scheduler.start()
 
-    from app.observability.alerting import setup_default_alerts
 
-    setup_default_alerts()
 
     logger.info(
         "app_started",
@@ -118,7 +115,65 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Utservio Competitor Intelligence Engine",
-        description="Production-grade competitor intelligence data collection engine.",
+        description="""
+## Overview
+
+Production-grade competitor intelligence data collection engine.
+
+### Features
+
+- **Generic HTML Extraction**: 23 parsing strategies with zero CSS selectors
+- **Entity Resolution**: Automatic deduplication with fuzzy matching
+- **Relationship Linking**: Connect extracted entities into graphs
+- **Dynamic Confidence Scoring**: Per-field confidence with cross-strategy consistency
+- **Evidence Metadata**: DOM path, XPath, and HTML snippet for every extraction
+- **Hybrid Fetching**: Static HTML + JavaScript rendering via Playwright
+- **Incremental Crawling**: ETag/Last-Modified conditional requests
+- **Structured Logging**: Production-ready observability via structlog
+- **Prometheus Metrics**: Runtime performance monitoring
+
+### Architecture
+
+```
+API Layer (FastAPI)
+    ↓
+Service Layer (Collection Service)
+    ↓
+Collector Layer (Company, Service, Pricing, Content, Social, Discovery)
+    ↓
+Parser Layer (23 Strategies + Entity Resolution + Relationship Linking)
+    ↓
+Repository Layer (13 Repositories with Native Upsert)
+    ↓
+Database Layer (PostgreSQL via SQLAlchemy Async)
+```
+
+### Authentication
+
+API endpoints require Bearer token authentication. Include the token in the Authorization header:
+
+```
+Authorization: Bearer <your-api-token>
+```
+
+### Rate Limiting
+
+- **Global**: 60 requests per minute
+- **Per-domain**: Configurable per competitor domain
+
+### Error Handling
+
+All errors follow RFC 7807 Problem Details format:
+
+```json
+{
+    "type": "https://api.utservio.com/errors/not-found",
+    "title": "Competitor Not Found",
+    "status": 404,
+    "detail": "Competitor with id 999 does not exist"
+}
+```
+        """,
         version="1.0.0",
         openapi_tags=OPENAPI_TAGS,
         docs_url="/docs",
@@ -131,12 +186,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from starlette.requests import Request
 
     class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next):
+        async def dispatch(self, request: Request, call_next: Any) -> Any:
             response = await call_next(request)
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:"
             )
             return response
 
@@ -158,22 +214,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(metrics.router)
     app.include_router(dashboard.router)
     app.include_router(reports.router)
-
-    try:
-        from app.observability.prometheus_metrics import router as prometheus_router
-        from app.observability.monitoring_dashboard import router as monitoring_router
-        from app.observability.apm_endpoint import router as apm_router
-
-        app.include_router(prometheus_router)
-        app.include_router(monitoring_router)
-        app.include_router(apm_router)
-    except ImportError:
-        logger.warning("observability_modules_not_available")
+    app.include_router(prometheus_router)
+    app.include_router(monitoring_router)
 
     from fastapi.responses import RedirectResponse
 
     @app.get("/", include_in_schema=False)
-    async def root():
+    async def root() -> RedirectResponse:
         return RedirectResponse(url="/dashboard")
 
     _configure_logging(settings.log_level)
@@ -194,7 +241,7 @@ def _configure_logging(log_level: str) -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.dev.set_exc_info,
             structlog.processors.TimeStamper(fmt="iso"),
-            global_log_buffer.add_log,
+            global_log_buffer.add_log,  # type: ignore[list-item]
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(numeric_level),

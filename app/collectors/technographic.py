@@ -57,7 +57,7 @@ class TechnographicCollector(BaseCollector):
 
             unique_tech = {t["name"]: t for t in detected_tech}.values()
 
-            saved = 0
+
             for tech in unique_tech:
                 existing_stmt = select(CompetitorTechStack).where(
                     CompetitorTechStack.competitor_id == competitor_id,
@@ -77,7 +77,7 @@ class TechnographicCollector(BaseCollector):
                         discovered_at=datetime.now(UTC),
                     )
                     session.add(stack_entry)
-                saved += 1
+
 
             return {
                 "status": "success",

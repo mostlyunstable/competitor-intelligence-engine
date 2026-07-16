@@ -216,7 +216,7 @@ class Preprocessor:
         count = 0
 
         # Expose aria-label
-        for el in soup.find_all(attrs={"aria-label": True}):
+        for el in soup.find_all(lambda tag: tag.has_attr("aria-label")):
             label = el.get("aria-label", "")
             if isinstance(label, list):
                 label = " ".join(label)

@@ -29,15 +29,6 @@ class RawStorageRepository(BaseRepository[RawStorage]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_latest(self, competitor_id: int) -> RawStorage | None:
-        stmt = (
-            select(RawStorage)
-            .where(RawStorage.competitor_id == competitor_id)
-            .order_by(RawStorage.id.desc())
-        )
-        result = await self._session.execute(stmt)
-        return result.scalars().first()
-
     async def upsert(
         self,
         competitor_id: int,
@@ -56,40 +47,67 @@ class RawStorageRepository(BaseRepository[RawStorage]):
         and merge the extracted data.
         Otherwise, create a new record.
         """
-        existing = await self.get_by_url(competitor_id, source_url)
-        if existing:
-            existing.storage_uri = storage_uri
-            existing.mime_type = mime_type
-            existing.file_size_bytes = file_size_bytes
-            existing.metadata_ = metadata
-            
-            # Merge extracted_data to prevent modules from overwriting each other
-            if existing.extracted_data and extracted_data:
-                merged = dict(existing.extracted_data)
-                for k, v in extracted_data.items():
-                    merged[k] = v
-                existing.extracted_data = merged
-            elif extracted_data:
-                existing.extracted_data = extracted_data
-                
-            existing.content_hash = content_hash
-            existing.collection_status = collection_status
-            existing.collected_at = datetime.now(UTC)
-            await self._session.flush()
-            return existing
-        return await self.create(
-            competitor_id=competitor_id,
-            source_url=source_url,
-            content_hash=content_hash,
-            storage_uri=storage_uri,
-            mime_type=mime_type,
-            file_size_bytes=file_size_bytes,
-            metadata_=metadata,
-            extracted_data=extracted_data,
-            collection_status=collection_status,
-        )
+        from sqlalchemy.exc import IntegrityError
+
+        try:
+            # We attempt to insert normally to rely on the DB's native constraint rather than checking first.
+            record = await self.create(
+                competitor_id=competitor_id,
+                source_url=source_url,
+                content_hash=content_hash,
+                storage_uri=storage_uri,
+                mime_type=mime_type,
+                file_size_bytes=file_size_bytes,
+                metadata_=metadata,
+                extracted_data=extracted_data,
+                collection_status=collection_status,
+            )
+            return record
+        except IntegrityError:
+            # A unique violation occurred (competitor_id, source_url).
+            # Another concurrent transaction inserted the row first.
+            # Rollback the failed insert in this session.
+            await self._session.rollback()
+
+            # Now that it definitely exists, retrieve it and update it safely.
+            existing = await self.get_by_url(competitor_id, source_url)
+            if existing:
+                existing.storage_uri = storage_uri
+                existing.mime_type = mime_type
+                existing.file_size_bytes = file_size_bytes
+                existing.metadata_ = metadata
+
+                # Merge extracted_data to prevent modules from overwriting each other
+                if existing.extracted_data and extracted_data:
+                    merged = dict(existing.extracted_data)
+                    for k, v in extracted_data.items():
+                        merged[k] = v
+                    existing.extracted_data = merged
+                elif extracted_data:
+                    existing.extracted_data = extracted_data
+
+                existing.content_hash = content_hash
+                existing.collection_status = collection_status
+                existing.collected_at = datetime.now(UTC)
+                await self._session.flush()
+                return existing
+            else:
+                # Fallback if extremely weird concurrency things happen (deleted immediately after insert)
+                raise RuntimeError(
+                    "Failed to upsert RawStorage record due to concurrent deletion."
+                ) from None
 
     async def delete_by_competitor(self, competitor_id: int) -> None:
         stmt = delete(RawStorage).where(RawStorage.competitor_id == competitor_id)
         await self._session.execute(stmt)
         await self._session.flush()
+
+    async def get_latest(self, competitor_id: int) -> RawStorage | None:
+        stmt = (
+            select(RawStorage)
+            .where(RawStorage.competitor_id == competitor_id)
+            .order_by(RawStorage.collected_at.desc(), RawStorage.id.desc())
+            .limit(1)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()

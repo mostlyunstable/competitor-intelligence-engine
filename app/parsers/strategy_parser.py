@@ -93,7 +93,8 @@ class StrategyParser:
         soup = BeautifulSoup(html, "html.parser")
 
         # Hardcoding competitor ID as 0 for generic parser loop
-        self._observer.on_page_start(url, 0, len(html), len(soup.find_all(True)))
+        element_count = sum(1 for _ in soup.find_all(True))
+        self._observer.on_page_start(url, 0, len(html), element_count)
 
         combined = ParsedResult()
 
@@ -140,12 +141,7 @@ class StrategyParser:
                 combined.count_entities()
 
                 # We need to snapshot the state before merge
-                ParsedResult()
                 # To avoid complex deepcopy issues with bs4 elements inside FieldValue, we just use the raw count
-                # The entity_profiler will inspect partial_result and combined to find exact overlaps.
-                # Actually, since `combined.merge()` mutates `combined`, we can just pass the original `combined` as `post_merge_result`
-                # and just use its current state as pre-merge.
-                # Actually, to make entity_profiler diffing perfect, let's clone the _fielded object safely if we can.
 
                 combined.merge(partial, strategy.name, strategy.weight)
 

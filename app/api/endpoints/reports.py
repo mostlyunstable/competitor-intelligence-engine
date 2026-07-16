@@ -21,7 +21,7 @@ from app.database.models import (
 from app.services.reporting_service import reporting_service
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Sequence
+    from collections.abc import Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -72,9 +72,5 @@ class ConfigSyncService:
             logger.exception("config_sync_failed")
             return {"status": "failed", "error": str(e), "synced": synced, "skipped": skipped}
 
-    def reload_config(self) -> list[Any]:
-        loader = self._get_loader()
-        return loader.reload()
-
 
 config_sync_service = ConfigSyncService()

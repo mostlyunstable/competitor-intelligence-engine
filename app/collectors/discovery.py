@@ -168,8 +168,13 @@ class DiscoveryEngine:
                     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
                     soup = BeautifulSoup(response.text, "html.parser")
 
+            # Apply the limit dynamically during parsing to prevent OOM bombs
+            max_pages = self._settings.max_pages_per_competitor
+
             for loc in soup.find_all("loc"):
                 if loc.string:
+                    if len(urls) >= max_pages:
+                        break
                     urls.append(
                         DiscoveredURL(
                             url=normalize_url(loc.string.strip(), base_url=url),
@@ -178,10 +183,15 @@ class DiscoveryEngine:
                     )
 
             for sitemap in soup.find_all("sitemap"):
+                if len(urls) >= max_pages:
+                    break
                 loc_tag = sitemap.find("loc")
                 if loc_tag and loc_tag.string:
                     sub_urls = await self._fetch_sitemaps(client, loc_tag.string.strip(), visited)
                     urls.extend(sub_urls)
+                    if len(urls) >= max_pages:
+                        urls = urls[:max_pages]
+                        break
 
             logger.info("sitemap_parsed", url=sitemap_url, urls_found=len(urls))
 

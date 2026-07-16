@@ -32,15 +32,15 @@ class ConfigurationLoader:
             logger.exception("failed_to_load_competitors_config", path=str(self._config_path))
             return []
 
+    def reload(self) -> list[CompetitorConfig]:
+        self._competitors.clear()
+        return self.load()
+
     def get_competitors(self) -> list[CompetitorConfig]:
         return list(self._competitors)
 
     def get_competitor_by_name(self, name: str) -> CompetitorConfig | None:
-        for comp in self._competitors:
-            if comp.name == name:
-                return comp
+        for c in self._competitors:
+            if c.name.lower() == name.lower():
+                return c
         return None
-
-    def reload(self) -> list[CompetitorConfig]:
-        self._competitors.clear()
-        return self.load()

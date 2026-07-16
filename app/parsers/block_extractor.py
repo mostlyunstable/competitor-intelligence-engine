@@ -287,19 +287,17 @@ class DomBlockExtractor:
             return None
         if element.name == "div":
             return element
-        soup = BeautifulSoup("<div></div>", "html.parser")
-        wrapper = soup.div
-        if wrapper is None:
-            return None
+        wrapper = Tag(name="div")
         wrapper.append(element)
         return wrapper
 
     @staticmethod
     def _wrap_sequence(elements: list[Tag]) -> Tag:
         """Wrap a sequence of sibling Tags in a single ``<div>``."""
-        html = "".join(str(el) for el in elements)
-        soup = BeautifulSoup(f"<div>{html}</div>", "html.parser")
-        return soup.div  # type: ignore[return-value]
+        wrapper = Tag(name="div")
+        for el in elements:
+            wrapper.append(el)
+        return wrapper
 
     # ------------------------------------------------------------------
     # Classification
@@ -343,11 +341,9 @@ class DomBlockExtractor:
                 # Merge into the previous block
                 prev = merged[-1]
                 if prev.element.name != "div":
-                    soup = BeautifulSoup("<div></div>", "html.parser")
-                    wrapper = soup.div
-                    if wrapper is not None:
-                        wrapper.append(prev.element)
-                        prev.element = wrapper
+                    wrapper = Tag(name="div")
+                    wrapper.append(prev.element)
+                    prev.element = wrapper
                 prev.element.append(block.element)
                 # Keep the best confidence
                 prev.confidence = max(prev.confidence, block.confidence)
@@ -406,23 +402,3 @@ class DomBlockExtractor:
     # ------------------------------------------------------------------
     # Re-export of existing segmentation (public API for get_segments)
     # ------------------------------------------------------------------
-
-    def segment(self, html: str, url: str = "") -> list[PageSegment]:
-        """Return PageSegment list using the original PageSegmenter.
-
-        This method provides backward compatibility for callers that
-        relied on the old segmentation API.
-        """
-        return self._segmenter.segment(html, url)
-
-
-# ---------------------------------------------------------------------------
-# Convenience import alias — strategies use this function
-# ---------------------------------------------------------------------------
-
-
-def page_segments(segments: list[PageSegment], *types: str) -> list[PageSegment]:
-    """Filter blocks to only those matching one of the given types."""
-    if not types:
-        return list(segments)
-    return [s for s in segments if s.segment_type in types]

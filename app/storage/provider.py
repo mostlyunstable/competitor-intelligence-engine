@@ -39,7 +39,7 @@ class LocalStorageProvider(StorageProvider):
         filename = f"{content_hash}{ext}"
         filepath = os.path.join(directory, filename)
 
-        async with aiofiles.open(filepath, mode) as f:  # type: ignore
+        async with aiofiles.open(filepath, mode) as f:
             await f.write(content)
 
         return f"file://{filepath}"
@@ -47,7 +47,7 @@ class LocalStorageProvider(StorageProvider):
     async def load(self, uri: str) -> str | bytes:
         filepath = uri.replace("file://", "")
         mode = "rb" if filepath.endswith((".png", ".bin")) else "r"
-        async with aiofiles.open(filepath, mode) as f:  # type: ignore
+        async with aiofiles.open(filepath, mode) as f:
             return cast("str | bytes", await f.read())
 
 

@@ -26,20 +26,8 @@ async def trigger_collection(
     background_tasks: BackgroundTasks,
     _auth: str = Security(verify_api_key),
 ) -> CollectResponse:
-    from app.main import message_queue
-
-    if message_queue is not None:
-        from app.messagequeue.queue import MessageType
-
-        await message_queue.publish(
-            message_type=MessageType.COLLECTION,
-            payload={"competitor_id": request.competitor_id},
-            metadata={"source": "api"},
-        )
-    else:
-        from app.services.collection_service import collection_service
-
-        background_tasks.add_task(collection_service.collect_competitor, request.competitor_id)
+    from app.services.collection_service import collection_service
+    background_tasks.add_task(collection_service.collect_competitor, request.competitor_id)
 
     return CollectResponse(
         status="accepted",
@@ -58,20 +46,8 @@ async def trigger_collection_for_competitor(
     background_tasks: BackgroundTasks,
     _auth: str = Security(verify_api_key),
 ) -> CollectResponse:
-    from app.main import message_queue
-
-    if message_queue is not None:
-        from app.messagequeue.queue import MessageType
-
-        await message_queue.publish(
-            message_type=MessageType.COLLECTION,
-            payload={"competitor_id": competitor_id},
-            metadata={"source": "api"},
-        )
-    else:
-        from app.services.collection_service import collection_service
-
-        background_tasks.add_task(collection_service.collect_competitor, competitor_id)
+    from app.services.collection_service import collection_service
+    background_tasks.add_task(collection_service.collect_competitor, competitor_id)
 
     return CollectResponse(
         status="accepted",

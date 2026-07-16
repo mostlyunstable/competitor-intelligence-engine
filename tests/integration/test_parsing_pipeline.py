@@ -119,9 +119,9 @@ class TestParsingPipeline:
 
     def test_breadcrumb_extracted(self) -> None:
         result = self.parse()
-        assert (
-            "__breadcrumb__" in result.strategy_results
-        ), f"Missing __breadcrumb__ in {list(result.strategy_results)}"
+        assert "__breadcrumb__" in result.strategy_results, (
+            f"Missing __breadcrumb__ in {list(result.strategy_results)}"
+        )
         path = result.strategy_results["__breadcrumb__"]
         assert "Home" in path
         assert "Services" in path

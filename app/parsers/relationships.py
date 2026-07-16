@@ -582,6 +582,13 @@ class RelationshipEngine:
             (ENT_FAQ, ENT_SERVICE, REL_IS_ABOUT, 0.45),
         ]
 
+        # Build set of existing relation keys for O(1) dedup lookups
+        existing_keys: set[tuple[str, str, str, str, str]] = set()
+        for r in rels:
+            existing_keys.add(
+                (r.source_type, r.source_value, r.target_type, r.target_value, r.relation)
+            )
+
         for container_id, entities in groups.items():
             # Build lookup by type
             by_type: dict[str, list[str]] = {}
@@ -602,8 +609,10 @@ class RelationshipEngine:
                         if src_type == tgt_type and src_val == tgt_val:
                             continue
                         # Skip if this exact relation already exists
-                        if _has_relation(rels, src_type, src_val, tgt_type, tgt_val, relation):
+                        key = (src_type, src_val, tgt_type, tgt_val, relation)
+                        if key in existing_keys:
                             continue
+                        existing_keys.add(key)
                         rels.append(
                             Relationship(
                                 src_type,
@@ -718,20 +727,3 @@ def _best_substring_match(
                     best = (cand, ratio)
 
     return best[0] if best[1] >= min_ratio else None
-
-
-def _has_relation(
-    rels: list[Relationship],
-    src_type: str,
-    src_val: str,
-    tgt_type: str,
-    tgt_val: str,
-    relation: str,
-) -> bool:
-    """Check if a relationship already exists in the list."""
-    key = (src_type, src_val, tgt_type, tgt_val, relation)
-    for r in rels:
-        rk = (r.source_type, r.source_value, r.target_type, r.target_value, r.relation)
-        if rk == key:
-            return True
-    return False

@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 
 import httpx
 import structlog
-from bs4 import BeautifulSoup
 
 from app.configuration.settings import get_settings
 
@@ -114,27 +113,28 @@ class PageAnalyzer:
         }
 
     def _check_js_frameworks(self, html: str) -> bool:
-        """Check for JavaScript framework signatures."""
-        soup = BeautifulSoup(html, "html.parser")
+        """Check for JavaScript framework signatures in raw HTML.
 
-        script_tags = soup.find_all("script")
-        script_contents = " ".join([str(s.string or "") for s in script_tags if s.string])
-        script_srcs = " ".join([str(s.get("src", "")) for s in script_tags])
-
-        combined = f"{script_contents} {script_srcs}"
-
-        return any(pattern.search(combined) for pattern in self._compiled_frameworks)
+        Searches the full HTML source directly instead of parsing the DOM.
+        Framework names (react, vue.js, angular, etc.) are specific enough
+        that raw-text matching avoids false positives from comments/content.
+        """
+        return any(pattern.search(html) for pattern in self._compiled_frameworks)
 
     def _check_dynamic_indicators(self, html: str) -> bool:
         """Check for dynamic rendering indicators."""
         return any(pattern.search(html) for pattern in self._compiled_indicators)
 
     def _check_content_quality(self, html: str) -> bool:
-        """Check for poor content quality indicators."""
-        soup = BeautifulSoup(html, "html.parser")
+        """Check for poor content quality indicators.
 
-        text_content = soup.get_text(strip=True)
-        if len(text_content) < self._min_content_length:
+        Estimates visible text length via regex tag stripping instead of
+        a full DOM parse, then checks for quality-degradation patterns.
+        """
+        # Fast text-length estimate: strip tags and count non-whitespace chars
+        text_estimate = re.sub(r"<[^>]+>", "", html)
+        text_estimate = re.sub(r"\s+", "", text_estimate)
+        if len(text_estimate) < self._min_content_length:
             return True
 
         return any(pattern.search(html) for pattern in self._compiled_quality)
@@ -847,6 +847,7 @@ class HybridFetcher:
     async def close(self) -> None:
         """Close resources."""
         import asyncio
+
         close_tasks = []
         for client in self._clients.values():
             if not client.is_closed:

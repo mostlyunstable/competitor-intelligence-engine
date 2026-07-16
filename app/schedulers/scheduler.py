@@ -9,6 +9,7 @@ from app.configuration.settings import get_settings
 from app.database.connection import db_manager
 from app.database.models import CollectionFrequency, CollectionLog
 from app.database.repositories.competitor_repository import CompetitorRepository
+from app.services.collection_service import collection_service
 
 logger = structlog.get_logger(__name__)
 
@@ -93,31 +94,19 @@ class CollectionScheduler:
                 frequency=freq_val,
             )
             try:
-                await self._publish_collection_job(comp_id)
+                # Timeout of 30 minutes to prevent infinite hangs in one competitor affecting others
+                await asyncio.wait_for(
+                    collection_service.collect_competitor(comp_id), timeout=1800.0
+                )
+            except TimeoutError:
+                logger.error("scheduled_collection_timed_out", competitor_id=comp_id)
             except Exception:
                 logger.exception(
                     "publish_collection_job_failed",
                     competitor_id=comp_id,
                 )
 
-    async def _publish_collection_job(self, competitor_id: int) -> None:
-        """Publish a collection job to the message queue."""
-        from app.main import message_queue
 
-        if message_queue is not None:
-            from app.messagequeue.queue import MessageType
-
-            await message_queue.publish(
-                message_type=MessageType.COLLECTION,
-                payload={"competitor_id": competitor_id},
-                metadata={"source": "scheduler"},
-            )
-            logger.info("collection_job_published", competitor_id=competitor_id)
-        else:
-            from app.services.collection_service import collection_service
-
-            logger.warning("queue_unavailable_executing_directly", competitor_id=competitor_id)
-            await collection_service.collect_competitor(competitor_id)
 
     async def _get_last_collection_log(self, session: Any, competitor_id: int) -> Any:
         from app.database.repositories.collection_log_repository import CollectionLogRepository
@@ -131,10 +120,14 @@ class CollectionScheduler:
         if not last_log or not last_log.start_time:
             return True
 
+        if last_log.success is False:
+            return True
+
         interval_map = {
             CollectionFrequency.HOURLY: 3600,
             CollectionFrequency.DAILY: 86400,
             CollectionFrequency.WEEKLY: 604800,
+            CollectionFrequency.MONTHLY: 2592000,
         }
         interval = interval_map.get(frequency, 86400)
         start_time = last_log.start_time
