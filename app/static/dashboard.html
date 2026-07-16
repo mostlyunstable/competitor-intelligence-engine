@@ -877,9 +877,9 @@
             const res = await fetch(`/api/dashboard/extracted/${id}?t=${Date.now()}`);
             const data = await res.json();
             if (data.data && data.data.pricing && data.data.pricing.length > 0) {
-                let csv = "Tier,Price,Currency,Billing\n";
+                let csv = "Service Name,Base Price,Promotional Price,Currency\n";
                 data.data.pricing.forEach(p => {
-                    csv += `"${(p.tier_name || '').replace(/"/g, '""')}","${p.price || ''}","${p.currency || ''}","${p.billing_period || ''}"\n`;
+                    csv += `"${(p.service_name || '').replace(/"/g, '""')}","${p.base_price || ''}","${p.promotional_price || ''}","${p.currency || ''}"\n`;
                 });
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = window.URL.createObjectURL(blob);

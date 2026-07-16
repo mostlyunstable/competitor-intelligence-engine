@@ -420,10 +420,9 @@ async def export_zip(session: AsyncSession = Depends(get_session)):
     from app.database.models import RawStorage
     
     from sqlalchemy import cast, String
-    # [BUG FIX]: Use DB-level text searching and limits to prevent OOM
+    # [BUG FIX]: Removed text search on undefined 'q' to prevent crashes.
     stmt = select(RawStorage).where(
-        RawStorage.extracted_data.isnot(None),
-        cast(RawStorage.extracted_data, String).ilike(f"%{q}%")
+        RawStorage.extracted_data.isnot(None)
     ).order_by(RawStorage.collected_at.desc()).limit(100)
     result = await session.execute(stmt)
     raw_storages = result.scalars().all()
