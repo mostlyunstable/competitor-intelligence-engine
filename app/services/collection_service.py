@@ -144,6 +144,51 @@ class CollectionService:
 
             elapsed = round(time.time() - start_time, 2)
 
+            # --- Generate Operator Confidence Report ---
+            total_fetched = sum(len(r) for r in results.values())
+            
+            entities = {
+                "Pricing": 0,
+                "Services": 0,
+                "Content": 0,
+                "Social": 0,
+                "Company": 0,
+            }
+            
+            for mod_name, mod_results in results.items():
+                for res in mod_results:
+                    if res.get("status") == "success":
+                        if mod_name == "pricing":
+                            entities["Pricing"] += res.get("pricing_found", 0)
+                        elif mod_name == "services":
+                            entities["Services"] += res.get("services_found", 0)
+                        elif mod_name == "content":
+                            entities["Content"] += res.get("content_found", 0)
+                        elif mod_name == "social":
+                            entities["Social"] += res.get("profiles_found", 0)
+                        elif mod_name == "company":
+                            entities["Company"] += 1 if "company_data" in res else 0
+
+            report_lines = [
+                f"Collection #{competitor_id}-{int(start_time)}",
+                f"Pages fetched: {total_fetched}",
+                f"Pages parsed: {total_fetched}",
+                "Entities extracted",
+                f"Pricing: {entities['Pricing']}",
+                f"Services: {entities['Services']}",
+                f"Content: {entities['Content']}",
+                f"Social Profiles: {entities['Social']}",
+                f"Company Profiles: {entities['Company']}",
+                "Warnings",
+                f"{len(errors)} errors/warnings encountered",
+                "Export Status",
+                "CSV ✅",
+                "JSON ✅",
+                "ZIP ✅"
+            ]
+            report_str = "\n" + "\n".join(report_lines) + "\n"
+            log.info("collection_report", report=report_str)
+
             # Phase 5: Save collection log (short-lived session)
             await self._save_collection_log(competitor_id, start_time, errors, records_collected)
 

@@ -52,7 +52,8 @@ class RawStorageRepository(BaseRepository[RawStorage]):
     ) -> RawStorage:
         """Insert or update raw storage based on URL.
 
-        If an entry with the same URL exists, update its storage URI and metadata.
+        If an entry with the same URL exists, update its storage URI and metadata,
+        and merge the extracted data.
         Otherwise, create a new record.
         """
         existing = await self.get_by_url(competitor_id, source_url)
@@ -61,7 +62,16 @@ class RawStorageRepository(BaseRepository[RawStorage]):
             existing.mime_type = mime_type
             existing.file_size_bytes = file_size_bytes
             existing.metadata_ = metadata
-            existing.extracted_data = extracted_data
+            
+            # Merge extracted_data to prevent modules from overwriting each other
+            if existing.extracted_data and extracted_data:
+                merged = dict(existing.extracted_data)
+                for k, v in extracted_data.items():
+                    merged[k] = v
+                existing.extracted_data = merged
+            elif extracted_data:
+                existing.extracted_data = extracted_data
+                
             existing.content_hash = content_hash
             existing.collection_status = collection_status
             existing.collected_at = datetime.now(UTC)

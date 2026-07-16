@@ -7,7 +7,7 @@ async def main():
     
     svc = CollectionService()
     print("Starting collection for competitor ID 6 (Urban Company)...")
-    result = await svc.collect_competitor(6)
+    result = await svc.collect_competitor(4)
     
     print("\nCollection Result:")
     print(result)
