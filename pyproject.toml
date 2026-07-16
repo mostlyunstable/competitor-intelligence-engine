@@ -37,6 +37,7 @@ dependencies = [
     "openai>=1.58,<2",
     "psutil>=6.1,<7",
     "playwright-stealth>=1.0.6,<2",
+    "requests>=2.31,<3",
 ]
 
 [project.optional-dependencies]

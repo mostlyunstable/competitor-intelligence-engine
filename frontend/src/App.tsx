@@ -15,7 +15,8 @@ const AuthContext = createContext<{
   isAuthenticated: boolean
   login: (u: string, p: string) => void
   logout: () => void
-}>({ isAuthenticated: false, login: () => {}, logout: () => {} })
+  markUnauthenticated: () => void
+}>({ isAuthenticated: false, login: () => {}, logout: () => {}, markUnauthenticated: () => {} })
 
 export const useAuth = () => useContext(AuthContext)
 
@@ -38,8 +39,12 @@ export default function App() {
     setIsAuthenticated(false)
   }
 
+  const markUnauthenticated = () => {
+    setIsAuthenticated(false)
+  }
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, login, logout, markUnauthenticated }}>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

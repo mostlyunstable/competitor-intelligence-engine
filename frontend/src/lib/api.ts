@@ -30,19 +30,27 @@ class ApiClient {
       headers['Authorization'] = `Basic ${this.credentials}`
     }
 
-    const response = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers,
-    })
+    let response: Response
+    try {
+      response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+      })
+    } catch (e: any) {
+      throw new Error('Backend is unreachable — try again in a moment')
+    }
 
     if (response.status === 401) {
-      this.clearCredentials()
-      throw new Error('Unauthorized')
+      throw new Error('Invalid credentials — please log in again')
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }))
-      throw new Error(error.detail || `HTTP ${response.status}`)
+      let detail = `Request failed (HTTP ${response.status})`
+      try {
+        const body = await response.json()
+        if (body.detail) detail = body.detail
+      } catch {}
+      throw new Error(detail)
     }
 
     if (response.status === 204) return undefined as T
@@ -192,6 +200,15 @@ class ApiClient {
   // Telemetry
   async getTelemetry() {
     return this.request<any>('/api/dashboard/telemetry')
+  }
+
+  // Config
+  async getConfig() {
+    return this.request<any>('/api/dashboard/config')
+  }
+
+  async resyncConfig() {
+    return this.request<any>('/api/dashboard/config/resync', { method: 'POST' })
   }
 
   // Extracted Data

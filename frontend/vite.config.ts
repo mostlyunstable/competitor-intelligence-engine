@@ -22,18 +22,6 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
-      '/competitors': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/collection': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/reports': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
     },
   },
 })

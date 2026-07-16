@@ -24,7 +24,7 @@ export default function LogsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Collection Logs</h1>
+        <h1 className="text-2xl font-bold text-surface-900">Collection Logs</h1>
         <button onClick={refresh} className="btn-secondary">Refresh</button>
       </div>
 
@@ -32,8 +32,8 @@ export default function LogsPage() {
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <Filter size={14} className="text-gray-400" />
-            <span className="text-sm text-gray-500">Filters:</span>
+            <Filter size={14} className="text-surface-400" />
+            <span className="text-sm text-surface-500">Filters:</span>
           </div>
           <input
             type="number"
@@ -61,7 +61,7 @@ export default function LogsPage() {
       {/* Logs Table */}
       <div className="card overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-surface-50 border-b border-surface-200">
             <tr>
               <th className="table-header">Status</th>
               <th className="table-header">Competitor</th>
@@ -72,16 +72,16 @@ export default function LogsPage() {
               <th className="table-header">Retries</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-surface-50">
             {loading && logs.length === 0 ? (
               [...Array(5)].map((_, i) => (
                 <tr key={i}><td colSpan={7} className="p-4"><div className="skeleton h-10 w-full" /></td></tr>
               ))
             ) : logs.length === 0 ? (
-              <tr><td colSpan={7} className="p-8 text-center text-gray-400">No logs found</td></tr>
+              <tr><td colSpan={7} className="p-8 text-center text-surface-400">No logs found</td></tr>
             ) : (
               logs.map((log: any) => (
-                <tr key={log.id} className="hover:bg-gray-50">
+                <tr key={log.id} className="hover:bg-surface-50">
                   <td className="table-cell">
                     {log.success ? (
                       <span className="badge-success">Success</span>
@@ -90,8 +90,8 @@ export default function LogsPage() {
                     )}
                   </td>
                   <td className="table-cell font-medium">{log.competitor_name || `#${log.competitor_id}`}</td>
-                  <td className="table-cell text-gray-500 text-xs">{formatDate(log.start_time)}</td>
-                  <td className="table-cell text-gray-500">{log.duration_seconds ? `${log.duration_seconds.toFixed(1)}s` : '-'}</td>
+                  <td className="table-cell text-surface-500 text-xs">{formatDate(log.start_time)}</td>
+                  <td className="table-cell text-surface-500">{log.duration_seconds ? `${log.duration_seconds.toFixed(1)}s` : '-'}</td>
                   <td className="table-cell">{log.records_collected}</td>
                   <td className="table-cell">
                     {log.errors?.length > 0 ? (
@@ -107,8 +107,8 @@ export default function LogsPage() {
           </tbody>
         </table>
 
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
+        <div className="px-4 py-3 border-t border-surface-100 flex items-center justify-between">
+          <span className="text-sm text-surface-500">
             Page {page} of {totalPages} ({data?.total || 0} total)
           </span>
           <div className="flex items-center gap-2">

@@ -3,7 +3,7 @@ from fastapi.responses import PlainTextResponse
 
 from app.utilities.metrics import metrics
 
-router = APIRouter(tags=["metrics"])
+router = APIRouter(tags=["Metrics"])
 
 
 @router.get("/metrics", response_class=PlainTextResponse)

@@ -53,12 +53,33 @@ class ServiceCollector(BaseCollector):
             services_updated = 0
 
             # Check existence before native upsert to track created vs updated
+            skipped_count = 0
             for svc in services:
-                service_name = svc.get("name", "Unknown")
-                service_category = svc.get("category")
-                description = svc.get("description")
+                service_name = (svc.get("name") or "").strip()
+                if not service_name or len(service_name) > 500:
+                    skipped_count += 1
+                    continue
+
+                service_category = (svc.get("category") or "").strip() or None
+                if service_category and len(service_category) > 200:
+                    service_category = service_category[:200]
+
+                description = (svc.get("description") or "").strip() or None
+                if description and len(description) > 2000:
+                    description = description[:2000]
+
                 starting_price = svc.get("starting_price")
-                currency = svc.get("currency", "USD")
+                if starting_price is not None:
+                    try:
+                        starting_price = float(starting_price)
+                        if starting_price < 0:
+                            starting_price = None
+                    except (ValueError, TypeError):
+                        starting_price = None
+
+                currency = (svc.get("currency") or "USD").strip().upper()
+                if len(currency) != 3:
+                    currency = "USD"
 
                 content_hash = compute_service_hash(
                     service_name, service_category, description, starting_price, currency
@@ -86,6 +107,7 @@ class ServiceCollector(BaseCollector):
                 "services_found": len(services),
                 "services_created": services_created,
                 "services_updated": services_updated,
+                "services_skipped": skipped_count,
                 "elapsed_seconds": self._elapsed(start_time),
             }
         except Exception as e:

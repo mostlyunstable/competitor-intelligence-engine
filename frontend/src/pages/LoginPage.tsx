@@ -37,18 +37,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-surface-950 via-surface-900 to-surface-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-2xl">U</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Utservio</h1>
-          <p className="text-gray-500 mt-1">Competitor Intelligence Dashboard</p>
+          <h1 className="text-2xl font-bold text-white">Utservio</h1>
+          <p className="text-surface-400 mt-1">Competitor Intelligence Dashboard</p>
         </div>
 
-        <div className="card p-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Sign In</h2>
+        <div className="card p-8 bg-surface-900 border-surface-800">
+          <h2 className="text-lg font-semibold text-white mb-6">Sign In</h2>
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -58,14 +58,14 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
+              <label className="block text-sm font-medium text-surface-300 mb-1.5">Username</label>
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="input pl-9"
+                  className="input pl-9 bg-surface-800 border-surface-700 text-white placeholder-surface-500 focus:ring-brand-500 focus:border-brand-500"
                   placeholder="admin"
                   required
                 />
@@ -73,14 +73,14 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+              <label className="block text-sm font-medium text-surface-300 mb-1.5">Password</label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-9"
+                  className="input pl-9 bg-surface-800 border-surface-700 text-white placeholder-surface-500 focus:ring-brand-500 focus:border-brand-500"
                   placeholder="Enter password"
                   required
                 />
@@ -92,7 +92,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-4 text-xs text-center text-gray-400">
+          <p className="mt-4 text-xs text-center text-surface-500">
             Default: admin / admin123
           </p>
         </div>

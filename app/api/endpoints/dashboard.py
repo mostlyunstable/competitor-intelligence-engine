@@ -7,12 +7,13 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import cast, func, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_session
+from app.configuration.settings import get_settings
 from app.database.connection import db_manager
 from app.database.models import (
     CollectionFrequency,
@@ -49,7 +50,7 @@ def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) ->
     return credentials.username
 
 
-router = APIRouter(tags=["dashboard"], dependencies=[Depends(verify_credentials)])
+router = APIRouter(tags=["Dashboard"], dependencies=[Depends(verify_credentials)])
 
 
 class CompetitorCreate(BaseModel):
@@ -60,6 +61,34 @@ class CompetitorCreate(BaseModel):
     modules: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     notes: str | None = None
+
+    @field_validator("website_url")
+    @classmethod
+    def validate_url(cls, v: Any) -> Any:
+        import socket
+        from urllib.parse import urlparse
+
+        if not v or not v.strip():
+            raise ValueError("Website URL is required.")
+
+        v = v.strip()
+
+        parsed = urlparse(v)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("URL must start with http:// or https://")
+
+        domain = parsed.hostname
+        if not domain or "." not in domain:
+            raise ValueError("URL must contain a valid domain (e.g. https://example.com)")
+
+        try:
+            ip = socket.gethostbyname(domain)
+            if ip.startswith("127.") or ip.startswith("169.254.") or ip.startswith("10.") or ip.startswith("192.168."):
+                raise ValueError("Internal or private IPs are forbidden (SSRF Protection).")
+        except socket.gaierror:
+            raise ValueError(f"Could not resolve domain '{domain}'. Check the URL.")
+
+        return v
 
 
 class CompetitorUpdate(BaseModel):
@@ -219,13 +248,13 @@ async def get_competitor_detail(
             "created_at": comp.created_at.isoformat() if comp.created_at else None,
             "updated_at": comp.updated_at.isoformat() if comp.updated_at else None,
         },
-        "services": [{"id": s.id, "name": s.name, "description": s.description, "collected_at": s.collected_at.isoformat() if s.collected_at else None} for s in services],
+        "services": [{"id": s.id, "name": s.service_name, "description": s.description, "collected_at": s.collected_at.isoformat() if s.collected_at else None} for s in services],
         "pricing": [{"id": p.id, "service_name": p.service_name, "base_price": float(p.base_price) if p.base_price else None, "currency": p.currency, "category": p.category, "collected_at": p.collected_at.isoformat() if p.collected_at else None} for p in pricing],
         "content": [{"id": c.id, "title": c.title, "url": c.url, "content_type": c.content_type, "collected_at": c.collected_at.isoformat() if c.collected_at else None} for c in content],
-        "social": [{"id": s.id, "platform": s.platform, "url": s.url, "username": s.username, "collected_at": s.collected_at.isoformat() if s.collected_at else None} for s in social],
+        "social": [{"id": s.id, "platform": s.platform.value if hasattr(s.platform, 'value') else s.platform, "url": s.profile_url, "username": s.username, "collected_at": s.collected_at.isoformat() if s.collected_at else None} for s in social],
         "tech_stack": [{"id": t.id, "technology_name": t.technology_name, "category": t.category, "confidence": float(t.confidence) if t.confidence else None} for t in tech],
         "sources": [{"id": s.id, "url": s.url, "page_type": s.page_type, "is_active": s.is_active, "last_crawled_at": s.last_crawled_at.isoformat() if s.last_crawled_at else None} for s in sources],
-        "pages": [{"id": p.id, "url": p.url, "status_code": p.status_code, "title": p.title} for p in pages],
+        "pages": [{"id": p.id, "url": p.source.url if p.source else None, "status_code": p.metadata_.get("status_code") if p.metadata_ else None, "title": p.extracted_data.get("title") if p.extracted_data else None} for p in pages],
         "collection_logs": [{"id": l.id, "start_time": l.start_time.isoformat() if l.start_time else None, "success": l.success, "duration_seconds": float(l.duration_seconds) if l.duration_seconds else None, "records_collected": l.records_collected} for l in logs],
     }
 
@@ -236,9 +265,15 @@ async def create_dashboard_competitor(
 ) -> dict[str, Any]:
     from sqlalchemy.exc import IntegrityError
 
+    if not payload.name or not payload.name.strip():
+        raise HTTPException(status_code=422, detail="Competitor name is required")
+
+    if not payload.website_url or not payload.website_url.strip():
+        raise HTTPException(status_code=422, detail="Website URL is required")
+
     comp = Competitor(
-        name=payload.name,
-        website_url=payload.website_url,
+        name=payload.name.strip(),
+        website_url=payload.website_url.strip(),
         enabled=payload.enabled,
         collection_frequency=payload.collection_frequency,
         modules=payload.modules,
@@ -250,7 +285,10 @@ async def create_dashboard_competitor(
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        raise HTTPException(status_code=409, detail="A competitor with this name already exists.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"A competitor named '{payload.name.strip()}' already exists. Choose a different name.",
+        )
     await session.refresh(comp)
     return {"id": comp.id, "name": comp.name, "website_url": comp.website_url, "status": "created"}
 
@@ -425,8 +463,8 @@ async def get_dashboard_stats(
 
     running_jobs = 0
     try:
-        from app.messagequeue import MessageQueue
-        queue_stats = await message_queue.get_stats()
+        from app.main import message_queue as mq
+        queue_stats = await mq.get_stats()
         running_jobs = queue_stats.get("queue_size", 0)
     except Exception:
         pass
@@ -641,6 +679,37 @@ async def resume_scheduler() -> dict[str, str]:
     return {"status": "resumed", "message": "Scheduler resumed"}
 
 
+# --- Config Re-sync ---
+
+@router.post("/api/dashboard/config/resync")
+async def resync_config() -> dict[str, Any]:
+    from app.services.config_sync_service import config_sync_service
+    result = config_sync_service.reload_config()
+    synced = await config_sync_service.sync_competitors()
+    return {"status": "success", "reloaded": len(result), "synced": synced}
+
+
+@router.get("/api/dashboard/config")
+async def get_config() -> dict[str, Any]:
+    settings = get_settings()
+    return {
+        "environment": settings.environment,
+        "debug": settings.debug,
+        "queue_backend": settings.queue.backend,
+        "webhooks_enabled": settings.webhook.enabled,
+        "webhooks_slack": bool(settings.webhook.slack_webhook_url),
+        "webhooks_teams": bool(settings.webhook.teams_webhook_url),
+        "llm_enabled": settings.llm.enabled,
+        "llm_provider": settings.llm.provider,
+        "llm_model": settings.llm.model_name,
+        "cache_enabled": settings.cache.enabled,
+        "stealth_enabled": settings.stealth.enabled,
+        "scheduler_enabled": settings.scheduler.enabled,
+        "scheduler_interval": settings.scheduler.check_interval_seconds,
+        "config_path": settings.competitors_config_path,
+    }
+
+
 # ─── Search ─────────────────────────────────────────────────────────────────
 
 
@@ -815,6 +884,7 @@ async def get_raw_html(
 
 @router.get("/api/dashboard/export/zip")
 async def export_zip(session: AsyncSession = Depends(get_session)):
+    import io
     import zipfile
 
     stmt = (
@@ -873,9 +943,9 @@ async def get_system_health(session: AsyncSession = Depends(get_session)) -> dic
     }
 
     try:
-        from app.messagequeue import MessageQueue
+        from app.main import message_queue as mq
 
-        q_stats = await message_queue.get_stats()
+        q_stats = await mq.get_stats()
         checks["queue"] = {
             "status": "healthy",
             "queue_size": q_stats.get("queue_size", 0),

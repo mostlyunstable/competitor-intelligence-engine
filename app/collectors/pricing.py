@@ -52,13 +52,39 @@ class PricingCollector(BaseCollector):
             pricing_repo = CompetitorPricingRepository(session)
             pricing_created = 0
             pricing_updated = 0
+            skipped_count = 0
 
             for item in pricing_items:
-                service_name = item.get("service_name", "Unknown")
-                category = item.get("category")
+                service_name = (item.get("service_name") or "").strip()
+                if not service_name or len(service_name) > 500:
+                    skipped_count += 1
+                    continue
+
+                category = (item.get("category") or "").strip() or None
+                if category and len(category) > 200:
+                    category = category[:200]
+
                 base_price = item.get("base_price")
+                if base_price is not None:
+                    try:
+                        base_price = float(base_price)
+                        if base_price < 0:
+                            base_price = None
+                    except (ValueError, TypeError):
+                        base_price = None
+
                 promotional_price = item.get("promotional_price")
-                currency = item.get("currency", "USD")
+                if promotional_price is not None:
+                    try:
+                        promotional_price = float(promotional_price)
+                        if promotional_price < 0:
+                            promotional_price = None
+                    except (ValueError, TypeError):
+                        promotional_price = None
+
+                currency = (item.get("currency") or "USD").strip().upper()
+                if len(currency) != 3:
+                    currency = "USD"
 
                 content_hash = compute_pricing_hash(
                     service_name, category, base_price, promotional_price, currency
@@ -87,6 +113,7 @@ class PricingCollector(BaseCollector):
                 "pricing_found": len(pricing_items),
                 "pricing_created": pricing_created,
                 "pricing_updated": pricing_updated,
+                "pricing_skipped": skipped_count,
                 "elapsed_seconds": self._elapsed(start_time),
             }
         except Exception as e:

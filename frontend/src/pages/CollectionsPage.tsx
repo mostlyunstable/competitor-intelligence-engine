@@ -34,7 +34,7 @@ export default function CollectionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Collection Monitoring</h1>
+        <h1 className="text-2xl font-bold text-surface-900">Collection Monitoring</h1>
         <div className="flex items-center gap-2">
           {schedulerStatus?.is_running ? (
             <button onClick={handlePauseScheduler} className="btn-secondary">
@@ -54,24 +54,24 @@ export default function CollectionsPage() {
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="stat-card">
-          <Activity size={18} className="text-blue-600" />
+          <Activity size={18} className="text-brand-600" />
           <div className="text-xl font-bold">{stats?.collections_running || 0}</div>
-          <div className="text-xs text-gray-500">Running Now</div>
+          <div className="text-xs text-surface-500">Running Now</div>
         </div>
         <div className="stat-card">
           <Clock size={18} className="text-yellow-600" />
           <div className="text-xl font-bold">{stats?.queue_size || 0}</div>
-          <div className="text-xs text-gray-500">Queued Jobs</div>
+          <div className="text-xs text-surface-500">Queued Jobs</div>
         </div>
         <div className="stat-card">
-          <CheckCircle size={18} className="text-green-600" />
+          <CheckCircle size={18} className="text-emerald-600" />
           <div className="text-xl font-bold">{stats?.successful_collections || 0}</div>
-          <div className="text-xs text-gray-500">Successful</div>
+          <div className="text-xs text-surface-500">Successful</div>
         </div>
         <div className="stat-card">
           <XCircle size={18} className="text-red-600" />
           <div className="text-xl font-bold">{stats?.failed_collections || 0}</div>
-          <div className="text-xs text-gray-500">Failed</div>
+          <div className="text-xs text-surface-500">Failed</div>
         </div>
       </div>
 
@@ -79,15 +79,15 @@ export default function CollectionsPage() {
       <div className="card p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${schedulerStatus?.is_running ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+            <div className={`w-3 h-3 rounded-full ${schedulerStatus?.is_running ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
             <div>
-              <h3 className="font-semibold text-gray-900">Scheduler</h3>
-              <p className="text-sm text-gray-500">
+              <h3 className="font-semibold text-surface-900">Scheduler</h3>
+              <p className="text-sm text-surface-500">
                 {schedulerStatus?.is_running ? `Running (check every ${schedulerStatus.interval_seconds}s)` : 'Stopped'}
               </p>
             </div>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-surface-500">
             Last collection: {stats?.last_collection ? timeAgo(stats.last_collection) : 'Never'}
           </div>
         </div>
@@ -95,8 +95,8 @@ export default function CollectionsPage() {
 
       {/* Collection Timeline */}
       <div className="card">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Collection History</h2>
+        <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between">
+          <h2 className="font-semibold text-surface-900">Collection History</h2>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -107,31 +107,31 @@ export default function CollectionsPage() {
             />
           </div>
         </div>
-        <div className="divide-y divide-gray-50 max-h-[600px] overflow-auto">
+        <div className="divide-y divide-surface-50 max-h-[600px] overflow-auto">
           {loading && logs.length === 0 ? (
             [...Array(5)].map((_, i) => (
               <div key={i} className="p-4"><div className="skeleton h-16 w-full" /></div>
             ))
           ) : logs.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">No collection logs yet</div>
+            <div className="p-8 text-center text-surface-400">No collection logs yet</div>
           ) : (
             logs.map((log: any) => (
-              <div key={log.id} className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50">
+              <div key={log.id} className="px-5 py-4 flex items-center gap-4 hover:bg-surface-50">
                 {log.success ? (
-                  <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
+                  <CheckCircle size={20} className="text-emerald-500 flex-shrink-0" />
                 ) : (
                   <XCircle size={20} className="text-red-500 flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm text-gray-900">
+                    <span className="font-medium text-sm text-surface-900">
                       {log.competitor_name || `Competitor #${log.competitor_id}`}
                     </span>
                     <span className={`badge ${log.success ? 'badge-success' : 'badge-danger'}`}>
                       {log.success ? 'Success' : 'Failed'}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">
+                  <div className="text-xs text-surface-400 mt-1">
                     {formatDate(log.start_time)} &middot; {log.duration_seconds ? `${log.duration_seconds.toFixed(1)}s` : '-'} &middot; {log.records_collected} records
                   </div>
                   {log.errors?.length > 0 && (

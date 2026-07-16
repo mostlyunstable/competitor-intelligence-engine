@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 
 from app.api.auth import verify_api_key
+from app.api.dependencies import get_session
 from app.database.connection import db_manager
 from app.database.models import (
     CollectionLog,
@@ -24,12 +25,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/reports", tags=["reports"])
-
-
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with db_manager.session() as session:
-        yield session
+router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
 @router.get("/collection/{log_id}")
@@ -108,22 +104,36 @@ async def get_diff_report(
     if not after_log or after_log.competitor_id != competitor_id:
         raise HTTPException(status_code=404, detail="After log not found for this competitor")
 
-    async def _fetch(model: Any) -> Sequence[Any]:
-        result = await session.execute(select(model).where(model.competitor_id == competitor_id))
+    async def _fetch_before(model: Any) -> Sequence[Any]:
+        result = await session.execute(
+            select(model).where(
+                model.competitor_id == competitor_id,
+                model.collected_at <= before_log.start_time,
+            )
+        )
+        return result.scalars().all()
+
+    async def _fetch_after(model: Any) -> Sequence[Any]:
+        result = await session.execute(
+            select(model).where(
+                model.competitor_id == competitor_id,
+                model.collected_at <= after_log.start_time,
+            )
+        )
         return result.scalars().all()
 
     report = await reporting_service.compute_diff(
         competitor,
         before_log,
         after_log,
-        await _fetch(CompetitorService),
-        await _fetch(CompetitorService),
-        await _fetch(CompetitorPricing),
-        await _fetch(CompetitorPricing),
-        await _fetch(CompetitorContent),
-        await _fetch(CompetitorContent),
-        await _fetch(CompetitorSocial),
-        await _fetch(CompetitorSocial),
+        await _fetch_before(CompetitorService),
+        await _fetch_after(CompetitorService),
+        await _fetch_before(CompetitorPricing),
+        await _fetch_after(CompetitorPricing),
+        await _fetch_before(CompetitorContent),
+        await _fetch_after(CompetitorContent),
+        await _fetch_before(CompetitorSocial),
+        await _fetch_after(CompetitorSocial),
     )
 
     return {

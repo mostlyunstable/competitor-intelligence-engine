@@ -1,6 +1,8 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import asyncio
+
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +17,7 @@ logger = structlog.get_logger(__name__)
 
 # Global message queue (initialized at module level, configured in lifespan)
 message_queue = None
+_queue_worker_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
@@ -30,7 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await db_manager.create_tables()
 
     from app.messagequeue import MessageQueue
-    from app.messagequeue.queue import InMemoryQueueBackend, MessageType
+    from app.messagequeue.queue import MessageType
 
     message_queue = MessageQueue()
 
@@ -46,6 +49,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     message_queue.set_handler(MessageType.COLLECTION, _collection_handler)
 
     app.state.message_queue = message_queue
+
+    async def _queue_worker():
+        """Background task that continuously processes messages from the queue."""
+        logger.info("queue_worker_started")
+        while True:
+            try:
+                processed = await message_queue.process_all(max_messages=10)
+                if processed == 0:
+                    await asyncio.sleep(2)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.exception("queue_worker_error")
+                await asyncio.sleep(5)
+
+    global _queue_worker_task
+    _queue_worker_task = asyncio.create_task(_queue_worker())
 
     from app.services.config_sync_service import config_sync_service
 
@@ -67,6 +87,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
 
     yield
+
+    if _queue_worker_task and not _queue_worker_task.done():
+        _queue_worker_task.cancel()
+        try:
+            await _queue_worker_task
+        except asyncio.CancelledError:
+            pass
 
     from app.schedulers.scheduler import scheduler as sched
 

@@ -1,5 +1,3 @@
-from enum import StrEnum
-
 from fastapi import APIRouter, Depends, HTTPException, Security
 from pydantic import BaseModel, Field, field_validator, HttpUrl
 from typing import Any
@@ -7,19 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import verify_api_key
 from app.api.dependencies import get_session
+from app.configuration.models import CollectionModule
 from app.database.models import CollectionFrequency, Competitor
 from app.database.repositories.competitor_repository import CompetitorRepository
 
 router = APIRouter(prefix="/competitors", tags=["Competitors"])
-
-
-class CollectionModule(StrEnum):
-    DISCOVERY = "discovery"
-    COMPANY = "company"
-    SERVICES = "services"
-    PRICING = "pricing"
-    CONTENT = "content"
-    SOCIAL = "social"
 
 
 class CompetitorCreate(BaseModel):

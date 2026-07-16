@@ -52,15 +52,24 @@ class SocialCollector(BaseCollector):
             social_repo = CompetitorSocialRepository(session)
             profiles_created = 0
             profiles_updated = 0
+            skipped_count = 0
             for profile in profiles:
-                platform_str = profile.get("platform", "")
+                platform_str = (profile.get("platform") or "").strip().lower()
                 try:
                     platform = SocialPlatform(platform_str)
                 except ValueError:
+                    skipped_count += 1
                     continue
 
-                profile_url = normalize_url(profile.get("profile_url", ""), base_url=url)
-                username = profile.get("username")
+                profile_url_raw = (profile.get("profile_url") or "").strip()
+                if not profile_url_raw or not profile_url_raw.startswith(("http://", "https://")):
+                    skipped_count += 1
+                    continue
+                profile_url = normalize_url(profile_url_raw, base_url=url)
+
+                username = (profile.get("username") or "").strip() or None
+                if username and len(username) > 255:
+                    username = username[:255]
 
                 await social_repo.upsert(
                     competitor_id=competitor_id,
@@ -75,6 +84,7 @@ class SocialCollector(BaseCollector):
                 "profiles_found": len(profiles),
                 "profiles_created": profiles_created,
                 "profiles_updated": profiles_updated,
+                "profiles_skipped": skipped_count,
                 "elapsed_seconds": self._elapsed(start_time),
             }
         except Exception as e:

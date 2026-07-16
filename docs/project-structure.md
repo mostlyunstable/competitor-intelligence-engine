@@ -223,7 +223,7 @@ competitor-intelligence-engine/
 │   ├── future-improvements.md
 │   └── known-limitations.md
 │
-├── sample-data/                      # Sample Data
+
 │   └── competitors.json
 │
 ├── storage/                          # Runtime Storage

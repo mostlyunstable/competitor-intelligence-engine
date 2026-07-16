@@ -44,7 +44,7 @@ class CompetitorPricingRepository(BaseRepository[CompetitorPricing]):
         currency: str = "USD",
         discount: float | None = None,
         membership_pricing: dict[str, object] | None = None,
-        subscription_plans: dict[str, object] | None = None,
+        subscription_plans: list[str] | None = None,
     ) -> CompetitorPricing:
         """Native PostgreSQL upsert: single INSERT ... ON CONFLICT DO UPDATE query.
 
@@ -63,7 +63,7 @@ class CompetitorPricingRepository(BaseRepository[CompetitorPricing]):
                 currency=currency,
                 discount=discount,
                 membership_pricing=membership_pricing,
-                subscription_plans=subscription_plans or {},
+                subscription_plans=subscription_plans or [],
                 collected_at=now,
             )
             .on_conflict_do_update(

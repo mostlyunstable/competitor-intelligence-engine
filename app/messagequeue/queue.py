@@ -375,7 +375,11 @@ class MessageQueue:
             return False
 
         try:
-            success = handler(message)
+            result = handler(message)
+            if hasattr(result, '__await__'):
+                success = await result
+            else:
+                success = result
             if success:
                 await self._backend.ack(message.message_id)
                 self._stats["acknowledged"] += 1
