@@ -52,6 +52,12 @@ class ServiceCollector(BaseCollector):
             services_created = 0
             services_updated = 0
 
+            # Pre-fetch existing hashes to prevent N+1 queries
+            from sqlalchemy import select
+            stmt = select(service_repo._model.content_hash).where(service_repo._model.competitor_id == competitor_id)
+            result = await session.execute(stmt)
+            existing_hashes = set(result.scalars().all())
+
             # Check existence before native upsert to track created vs updated
             for svc in services:
                 service_name = svc.get("name", "Unknown")
@@ -64,8 +70,7 @@ class ServiceCollector(BaseCollector):
                     service_name, service_category, description, starting_price, currency
                 )
 
-                # Single existence check — native upsert handles the actual write
-                existing = await self._get_existing(service_repo, competitor_id, content_hash)
+                existing = content_hash in existing_hashes
                 await service_repo.upsert(
                     competitor_id=competitor_id,
                     content_hash=content_hash,
@@ -97,24 +102,3 @@ class ServiceCollector(BaseCollector):
                 "services_updated": 0,
                 "elapsed_seconds": self._elapsed(start_time),
             }
-
-    @staticmethod
-    async def _get_existing(
-        repo: CompetitorServiceRepository, competitor_id: int, content_hash: str
-    ) -> bool:
-        """Check if a service with this content hash already exists.
-
-        Uses a lightweight existence check instead of fetching the full row.
-        """
-        from sqlalchemy import select
-
-        stmt = (
-            select(1)
-            .where(
-                repo._model.competitor_id == competitor_id,
-                repo._model.content_hash == content_hash,
-            )
-            .limit(1)
-        )
-        result = await repo._session.execute(stmt)
-        return result.scalar_one_or_none() is not None

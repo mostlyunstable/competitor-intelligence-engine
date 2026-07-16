@@ -53,6 +53,11 @@ class PricingCollector(BaseCollector):
             pricing_created = 0
             pricing_updated = 0
 
+            from sqlalchemy import select
+            stmt = select(pricing_repo._model.content_hash).where(pricing_repo._model.competitor_id == competitor_id)
+            result = await session.execute(stmt)
+            existing_hashes = set(result.scalars().all())
+
             for item in pricing_items:
                 service_name = item.get("service_name", "Unknown")
                 category = item.get("category")
@@ -64,7 +69,7 @@ class PricingCollector(BaseCollector):
                     service_name, category, base_price, promotional_price, currency
                 )
 
-                existing = await self._get_existing(pricing_repo, competitor_id, content_hash)
+                existing = content_hash in existing_hashes
                 await pricing_repo.upsert(
                     competitor_id=competitor_id,
                     content_hash=content_hash,
@@ -98,19 +103,3 @@ class PricingCollector(BaseCollector):
                 "pricing_updated": 0,
                 "elapsed_seconds": self._elapsed(start_time),
             }
-
-    @staticmethod
-    async def _get_existing(
-        repo: CompetitorPricingRepository, competitor_id: int, content_hash: str
-    ) -> bool:
-        """Lightweight existence check."""
-        stmt = (
-            select(1)
-            .where(
-                repo._model.competitor_id == competitor_id,
-                repo._model.content_hash == content_hash,
-            )
-            .limit(1)
-        )
-        result = await repo._session.execute(stmt)
-        return result.scalar_one_or_none() is not None

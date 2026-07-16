@@ -58,24 +58,24 @@ async def get_dashboard(response: Response) -> str:
 
 @router.get("/api/dashboard/competitors")
 async def get_dashboard_competitors(session: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
-    from sqlalchemy import select
+    from sqlalchemy import select, func
 
-    from app.database.models import Competitor
-    stmt = select(Competitor).order_by(Competitor.name)
+    from app.database.models import Competitor, CollectionLog
+    
+    stmt = (
+        select(Competitor, func.max(CollectionLog.start_time).label("last_collected"))
+        .outerjoin(
+            CollectionLog,
+            (Competitor.id == CollectionLog.competitor_id) & (CollectionLog.success.is_(True))
+        )
+        .group_by(Competitor.id)
+        .order_by(Competitor.name)
+    )
     result = await session.execute(stmt)
-    competitors = result.scalars().all()
+    rows = result.all()
 
     out = []
-    for c in competitors:
-        # Get the most recent successful collection time
-        last_log_stmt = (
-            select(CollectionLog.start_time)
-            .where(CollectionLog.competitor_id == c.id)
-            .where(CollectionLog.success.is_(True))
-            .order_by(CollectionLog.start_time.desc())
-            .limit(1)
-        )
-        last_collected = await session.scalar(last_log_stmt)
+    for c, last_collected in rows:
         out.append({
             "id": c.id,
             "name": c.name,
@@ -534,229 +534,3 @@ async def get_feed(session: AsyncSession = Depends(get_session)):
     feed.sort(key=lambda x: x["timestamp"], reverse=True)
     return feed[:20]
 
-@router.get("/api/dashboard/search")
-async def global_search(q: str, session: AsyncSession = Depends(get_session)):
-    from sqlalchemy import select
-    from app.database.models import RawStorage
-    
-    # Very basic text search inside the extracted_data JSON
-    from sqlalchemy import cast, String
-    # [BUG FIX]: Use DB-level text searching and limits to prevent OOM
-    stmt = select(RawStorage).where(
-        RawStorage.extracted_data.isnot(None),
-        cast(RawStorage.extracted_data, String).ilike(f"%{q}%")
-    ).order_by(RawStorage.collected_at.desc()).limit(100)
-    result = await session.execute(stmt)
-    raw_storages = result.scalars().all()
-    
-    seen = set()
-    latest_per_comp = []
-    for r in raw_storages:
-        if r.competitor_id not in seen:
-            seen.add(r.competitor_id)
-            latest_per_comp.append(r)
-            
-    matches = []
-    q_lower = q.lower()
-    for r in latest_per_comp:
-        data_str = str(r.extracted_data).lower()
-        if q_lower in data_str:
-            comp_name = r.extracted_data.get("name", f"Competitor {r.competitor_id}")
-            # Try to find exactly what matched
-            match_context = "Found in profile"
-            if "services" in r.extracted_data:
-                for srv in r.extracted_data["services"]:
-                    if isinstance(srv, dict) and q_lower in str(srv).lower():
-                        match_context = f"Service: {srv.get('name', 'Unknown')}"
-                        break
-            matches.append({
-                "competitor_id": r.competitor_id,
-                "name": comp_name,
-                "context": match_context
-            })
-            
-    return {"query": q, "results": matches}
-
-@router.get("/api/dashboard/feed")
-async def get_feed(session: AsyncSession = Depends(get_session)):
-    from sqlalchemy import select
-    from app.database.models import CollectionLog, CompetitorPricing, Competitor
-    
-    # Get last 20 collection logs
-    log_stmt = select(CollectionLog, Competitor.name).join(Competitor, CollectionLog.competitor_id == Competitor.id).order_by(CollectionLog.start_time.desc()).limit(20)
-    log_result = await session.execute(log_stmt)
-    logs = log_result.all()
-    
-    # Get last 20 pricing changes
-    price_stmt = select(CompetitorPricing, Competitor.name).join(Competitor, CompetitorPricing.competitor_id == Competitor.id).order_by(CompetitorPricing.collected_at.desc()).limit(20)
-    price_result = await session.execute(price_stmt)
-    prices = price_result.all()
-    
-    feed = []
-    for log, comp_name in logs:
-        feed.append({
-            "type": "collection_success" if log.success else "collection_failure",
-            "message": f"{comp_name} collection {'succeeded' if log.success else 'failed'}",
-            "timestamp": log.start_time.isoformat() if log.start_time else "",
-            "competitor_id": log.competitor_id
-        })
-        
-    for price, comp_name in prices:
-        feed.append({
-            "type": "pricing_update",
-            "message": f"{comp_name} updated pricing for {price.service_name}: {price.base_price} {price.currency}",
-            "timestamp": price.collected_at.isoformat() if price.collected_at else "",
-            "competitor_id": price.competitor_id
-        })
-        
-    # Sort by timestamp desc
-    feed.sort(key=lambda x: x["timestamp"], reverse=True)
-    return feed[:20]
-
-@router.get("/api/dashboard/search")
-async def global_search(q: str, session: AsyncSession = Depends(get_session)):
-    from sqlalchemy import select
-    from app.database.models import RawStorage
-    
-    # Very basic text search inside the extracted_data JSON
-    stmt = select(RawStorage).where(RawStorage.extracted_data.isnot(None)).order_by(RawStorage.collected_at.desc())
-    result = await session.execute(stmt)
-    raw_storages = result.scalars().all()
-    
-    seen = set()
-    latest_per_comp = []
-    for r in raw_storages:
-        if r.competitor_id not in seen:
-            seen.add(r.competitor_id)
-            latest_per_comp.append(r)
-            
-    matches = []
-    q_lower = q.lower()
-    for r in latest_per_comp:
-        data_str = str(r.extracted_data).lower()
-        if q_lower in data_str:
-            comp_name = r.extracted_data.get("name", f"Competitor {r.competitor_id}")
-            # Try to find exactly what matched
-            match_context = "Found in profile"
-            if "services" in r.extracted_data:
-                for srv in r.extracted_data["services"]:
-                    if isinstance(srv, dict) and q_lower in str(srv).lower():
-                        match_context = f"Service: {srv.get('name', 'Unknown')}"
-                        break
-            matches.append({
-                "competitor_id": r.competitor_id,
-                "name": comp_name,
-                "context": match_context
-            })
-            
-    return {"query": q, "results": matches}
-
-@router.get("/api/dashboard/feed")
-async def get_feed(session: AsyncSession = Depends(get_session)):
-    from sqlalchemy import select
-    from app.database.models import CollectionLog, CompetitorPricing, Competitor
-    
-    # Get last 20 collection logs
-    log_stmt = select(CollectionLog, Competitor.name).join(Competitor, CollectionLog.competitor_id == Competitor.id).order_by(CollectionLog.start_time.desc()).limit(20)
-    log_result = await session.execute(log_stmt)
-    logs = log_result.all()
-    
-    # Get last 20 pricing changes
-    price_stmt = select(CompetitorPricing, Competitor.name).join(Competitor, CompetitorPricing.competitor_id == Competitor.id).order_by(CompetitorPricing.collected_at.desc()).limit(20)
-    price_result = await session.execute(price_stmt)
-    prices = price_result.all()
-    
-    feed = []
-    for log, comp_name in logs:
-        feed.append({
-            "type": "collection_success" if log.success else "collection_failure",
-            "message": f"{comp_name} collection {'succeeded' if log.success else 'failed'}",
-            "timestamp": log.start_time.isoformat() if log.start_time else "",
-            "competitor_id": log.competitor_id
-        })
-        
-    for price, comp_name in prices:
-        feed.append({
-            "type": "pricing_update",
-            "message": f"{comp_name} updated pricing for {price.service_name}: {price.base_price} {price.currency}",
-            "timestamp": price.collected_at.isoformat() if price.collected_at else "",
-            "competitor_id": price.competitor_id
-        })
-        
-    # Sort by timestamp desc
-    feed.sort(key=lambda x: x["timestamp"], reverse=True)
-    return feed[:20]
-
-@router.get("/api/dashboard/search")
-async def global_search(q: str, session: AsyncSession = Depends(get_session)):
-    from sqlalchemy import select
-    from app.database.models import RawStorage
-    
-    # Very basic text search inside the extracted_data JSON
-    stmt = select(RawStorage).where(RawStorage.extracted_data.isnot(None)).order_by(RawStorage.collected_at.desc())
-    result = await session.execute(stmt)
-    raw_storages = result.scalars().all()
-    
-    seen = set()
-    latest_per_comp = []
-    for r in raw_storages:
-        if r.competitor_id not in seen:
-            seen.add(r.competitor_id)
-            latest_per_comp.append(r)
-            
-    matches = []
-    q_lower = q.lower()
-    for r in latest_per_comp:
-        data_str = str(r.extracted_data).lower()
-        if q_lower in data_str:
-            comp_name = r.extracted_data.get("name", f"Competitor {r.competitor_id}")
-            # Try to find exactly what matched
-            match_context = "Found in profile"
-            if "services" in r.extracted_data:
-                for srv in r.extracted_data["services"]:
-                    if isinstance(srv, dict) and q_lower in str(srv).lower():
-                        match_context = f"Service: {srv.get('name', 'Unknown')}"
-                        break
-            matches.append({
-                "competitor_id": r.competitor_id,
-                "name": comp_name,
-                "context": match_context
-            })
-            
-    return {"query": q, "results": matches}
-
-@router.get("/api/dashboard/feed")
-async def get_feed(session: AsyncSession = Depends(get_session)):
-    from sqlalchemy import select
-    from app.database.models import CollectionLog, CompetitorPricing, Competitor
-    
-    # Get last 20 collection logs
-    log_stmt = select(CollectionLog, Competitor.name).join(Competitor, CollectionLog.competitor_id == Competitor.id).order_by(CollectionLog.start_time.desc()).limit(20)
-    log_result = await session.execute(log_stmt)
-    logs = log_result.all()
-    
-    # Get last 20 pricing changes
-    price_stmt = select(CompetitorPricing, Competitor.name).join(Competitor, CompetitorPricing.competitor_id == Competitor.id).order_by(CompetitorPricing.collected_at.desc()).limit(20)
-    price_result = await session.execute(price_stmt)
-    prices = price_result.all()
-    
-    feed = []
-    for log, comp_name in logs:
-        feed.append({
-            "type": "collection_success" if log.success else "collection_failure",
-            "message": f"{comp_name} collection {'succeeded' if log.success else 'failed'}",
-            "timestamp": log.start_time.isoformat() if log.start_time else "",
-            "competitor_id": log.competitor_id
-        })
-        
-    for price, comp_name in prices:
-        feed.append({
-            "type": "pricing_update",
-            "message": f"{comp_name} updated pricing for {price.service_name}: {price.base_price} {price.currency}",
-            "timestamp": price.collected_at.isoformat() if price.collected_at else "",
-            "competitor_id": price.competitor_id
-        })
-        
-    # Sort by timestamp desc
-    feed.sort(key=lambda x: x["timestamp"], reverse=True)
-    return feed[:20]

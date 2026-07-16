@@ -45,7 +45,7 @@ class CollectionService:
                 self._collectors[module] = collector_cls()
         return self._collectors.get(module)
 
-    async def collect_competitor(self, competitor_id: int) -> dict[str, Any]:
+    async def collect_competitor(self, competitor_id: int, clear_registry: bool = True) -> dict[str, Any]:
         async with self._crawls_lock:
             if competitor_id in self._active_crawls:
                 logger.warning("collection_already_running", competitor_id=competitor_id)
@@ -181,7 +181,8 @@ class CollectionService:
                 "elapsed_seconds": elapsed,
             }
         finally:
-            registry.clear()
+            if clear_registry:
+                registry.clear()
             async with self._crawls_lock:
                 self._active_crawls.pop(competitor_id, None)
 

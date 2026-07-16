@@ -78,7 +78,7 @@ async def main() -> None:
         print(f"Benchmarking: {comp.name}")
         print("==========================================")
         try:
-            await svc.collect_competitor(competitor_id=comp.id)
+            await svc.collect_competitor(competitor_id=comp.id, clear_registry=False)
             print(f"Completed {comp.name}")
         except Exception as e:
             print(f"Error collecting {comp.name}: {e}")
