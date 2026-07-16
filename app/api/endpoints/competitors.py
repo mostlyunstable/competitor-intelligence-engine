@@ -1,8 +1,8 @@
 from enum import StrEnum
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Security
-from pydantic import BaseModel, Field, field_validator, HttpUrl
-from typing import Any
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import verify_api_key

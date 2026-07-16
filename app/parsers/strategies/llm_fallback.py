@@ -1,4 +1,5 @@
 import json
+import time
 
 import structlog
 from bs4 import BeautifulSoup
@@ -11,7 +12,7 @@ from app.parsers.strategy import ParsedResult
 logger = structlog.get_logger(__name__)
 
 
-import time
+
 
 _CIRCUIT_FAILURES = 0
 _CIRCUIT_OPEN_UNTIL = 0.0
@@ -69,7 +70,7 @@ class LLMFallbackService:
     ) -> ParsedResult:
         """Execute the LLM fallback on the page content and merge it into the result."""
         global _CIRCUIT_FAILURES, _CIRCUIT_OPEN_UNTIL
-        
+
         if not self.settings.enabled or not self.settings.api_key:
             return combined_result
 
@@ -139,7 +140,7 @@ class LLMFallbackService:
             # Merge the partial result with a moderate confidence weight
             combined_result.merge(partial, "llm_fallback", 0.40)
             logger.info("llm_extraction_success", url=url, model=self.settings.model_name)
-            
+
             # Reset circuit on success
             if _CIRCUIT_FAILURES > 0:
                 logger.info("llm_circuit_breaker_reset")
