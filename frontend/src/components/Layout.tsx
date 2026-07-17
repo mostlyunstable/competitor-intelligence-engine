@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import {
   LayoutDashboard, Users, Activity, FileText, BarChart3,
-  Settings, LogOut, Search, Bell, ChevronDown
+  Settings, LogOut, Search, Bell, ChevronDown, GitCompare
 } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../lib/api'
@@ -10,6 +10,7 @@ import { api } from '../lib/api'
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Overview' },
   { to: '/competitors', icon: Users, label: 'Competitors' },
+  { to: '/competitors/compare', icon: GitCompare, label: 'Compare' },
   { to: '/collections', icon: Activity, label: 'Collections' },
   { to: '/logs', icon: FileText, label: 'Logs' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },

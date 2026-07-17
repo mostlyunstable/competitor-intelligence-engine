@@ -5,15 +5,15 @@ from typing import Any
 import asyncio
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.endpoints import collection, competitors, dashboard, health, metrics, reports
+from app.api.endpoints import collection, competitors, dashboard, health, reports
 from app.api.middleware import RateLimitMiddleware
 from app.configuration.settings import Settings, get_settings
 from app.database.connection import db_manager
 from app.observability.monitoring_dashboard import router as monitoring_router
-from app.observability.prometheus_metrics import router as prometheus_router
+from app.services.websocket_manager import ws_manager
 
 logger = structlog.get_logger(__name__)
 
@@ -210,10 +210,8 @@ All errors follow RFC 7807 Problem Details format:
     app.include_router(health.router)
     app.include_router(competitors.router)
     app.include_router(collection.router)
-    app.include_router(metrics.router)
     app.include_router(dashboard.router)
     app.include_router(reports.router)
-    app.include_router(prometheus_router)
     app.include_router(monitoring_router)
 
     from fastapi.responses import RedirectResponse
@@ -221,6 +219,21 @@ All errors follow RFC 7807 Problem Details format:
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:
         return RedirectResponse(url="/dashboard")
+
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket) -> None:
+        await ws_manager.connect(websocket)
+        try:
+            while True:
+                # Keep connection alive, handle client messages if needed
+                data = await websocket.receive_text()
+                # Client can send ping/pong or commands
+                if data == "ping":
+                    await websocket.send_text('{"type":"pong"}')
+        except WebSocketDisconnect:
+            await ws_manager.disconnect(websocket)
+        except Exception:
+            await ws_manager.disconnect(websocket)
 
     _configure_logging(settings.log_level)
 

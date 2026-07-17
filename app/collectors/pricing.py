@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 from typing import Any
 
@@ -9,6 +10,57 @@ from app.collectors.base import BaseCollector
 from app.database.repositories.competitor_pricing_repository import CompetitorPricingRepository
 from app.parsers.strategy_parser import StrategyParser
 from app.utilities.content_hasher import compute_pricing_hash
+
+# Navigation / junk patterns to reject from pricing
+_NAV_NAMES_PRICING = frozenset({
+    "home", "contact", "about", "about us", "services", "blog", "news",
+    "faq", "faqs", "login", "sign up", "sign in", "search", "sitemap",
+    "privacy policy", "terms of service", "terms", "user agreement",
+    "accessibility", "careers", "jobs", "support", "help", "close",
+    "menu", "skip to content", "back", "next", "prev", "submit",
+    "cancel", "reset", "apply", "buy now", "purchase now", "contact us",
+    "email us", "call us", "get a warranty", "get a quote",
+})
+
+_PRICING_PATTERNS = re.compile(
+    r"(plan|pricing|price|cost|rate|fee|per month|per year|annually|monthly|starting at|\$)",
+    re.IGNORECASE,
+)
+
+
+def _is_valid_pricing(service_name: str, base_price: float | None, category: str | None) -> bool:
+    """Filter out navigation items from pricing results."""
+    if not service_name or len(service_name) < 5 or len(service_name) > 200:
+        return False
+
+    lower = service_name.lower().strip()
+    if lower in _NAV_NAMES_PRICING:
+        return False
+
+    if re.match(r"^[\d\s\-+().]+$", service_name):
+        return False
+    if "@" in service_name:
+        return False
+    if service_name.startswith(("http://", "https://", "www.", "/")):
+        return False
+
+    # Accept if it has a real price
+    if base_price is not None and base_price > 0:
+        return True
+
+    # Accept if category looks like pricing
+    if category and _PRICING_PATTERNS.search(category):
+        return True
+
+    # Accept if name itself mentions pricing concepts
+    if _PRICING_PATTERNS.search(service_name):
+        return True
+
+    # Reject if it looks like navigation
+    if re.match(r"^(get |buy |call |email |find |request |schedule |start |compare |view |see |read |learn |explore )", service_name, re.IGNORECASE):
+        return False
+
+    return False
 
 
 class PricingCollector(BaseCollector):
@@ -72,6 +124,10 @@ class PricingCollector(BaseCollector):
                             base_price = None
                     except (ValueError, TypeError):
                         base_price = None
+
+                if not _is_valid_pricing(service_name, base_price, category):
+                    skipped_count += 1
+                    continue
 
                 promotional_price = item.get("promotional_price")
                 if promotional_price is not None:

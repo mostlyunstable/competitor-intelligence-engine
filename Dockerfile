@@ -1,46 +1,27 @@
-FROM python:3.12-slim AS base
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        tini \
-        curl \
-        postgresql-client \
+# Install system dependencies for Playwright
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base AS deps
-
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir ".[dev]" || pip install --no-cache-dir .
-
-FROM base AS runtime
-
-COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=deps /usr/local/bin /usr/local/bin
-
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN mkdir -p /ms-playwright && \
-    playwright install --with-deps chromium 2>/dev/null || true && \
-    chmod -R 755 /ms-playwright
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
+# Copy application code
 COPY . .
 
-RUN useradd --create-home --shell /bin/bash appuser
+# Install Python dependencies
+RUN pip install --no-cache-dir .
+
+# Install Playwright browsers as root to /ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install chromium --with-deps
+
+# Create non-root user and give access to playwright dir
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app /ms-playwright
 USER appuser
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-ENTRYPOINT ["tini", "--"]
-CMD ["/entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

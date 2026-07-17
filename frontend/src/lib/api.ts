@@ -62,8 +62,10 @@ class ApiClient {
     return this.request<any>('/api/dashboard/stats')
   }
 
-  async getFeed(limit = 20) {
-    return this.request<any[]>(`/api/dashboard/feed?limit=${limit}`)
+  async getFeed(limit = 20, offset = 0) {
+    return this.request<{ items: any[]; total: number; has_more: boolean }>(
+      `/api/dashboard/feed?limit=${limit}&offset=${offset}`
+    )
   }
 
   async getSummary() {
@@ -211,6 +213,21 @@ class ApiClient {
     return this.request<any>('/api/dashboard/config/resync', { method: 'POST' })
   }
 
+  // Trends
+  async getTrends(days = 30) {
+    return this.request<any>(`/api/dashboard/trends?days=${days}`)
+  }
+
+  // Compare
+  async compareCompetitors(ids: number[]) {
+    return this.request<any[]>(`/api/dashboard/compare?competitor_ids=${ids.join(',')}`)
+  }
+
+  // Changes
+  async getChanges(competitorId: number, limit = 50) {
+    return this.request<any[]>(`/api/dashboard/competitors/${competitorId}/changes?limit=${limit}`)
+  }
+
   // Extracted Data
   async getExtracted(competitorId: number) {
     return this.request<any>(`/api/dashboard/extracted/${competitorId}`)
@@ -228,6 +245,10 @@ class ApiClient {
 
   getExportZipUrl() {
     return `${API_BASE}/api/dashboard/export/zip`
+  }
+
+  getPdfExportUrl() {
+    return `${API_BASE}/api/dashboard/export/pdf`
   }
 
   getRawHtmlUrl(competitorId: number) {

@@ -15,7 +15,6 @@ from app.database.models import (
 )
 from app.database.repositories.collection_log_repository import CollectionLogRepository
 from app.database.repositories.competitor_content_repository import CompetitorContentRepository
-from app.database.repositories.competitor_page_repository import CompetitorPageRepository
 from app.database.repositories.competitor_pricing_repository import CompetitorPricingRepository
 from app.database.repositories.competitor_repository import CompetitorRepository
 from app.database.repositories.competitor_service_repository import CompetitorServiceRepository
@@ -122,15 +121,6 @@ class TestForeignKeyConstraints:
             await repo.create(
                 competitor_id=999999,
                 url="https://invalid.com",
-            )
-            await session.flush()
-
-    async def test_page_requires_valid_competitor(self, session: AsyncSession) -> None:
-        repo = CompetitorPageRepository(session)
-        with pytest.raises(IntegrityError):
-            await repo.create(
-                competitor_id=999999,
-                storage_uri="file://html",
             )
             await session.flush()
 
@@ -283,21 +273,6 @@ class TestCascadeDeletes:
         await comp_repo.delete(competitor.id)
         sources = await source_repo.get_by_competitor(competitor.id)
         assert len(sources) == 0
-
-    async def test_delete_competitor_cascades_pages(self, session: AsyncSession) -> None:
-        comp_repo = CompetitorRepository(session)
-        competitor = await comp_repo.create(
-            name="Cascade Page Corp",
-            website_url="https://cascadepage.com",
-        )
-
-        page_repo = CompetitorPageRepository(session)
-        await page_repo.create(competitor_id=competitor.id, storage_uri="file://p1")
-        await page_repo.create(competitor_id=competitor.id, storage_uri="file://p2")
-
-        await comp_repo.delete(competitor.id)
-        pages = await page_repo.get_by_competitor(competitor.id)
-        assert len(pages) == 0
 
     async def test_delete_competitor_cascades_services(self, session: AsyncSession) -> None:
         comp_repo = CompetitorRepository(session)

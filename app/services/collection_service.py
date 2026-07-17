@@ -18,6 +18,7 @@ from app.database.repositories.collection_log_repository import CollectionLogRep
 from app.database.repositories.competitor_repository import CompetitorRepository
 from app.database.repositories.competitor_source_repository import CompetitorSourceRepository
 from app.observability.parser_metrics import registry
+from app.services.change_detection_service import change_detection_service
 from app.services.webhook_service import WebhookService
 
 logger = structlog.get_logger(__name__)
@@ -44,6 +45,37 @@ class CollectionService:
             if collector_cls:
                 self._collectors[module] = collector_cls()
         return self._collectors.get(module)
+
+    async def _collect_with_retry(
+        self, collector: Any, competitor_id: int, url: str, module: str, log: Any,
+        max_retries: int = 3, base_delay: float = 1.0,
+    ) -> dict[str, Any]:
+        """Collect a URL with exponential backoff retry on transient errors."""
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                async with db_manager.session() as session:
+                    return await collector.collect(competitor_id, url, session=session)
+            except Exception as e:
+                last_error = e
+                error_str = str(e).lower()
+                retryable = any(kw in error_str for kw in (
+                    "timeout", "timed out", "connection", "reset",
+                    "502", "503", "504", "rate limit", "too many",
+                ))
+                if attempt < max_retries and retryable:
+                    delay = base_delay * (2 ** attempt)
+                    log.warning(
+                        "collection_retry",
+                        module=module, url=url, attempt=attempt + 1,
+                        max_retries=max_retries, delay=delay, error=str(e),
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    break
+
+        log.error("module_collection_failed", module=module, url=url, error=str(last_error))
+        return {"status": "failed", "error": str(last_error)}
 
     async def collect_competitor(self, competitor_id: int) -> dict[str, Any]:
         async with self._crawls_lock:
@@ -74,6 +106,10 @@ class CollectionService:
             competitor_name = competitor_data["name"]
 
             log.info("collection_started", modules=modules, base_url=base_url)
+
+            # Broadcast collection started via WebSocket
+            from app.services.websocket_manager import ws_manager
+            await ws_manager.broadcast_collection_started(competitor_id, competitor_name)
 
             # Phase 2: Discover URLs (no DB session needed)
             discovery_engine = DiscoveryEngine()
@@ -121,24 +157,14 @@ class CollectionService:
 
                 module_results = []
                 for url in urls_to_fetch:
-                    try:
-                        # Each URL gets its own short-lived session
-                        async with db_manager.session() as session:
-                            result = await collector.collect(competitor_id, url, session=session)
-                        module_results.append(result)
-                        if result.get("status") == "success":
-                            records_collected += sum(
-                                v for v in result.values() if isinstance(v, int) and v > 0
-                            )
-                    except Exception as e:
-                        log.error(
-                            "module_collection_failed",
-                            module=module,
-                            url=url,
-                            error=str(e),
+                    result = await self._collect_with_retry(
+                        collector, competitor_id, url, module, log
+                    )
+                    module_results.append(result)
+                    if result.get("status") == "success":
+                        records_collected += sum(
+                            v for v in result.values() if isinstance(v, int) and v > 0
                         )
-                        module_results.append({"status": "failed", "error": str(e)})
-                        errors.append(f"{module}/{url}: {e!s}")
 
                 results[module] = module_results
 
@@ -192,12 +218,42 @@ class CollectionService:
             # Phase 5: Save collection log (short-lived session)
             await self._save_collection_log(competitor_id, start_time, errors, records_collected)
 
+            # Phase 6: Detect changes (short-lived session)
+            all_changes: list[dict[str, Any]] = []
+            for data_type in ("services", "pricing", "content", "social"):
+                async with db_manager.session() as session:
+                    changes = await change_detection_service.detect_changes(
+                        competitor_id, data_type, session
+                    )
+                    all_changes.extend(changes)
+                    await session.commit()
+
+            if all_changes:
+                log.info(
+                    "changes_detected",
+                    total=len(all_changes),
+                    added=sum(1 for c in all_changes if c["change_type"] == "added"),
+                    removed=sum(1 for c in all_changes if c["change_type"] == "removed"),
+                    modified=sum(1 for c in all_changes if c["change_type"] == "modified"),
+                )
+                # Broadcast changes via WebSocket
+                await ws_manager.broadcast_changes_detected(competitor_id, all_changes)
+
             log.info(
                 "collection_completed",
                 elapsed=elapsed,
                 modules=modules,
                 records_collected=records_collected,
                 errors=len(errors),
+            )
+
+            # Broadcast collection completed via WebSocket
+            await ws_manager.broadcast_collection_completed(
+                competitor_id=competitor_id,
+                competitor_name=competitor_name,
+                records_collected=records_collected,
+                elapsed=elapsed,
+                changes=len(all_changes),
             )
 
             if records_collected > 0:
@@ -219,6 +275,13 @@ class CollectionService:
         except Exception as e:
             elapsed = round(time.time() - start_time, 2)
             log.error("collection_failed", error=str(e), elapsed=elapsed)
+            # Broadcast collection failed via WebSocket
+            from app.services.websocket_manager import ws_manager
+            await ws_manager.broadcast_collection_failed(
+                competitor_id=competitor_id,
+                competitor_name=competitor_data.get("name", f"ID {competitor_id}"),
+                error=str(e),
+            )
             return {
                 "status": "failed",
                 "competitor_id": competitor_id,
@@ -302,12 +365,16 @@ class CollectionService:
     def _select_urls_for_module(
         self, module: str, discovered_urls: list[str], base_url: str
     ) -> list[str]:
-        """Select discovered URLs relevant to a module using pattern matching."""
+        """Select discovered URLs relevant to a module using pattern matching.
+
+        Always includes the base URL for services/pricing since the homepage
+        often contains the main plan/coverage listings.
+        """
         base = base_url.rstrip("/")
         patterns = {
             "company": [r"/about", r"/company", r"/team", r"/story", r"/mission", r"/contact"],
-            "services": [r"/service", r"/product", r"/feature", r"/solution", r"/plan"],
-            "pricing": [r"/pric", r"/cost", r"/rate", r"/plan", r"/subscription"],
+            "services": [r"/plan", r"/coverage", r"/warranty", r"/protect"],
+            "pricing": [r"/pric", r"/cost", r"/rate", r"/subscription"],
             "content": [r"/blog", r"/article", r"/news", r"/resource", r"/case-study", r"/post"],
             "social": [r"/social", r"/follow", r"/community"],
         }
@@ -321,6 +388,10 @@ class CollectionService:
             url_lower = url.lower()
             if any(p in url_lower for p in module_patterns):
                 matched.append(url)
+
+        # Always include base URL for services and pricing (homepage has plan listings)
+        if module in ("services", "pricing") and base not in matched:
+            matched.insert(0, base)
 
         if not matched:
             return [base]

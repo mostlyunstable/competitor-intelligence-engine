@@ -6,10 +6,12 @@ import LoginPage from './pages/LoginPage'
 import OverviewPage from './pages/OverviewPage'
 import CompetitorsPage from './pages/CompetitorsPage'
 import CompetitorProfilePage from './pages/CompetitorProfilePage'
+import CompetitorComparePage from './pages/CompetitorComparePage'
 import CollectionsPage from './pages/CollectionsPage'
 import LogsPage from './pages/LogsPage'
 import ReportsPage from './pages/ReportsPage'
 import AdminPage from './pages/AdminPage'
+import ActivityPage from './pages/ActivityPage'
 
 const AuthContext = createContext<{
   isAuthenticated: boolean
@@ -56,10 +58,12 @@ export default function App() {
                   <Routes>
                     <Route path="/" element={<OverviewPage />} />
                     <Route path="/competitors" element={<CompetitorsPage />} />
+                    <Route path="/competitors/compare" element={<CompetitorComparePage />} />
                     <Route path="/competitors/:id" element={<CompetitorProfilePage />} />
                     <Route path="/collections" element={<CollectionsPage />} />
                     <Route path="/logs" element={<LogsPage />} />
                     <Route path="/reports" element={<ReportsPage />} />
+                    <Route path="/activity" element={<ActivityPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                   </Routes>
                 </Layout>

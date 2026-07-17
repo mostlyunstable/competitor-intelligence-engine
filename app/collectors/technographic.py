@@ -1,13 +1,9 @@
-from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 from bs4 import BeautifulSoup
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.collectors.base import BaseCollector
-from app.database.models import CompetitorTechStack
 
 logger = structlog.get_logger(__name__)
 
@@ -19,7 +15,7 @@ class TechnographicCollector(BaseCollector):
         super().__init__()
 
     async def collect(
-        self, competitor_id: int, url: str, *, session: AsyncSession, **kwargs: Any
+        self, competitor_id: int, url: str, **kwargs: Any
     ) -> dict[str, Any]:
         detected_tech: list[dict[str, Any]] = []
 
@@ -55,34 +51,12 @@ class TechnographicCollector(BaseCollector):
                     if "webflow" in content:
                         detected_tech.append({"name": "Webflow", "category": "CMS"})
 
-            unique_tech = {t["name"]: t for t in detected_tech}.values()
-
-
-            for tech in unique_tech:
-                existing_stmt = select(CompetitorTechStack).where(
-                    CompetitorTechStack.competitor_id == competitor_id,
-                    CompetitorTechStack.technology_name == tech["name"],
-                )
-                existing = (await session.execute(existing_stmt)).scalar_one_or_none()
-
-                if existing:
-                    existing.confidence = 1.0
-                    existing.discovered_at = datetime.now(UTC)
-                else:
-                    stack_entry = CompetitorTechStack(
-                        competitor_id=competitor_id,
-                        technology_name=tech["name"],
-                        category=tech.get("category"),
-                        confidence=1.0,
-                        discovered_at=datetime.now(UTC),
-                    )
-                    session.add(stack_entry)
-
+            unique_tech = list({t["name"]: t for t in detected_tech}.values())
 
             return {
                 "status": "success",
                 "technologies_detected": len(unique_tech),
-                "data": list(unique_tech),
+                "data": unique_tech,
             }
 
         except Exception as e:

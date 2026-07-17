@@ -179,7 +179,7 @@ class PlaywrightRenderer:
 
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(
-                headless=False,
+                headless=True,
                 proxy=proxy,
                 args=[
                     "--no-sandbox",
@@ -189,7 +189,6 @@ class PlaywrightRenderer:
                     "--disable-features=IsolateOrigins,site-per-process",
                     "--disable-infobars",
                     "--window-size=1920,1080",
-                    "--start-maximized",
                 ],
             )
             self._context = await self._browser.new_context(

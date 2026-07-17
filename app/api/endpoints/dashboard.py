@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
@@ -20,7 +21,6 @@ from app.database.models import (
     CollectionLog,
     Competitor,
     CompetitorContent,
-    CompetitorPage,
     CompetitorPricing,
     CompetitorService,
     CompetitorSocial,
@@ -224,14 +224,8 @@ async def get_competitor_detail(
     social_stmt = select(CompetitorSocial).where(CompetitorSocial.competitor_id == competitor_id)
     social = (await session.execute(social_stmt)).scalars().all()
 
-    tech_stmt = select(CompetitorTechStack).where(CompetitorTechStack.competitor_id == competitor_id)
-    tech = (await session.execute(tech_stmt)).scalars().all()
-
     sources_stmt = select(CompetitorSource).where(CompetitorSource.competitor_id == competitor_id)
     sources = (await session.execute(sources_stmt)).scalars().all()
-
-    pages_stmt = select(CompetitorPage).where(CompetitorPage.competitor_id == competitor_id).limit(50)
-    pages = (await session.execute(pages_stmt)).scalars().all()
 
     logs_stmt = (
         select(CollectionLog)
@@ -258,9 +252,7 @@ async def get_competitor_detail(
         "pricing": [{"id": p.id, "service_name": p.service_name, "base_price": float(p.base_price) if p.base_price else None, "currency": p.currency, "category": p.category, "collected_at": p.collected_at.isoformat() if p.collected_at else None} for p in pricing],
         "content": [{"id": c.id, "title": c.title, "url": c.url, "content_type": c.content_type, "collected_at": c.collected_at.isoformat() if c.collected_at else None} for c in content],
         "social": [{"id": s.id, "platform": s.platform.value if hasattr(s.platform, 'value') else s.platform, "url": s.profile_url, "username": s.username, "collected_at": s.collected_at.isoformat() if s.collected_at else None} for s in social],
-        "tech_stack": [{"id": t.id, "technology_name": t.technology_name, "category": t.category, "confidence": float(t.confidence) if t.confidence else None} for t in tech],
         "sources": [{"id": s.id, "url": s.url, "page_type": s.page_type, "is_active": s.is_active, "last_crawled_at": s.last_crawled_at.isoformat() if s.last_crawled_at else None} for s in sources],
-        "pages": [{"id": p.id, "url": p.source.url if p.source else None, "status_code": p.metadata_.get("status_code") if p.metadata_ else None, "title": p.extracted_data.get("title") if p.extracted_data else None} for p in pages],
         "collection_logs": [{"id": l.id, "start_time": l.start_time.isoformat() if l.start_time else None, "success": l.success, "duration_seconds": float(l.duration_seconds) if l.duration_seconds else None, "records_collected": l.records_collected} for l in logs],
     }
 
@@ -447,7 +439,6 @@ async def get_dashboard_stats(
         select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True))
     ) or 0
     urls_count = await session.scalar(select(func.count()).select_from(CompetitorSource)) or 0
-    pages_count = await session.scalar(select(func.count()).select_from(CompetitorPage)) or 0
     services_count = await session.scalar(select(func.count()).select_from(CompetitorService)) or 0
     pricing_count = await session.scalar(select(func.count()).select_from(CompetitorPricing)) or 0
     content_count = await session.scalar(select(func.count()).select_from(CompetitorContent)) or 0
@@ -492,7 +483,6 @@ async def get_dashboard_stats(
         "scheduler_status": "running" if scheduler.is_running else "stopped",
         "last_collection": last_collection.isoformat() if last_collection else None,
         "urls_discovered": urls_count,
-        "pages_crawled": pages_count,
         "services_extracted": services_count,
         "pricing_extracted": pricing_count,
         "content_extracted": content_count,
@@ -546,13 +536,15 @@ async def get_dashboard_summary(
 
 @router.get("/api/dashboard/feed")
 async def get_feed(
-    limit: int = 20, session: AsyncSession = Depends(get_session)
-) -> list[dict[str, Any]]:
+    limit: int = 20, offset: int = 0, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    fetch_limit = limit + offset + 100
+
     log_stmt = (
         select(CollectionLog, Competitor.name)
         .join(Competitor, CollectionLog.competitor_id == Competitor.id)
         .order_by(CollectionLog.start_time.desc())
-        .limit(limit)
+        .limit(fetch_limit)
     )
     log_result = await session.execute(log_stmt)
     logs = log_result.all()
@@ -561,7 +553,7 @@ async def get_feed(
         select(CompetitorPricing, Competitor.name)
         .join(Competitor, CompetitorPricing.competitor_id == Competitor.id)
         .order_by(CompetitorPricing.collected_at.desc())
-        .limit(limit)
+        .limit(fetch_limit)
     )
     price_result = await session.execute(price_stmt)
     prices = price_result.all()
@@ -585,7 +577,13 @@ async def get_feed(
         })
 
     feed.sort(key=lambda x: x["timestamp"], reverse=True)
-    return feed[:limit]
+    return {
+        "items": feed[offset:offset + limit],
+        "total": len(feed),
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + limit < len(feed),
+    }
 
 
 # ─── Collection Logs ────────────────────────────────────────────────────────
@@ -711,9 +709,8 @@ async def resume_scheduler() -> dict[str, str]:
 @router.post("/api/dashboard/config/resync")
 async def resync_config() -> dict[str, Any]:
     from app.services.config_sync_service import config_sync_service
-    result = config_sync_service.reload_config()
     synced = await config_sync_service.sync_competitors()
-    return {"status": "success", "reloaded": len(result), "synced": synced}
+    return {"status": "success", "synced": synced}
 
 
 @router.get("/api/dashboard/config")
@@ -992,3 +989,189 @@ async def get_system_health(session: AsyncSession = Depends(get_session)) -> dic
 
     overall = all(c.get("status") == "healthy" for c in checks.values())
     return {"status": "healthy" if overall else "degraded", "checks": checks}
+
+
+@router.get("/api/dashboard/competitors/{competitor_id}/changes")
+async def get_competitor_changes(
+    competitor_id: int,
+    limit: int = 50,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    """Get recent changes detected for a competitor."""
+    from app.services.change_detection_service import change_detection_service
+
+    return await change_detection_service.get_recent_changes(
+        competitor_id=competitor_id, limit=limit, session=session
+    )
+
+
+@router.get("/api/dashboard/trends")
+async def get_collection_trends(
+    days: int = 30,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Get collection trends over time."""
+    from datetime import timedelta
+    from sqlalchemy import func, cast, Date
+
+    since = datetime.now(UTC) - timedelta(days=days)
+
+    # Collections per day
+    daily_stmt = (
+        select(
+            cast(CollectionLog.start_time, Date).label("date"),
+            func.count().label("total"),
+            func.sum(func.cast(CollectionLog.success, Integer)).label("successful"),
+        )
+        .where(CollectionLog.start_time >= since)
+        .group_by(cast(CollectionLog.start_time, Date))
+        .order_by(cast(CollectionLog.start_time, Date))
+    )
+    daily = (await session.execute(daily_stmt)).all()
+
+    # Records collected per day
+    records_stmt = (
+        select(
+            cast(CollectionLog.start_time, Date).label("date"),
+            func.sum(CollectionLog.records_collected).label("records"),
+        )
+        .where(CollectionLog.start_time >= since)
+        .group_by(cast(CollectionLog.start_time, Date))
+        .order_by(cast(CollectionLog.start_time, Date))
+    )
+    records = (await session.execute(records_stmt)).all()
+
+    return {
+        "daily_collections": [
+            {"date": str(r.date), "total": r.total, "successful": r.successful or 0}
+            for r in daily
+        ],
+        "daily_records": [
+            {"date": str(r.date), "records": r.records or 0}
+            for r in records
+        ],
+    }
+
+
+@router.get("/api/dashboard/compare")
+async def compare_competitors(
+    competitor_ids: str = "",
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    """Compare multiple competitors side by side."""
+    if not competitor_ids:
+        return []
+
+    ids = [int(i) for i in competitor_ids.split(",") if i.strip().isdigit()]
+    if not ids:
+        return []
+
+    results = []
+    for cid in ids[:5]:
+        comp = (await session.execute(
+            select(Competitor).where(Competitor.id == cid)
+        )).scalar_one_or_none()
+        if not comp:
+            continue
+
+        services_count = await session.scalar(
+            select(func.count()).select_from(CompetitorService).where(CompetitorService.competitor_id == cid)
+        ) or 0
+        pricing_count = await session.scalar(
+            select(func.count()).select_from(CompetitorPricing).where(CompetitorPricing.competitor_id == cid)
+        ) or 0
+        social_count = await session.scalar(
+            select(func.count()).select_from(CompetitorSocial).where(CompetitorSocial.competitor_id == cid)
+        ) or 0
+        content_count = await session.scalar(
+            select(func.count()).select_from(CompetitorContent).where(CompetitorContent.competitor_id == cid)
+        ) or 0
+
+        results.append({
+            "id": comp.id,
+            "name": comp.name,
+            "website_url": comp.website_url,
+            "modules": comp.modules or [],
+            "services_count": services_count,
+            "pricing_count": pricing_count,
+            "social_count": social_count,
+            "content_count": content_count,
+        })
+
+    return results
+
+
+@router.get("/api/dashboard/export/pdf")
+async def export_pdf_report(session: AsyncSession = Depends(get_session)) -> Any:
+    """Export a PDF-like report as HTML for printing."""
+    result = await session.execute(select(Competitor).where(Competitor.enabled.is_(True)))
+    competitors = result.scalars().all()
+
+    rows = []
+    for comp in competitors:
+        services = await session.scalar(
+            select(func.count()).select_from(CompetitorService).where(CompetitorService.competitor_id == comp.id)
+        ) or 0
+        pricing = await session.scalar(
+            select(func.count()).select_from(CompetitorPricing).where(CompetitorPricing.competitor_id == comp.id)
+        ) or 0
+        social = await session.scalar(
+            select(func.count()).select_from(CompetitorSocial).where(CompetitorSocial.competitor_id == comp.id)
+        ) or 0
+        content = await session.scalar(
+            select(func.count()).select_from(CompetitorContent).where(CompetitorContent.competitor_id == comp.id)
+        ) or 0
+        rows.append(f"""
+        <tr>
+            <td style="padding:8px;border:1px solid #ddd">{comp.name}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:center">{services}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:center">{pricing}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:center">{social}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:center">{content}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:bold">{services + pricing + social + content}</td>
+        </tr>""")
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Competitor Intelligence Report</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; padding: 40px; color: #333; }}
+        h1 {{ color: #ff8811; border-bottom: 2px solid #ff8811; padding-bottom: 10px; }}
+        h2 {{ color: #555; margin-top: 30px; }}
+        table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+        th {{ background: #f5f5f5; padding: 10px; border: 1px solid #ddd; text-align: left; }}
+        .footer {{ margin-top: 40px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }}
+        @media print {{ body {{ padding: 20px; }} }}
+    </style>
+</head>
+<body>
+    <h1>Competitor Intelligence Report</h1>
+    <p>Generated: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}</p>
+    <h2>Data Summary</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Competitor</th>
+                <th>Services</th>
+                <th>Pricing</th>
+                <th>Social</th>
+                <th>Content</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {''.join(rows)}
+        </tbody>
+    </table>
+    <div class="footer">
+        <p>Utservio Competitor Intelligence Engine</p>
+    </div>
+</body>
+</html>"""
+
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={"Content-Disposition": "attachment; filename=competitor_report.html"},
+    )

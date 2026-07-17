@@ -1,7 +1,7 @@
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate } from '../lib/utils'
-import { BarChart3, Download, FileText, TrendingUp } from 'lucide-react'
+import { BarChart3, Download, FileText, TrendingUp, FileDown } from 'lucide-react'
 
 export default function ReportsPage() {
   const { data: summary, loading } = usePolling(() => api.getSummary(), 30000)
@@ -12,10 +12,13 @@ export default function ReportsPage() {
         <h1 className="text-2xl font-bold text-surface-900">Reports</h1>
         <div className="flex items-center gap-2">
           <a href={api.getCompareCsvUrl()} className="btn-secondary" download>
-            <Download size={16} /> Export CSV
+            <Download size={16} /> CSV
+          </a>
+          <a href={api.getPdfExportUrl()} className="btn-secondary" download>
+            <FileDown size={16} /> PDF
           </a>
           <a href={api.getExportZipUrl()} className="btn-primary" download>
-            <Download size={16} /> Export ZIP
+            <Download size={16} /> Full ZIP
           </a>
         </div>
       </div>

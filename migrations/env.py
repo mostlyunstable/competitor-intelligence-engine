@@ -12,7 +12,6 @@ from app.database.models import (  # noqa: F401
     CollectionLog,
     Competitor,
     CompetitorContent,
-    CompetitorPage,
     CompetitorPricing,
     CompetitorService,
     CompetitorSocial,

@@ -143,66 +143,6 @@ class TestContentHashing:
 # ===========================================================================
 
 
-@pytest.mark.integration
-class TestPageDuplicatePrevention:
-    async def test_same_content_not_duplicated(self, session: AsyncSession) -> None:
-        """Two pages with same source_id and content_hash should not both be inserted."""
-        competitor = await _create_competitor(session)
-        content_hash = compute_content_hash("<html>same content</html>", "https://example.com")
-
-        # Insert first page
-        from app.database.repositories.competitor_page_repository import CompetitorPageRepository
-
-        repo = CompetitorPageRepository(session)
-        page1 = await repo.upsert(
-            competitor_id=competitor.id,
-            content_hash=content_hash,
-            source_id=None,
-            storage_uri="file:///path/same.html",
-            collection_status=CollectionStatus.SUCCESS,
-        )
-        assert page1.id is not None
-
-        # Upsert with same hash should update, not create new
-        page2 = await repo.upsert(
-            competitor_id=competitor.id,
-            content_hash=content_hash,
-            source_id=None,
-            storage_uri="file:///path/same.html",
-            collection_status=CollectionStatus.SUCCESS,
-        )
-        assert page2.id == page1.id
-
-        # Verify only one page exists
-        all_pages = await repo.get_by_competitor(competitor.id)
-        assert len(all_pages) == 1
-
-    async def test_different_content_creates_separate_pages(self, session: AsyncSession) -> None:
-        """Pages with different content hashes should both be inserted."""
-        competitor = await _create_competitor(session, name="MultiPage Corp")
-
-        from app.database.repositories.competitor_page_repository import CompetitorPageRepository
-
-        repo = CompetitorPageRepository(session)
-        hash1 = compute_content_hash("<html>page one</html>", "https://example.com/page1")
-        hash2 = compute_content_hash("<html>page two</html>", "https://example.com/page2")
-
-        page1 = await repo.upsert(
-            competitor_id=competitor.id,
-            content_hash=hash1,
-            storage_uri="file:///path/one.html",
-        )
-        page2 = await repo.upsert(
-            competitor_id=competitor.id,
-            content_hash=hash2,
-            storage_uri="file:///path/two.html",
-        )
-
-        assert page1.id != page2.id
-        all_pages = await repo.get_by_competitor(competitor.id)
-        assert len(all_pages) == 2
-
-
 # ===========================================================================
 # Service Duplicate Prevention
 # ===========================================================================

@@ -1,28 +1,5 @@
-version: "3.9"
-
 services:
-  app:
-    build:
-      context: .
-      target: runtime
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./storage:/app/storage
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  postgres:
+  db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: utservio
@@ -31,25 +8,39 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U utservio -d utservio_ci"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
+  backend:
+    build: .
     ports:
-      - "6379:6379"
+      - "8000:8000"
+    environment:
+      - CI_DATABASE__URL=postgresql+asyncpg://utservio:changeme@db:5432/utservio_ci
+      - CI_API_KEY=
+      - CI_DEBUG=true
+      - CI_ENVIRONMENT=development
+      - CI_LOG_LEVEL=INFO
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ./competitors.json:/app/competitors.json:ro
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
-  pgdata:
-  redisdata:
+  postgres-data:

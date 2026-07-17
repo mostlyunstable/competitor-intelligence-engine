@@ -1,14 +1,10 @@
-# ================================
 # Environment & Secrets
-# ================================
 .env
 .env.local
 .env.production
 .env.*
 
-# ================================
 # Python
-# ================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,27 +16,20 @@ build/
 eggs/
 *.whl
 pip-log.txt
-pip-delete-this-directory.txt
 
-# ================================
 # Virtual Environments
-# ================================
 venv/
 .venv/
 ENV/
 
-# ================================
 # IDE / Editor
-# ================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# ================================
 # Testing & Quality
-# ================================
 .coverage
 .coverage.*
 htmlcov/
@@ -49,72 +38,47 @@ coverage.xml
 .mypy_cache/
 .ruff_cache/
 
-# ================================
 # Docker
-# ================================
 postgres-data/
 redis-data/
 app-data/
 
-# ================================
 # Playwright
-# ================================
 ms-playwright/
 
-# ================================
 # OS
-# ================================
 .DS_Store
-Thumbbs.db
 
-# ================================
 # Databases (local dev/test only)
-# ================================
 *.db
 *.sqlite
 *.sqlite3
 
-# ================================
 # Logs & Runtime Artifacts
-# ================================
 *.log
 logs/
 
-# ================================
 # Generated Reports (runtime output)
-# ================================
 reports/
 strategy_metrics.jsonl
 
-# ================================
 # Screenshots & Storage (runtime)
-# ================================
 storage/screenshots/
 storage/raw_html/
+storage/
 
-# ================================
 # Runtime State Files
-# ================================
 strategy_stats.json
-competitors.json
 
-# ================================
 # Backup & Temporary Files
-# ================================
 *.bak
 *.tmp
 *.old
 *.orig
 *.backup
 
-# ================================
 # Alembic
-# ================================
 migrations/versions/*.pyc
+
+# Node
 node_modules/
-.env
-__pycache__/
-*.pyc
-.venv/
-storage/
-*.db
