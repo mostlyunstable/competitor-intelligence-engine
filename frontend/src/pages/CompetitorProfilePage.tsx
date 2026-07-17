@@ -1,11 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useCallback } from 'react'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate, timeAgo } from '../lib/utils'
 import {
   ArrowLeft, Globe, Play, Edit, ExternalLink, Clock,
   CheckCircle, XCircle, Code, DollarSign, FileText,
-  Users, Share2, Database, History
+  Users, Share2, Database, History, RefreshCw
 } from 'lucide-react'
 
 export default function CompetitorProfilePage() {
@@ -13,8 +14,18 @@ export default function CompetitorProfilePage() {
   const navigate = useNavigate()
   const competitorId = parseInt(id || '0')
 
-  const { data, loading } = usePolling(() => api.getCompetitor(competitorId), 30000)
-  const { data: extracted } = usePolling(() => api.getExtracted(competitorId), 60000)
+  const { data, loading, refresh } = usePolling(() => api.getCompetitor(competitorId), 30000)
+  const { data: extracted, refresh: refreshExtracted } = usePolling(() => api.getExtracted(competitorId), 60000)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.all([refresh(), refreshExtracted()])
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refresh, refreshExtracted])
 
   if (loading && !data) {
     return <div className="space-y-4">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-32 w-full" />)}</div>
@@ -43,6 +54,9 @@ export default function CompetitorProfilePage() {
             </a>
           </div>
         </div>
+        <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
+        </button>
         <button onClick={async () => { await api.triggerCollection(competitorId) }} className="btn-primary">
           <Play size={16} /> Collect Now
         </button>

@@ -1,17 +1,15 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { usePolling } from '../hooks'
-import { useWebSocket } from '../hooks/useWebSocket'
 import { api } from '../lib/api'
-import { formatDate, timeAgo, formatDuration } from '../lib/utils'
+import { formatDate, timeAgo } from '../lib/utils'
 import { BarChart } from '../components/Charts'
 import {
   Users, Activity, CheckCircle, XCircle, TrendingUp, Clock,
-  Database, Cpu, Zap, ArrowUpRight, AlertTriangle, Wifi, WifiOff, BarChart3,
-  ExternalLink
+  Database, Zap, RefreshCw, BarChart3, ExternalLink
 } from 'lucide-react'
 
-function StatCard({ label, value, icon: Icon, color, sub }: {
-  label: string; value: string | number; icon: any; color: string; sub?: string
+function StatCard({ label, value, icon: Icon, color }: {
+  label: string; value: string | number; icon: any; color: string
 }) {
   return (
     <div className="stat-card">
@@ -19,7 +17,6 @@ function StatCard({ label, value, icon: Icon, color, sub }: {
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
           <Icon size={20} className="text-white" />
         </div>
-        {sub && <span className="text-xs text-surface-400">{sub}</span>}
       </div>
       <div className="text-2xl font-bold text-surface-900">{value}</div>
       <div className="text-sm text-surface-500">{label}</div>
@@ -35,37 +32,24 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${colors[status] || 'bg-surface-400'}`} />
 }
 
-interface LiveEvent {
-  id: number
-  type: string
-  data: any
-  timestamp: string
-}
-
 export default function OverviewPage() {
   const { data: stats, loading: statsLoading, refresh: refetchStats } = usePolling(() => api.getStats(), 15000)
   const { data: feedPage, refresh: refetchFeed } = usePolling(() => api.getFeed(20, 0), 20000)
-  const { data: health } = usePolling(() => api.getHealth(), 30000)
+  const { data: health, refresh: refetchHealth } = usePolling(() => api.getHealth(), 30000)
   const { data: telemetry } = usePolling(() => api.getTelemetry(), 10000)
-  const { data: trends } = usePolling(() => api.getTrends(14), 60000)
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([])
-  const eventIdRef = useRef(0)
+  const { data: trends, refresh: refetchTrends } = usePolling(() => api.getTrends(14), 60000)
+  const [refreshing, setRefreshing] = useState(false)
 
   const feed = feedPage?.items || []
 
-  const handleWsMessage = useCallback((msg: any) => {
-    eventIdRef.current += 1
-    const evt = { id: eventIdRef.current, ...msg }
-    setLiveEvents(prev => [...prev.slice(-19), evt])
-    if (msg.type === 'collection_completed' || msg.type === 'collection_failed') {
-      refetchStats()
-      refetchFeed()
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.all([refetchStats(), refetchFeed(), refetchHealth(), refetchTrends()])
+    } finally {
+      setRefreshing(false)
     }
-  }, [refetchStats, refetchFeed])
-
-  const { connected } = useWebSocket({
-    onMessage: handleWsMessage,
-  })
+  }, [refetchStats, refetchFeed, refetchHealth, refetchTrends])
 
   if (statsLoading && !stats) {
     return (
@@ -87,22 +71,23 @@ export default function OverviewPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">Dashboard Overview</h1>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm">
-            {connected ? (
-              <><Wifi size={14} className="text-emerald-500" /><span className="text-emerald-600">Live</span></>
-            ) : (
-              <><WifiOff size={14} className="text-red-500" /><span className="text-red-600">Disconnected</span></>
-            )}
-          </div>
           <div className="flex items-center gap-2 text-sm text-surface-500">
             <Clock size={14} />
-            Last updated: {timeAgo(new Date().toISOString())}
+            Updated {timeAgo(new Date().toISOString())}
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity duration-200 ${refreshing ? 'opacity-60' : ''}`}>
         <StatCard label="Total Competitors" value={s.total_competitors || 0} icon={Users} color="bg-brand-600" />
         <StatCard label="Active Competitors" value={s.active_competitors || 0} icon={Users} color="bg-green-600" />
         <StatCard label="Collections Running" value={s.collections_running || 0} icon={Activity} color="bg-blue-600" />
@@ -147,66 +132,9 @@ export default function OverviewPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Live Events */}
-        <div className="lg:col-span-1 card">
-          <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between">
-            <h2 className="font-semibold text-surface-900">Live Events</h2>
-            {liveEvents.length > 0 && (
-              <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">
-                {liveEvents.length}
-              </span>
-            )}
-          </div>
-          <div className="divide-y divide-surface-50 max-h-96 overflow-auto">
-            {liveEvents.length === 0 ? (
-              <div className="p-8 text-center text-surface-400 text-sm">
-                Waiting for live events...
-              </div>
-            ) : (
-              liveEvents.map((event) => (
-                <div key={event.id} className="px-5 py-3 hover:bg-surface-50">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`inline-block w-2 h-2 rounded-full ${
-                      event.type === 'collection_completed' ? 'bg-emerald-500' :
-                      event.type === 'collection_failed' ? 'bg-red-500' :
-                      event.type === 'collection_started' ? 'bg-blue-500' :
-                      event.type === 'changes_detected' ? 'bg-amber-500' :
-                      'bg-surface-400'
-                    }`} />
-                    <span className="text-xs font-medium text-surface-700">
-                      {event.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </span>
-                  </div>
-                  {event.type === 'collection_completed' && (
-                    <p className="text-xs text-surface-600 ml-4">
-                      {event.data.competitor_name} — {event.data.records_collected} records in {event.data.elapsed_seconds}s
-                    </p>
-                  )}
-                  {event.type === 'collection_failed' && (
-                    <p className="text-xs text-red-600 ml-4">
-                      {event.data.competitor_name} — {event.data.error?.slice(0, 50)}
-                    </p>
-                  )}
-                  {event.type === 'collection_started' && (
-                    <p className="text-xs text-surface-600 ml-4">
-                      {event.data.competitor_name}
-                    </p>
-                  )}
-                  {event.type === 'changes_detected' && (
-                    <p className="text-xs text-amber-600 ml-4">
-                      {event.data.changes?.length || 0} changes found
-                    </p>
-                  )}
-                  <p className="text-xs text-surface-400 ml-4 mt-0.5">{timeAgo(event.timestamp)}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
-        <div className="lg:col-span-1 card">
+        <div className="card">
           <div className="px-5 py-4 border-b border-surface-100">
             <h2 className="font-semibold text-surface-900">Recent Activity</h2>
           </div>
@@ -263,13 +191,6 @@ export default function OverviewPage() {
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-surface-600">WebSocket</span>
-              <div className="flex items-center gap-2">
-                <StatusDot status={connected ? 'healthy' : 'stopped'} />
-                <span className="text-sm font-medium text-surface-900">{connected ? 'connected' : 'disconnected'}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
               <span className="text-sm text-surface-600">Queue</span>
               <div className="flex items-center gap-2">
                 <StatusDot status="healthy" />
@@ -306,6 +227,17 @@ export default function OverviewPage() {
             <div className="pt-3 border-t border-surface-100">
               <h3 className="text-sm font-medium text-surface-900 mb-2">Last Collection</h3>
               <p className="text-sm text-surface-600">{formatDate(s.last_collection)}</p>
+            </div>
+
+            <div className="pt-3 border-t border-surface-100">
+              <a
+                href="/logs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full px-4 py-2.5 text-sm text-brand-600 hover:bg-surface-50 border border-surface-200 rounded-lg flex items-center justify-center gap-2"
+              >
+                View all logs <ExternalLink size={14} />
+              </a>
             </div>
           </div>
         </div>

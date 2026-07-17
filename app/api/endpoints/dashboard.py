@@ -1103,7 +1103,9 @@ async def compare_competitors(
 
 @router.get("/api/dashboard/export/pdf")
 async def export_pdf_report(session: AsyncSession = Depends(get_session)) -> Any:
-    """Export a PDF-like report as HTML for printing."""
+    """Export a PDF report using Playwright to render HTML to PDF."""
+    from playwright.async_api import async_playwright
+
     result = await session.execute(select(Competitor).where(Competitor.enabled.is_(True)))
     competitors = result.scalars().all()
 
@@ -1142,7 +1144,6 @@ async def export_pdf_report(session: AsyncSession = Depends(get_session)) -> Any
         table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
         th {{ background: #f5f5f5; padding: 10px; border: 1px solid #ddd; text-align: left; }}
         .footer {{ margin-top: 40px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }}
-        @media print {{ body {{ padding: 20px; }} }}
     </style>
 </head>
 <body>
@@ -1170,8 +1171,15 @@ async def export_pdf_report(session: AsyncSession = Depends(get_session)) -> Any
 </body>
 </html>"""
 
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.set_content(html, wait_until="networkidle")
+        pdf_bytes = await page.pdf(format="A4", print_background=True)
+        await browser.close()
+
     return Response(
-        content=html,
-        media_type="text/html",
-        headers={"Content-Disposition": "attachment; filename=competitor_report.html"},
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=competitor_report.pdf"},
     )

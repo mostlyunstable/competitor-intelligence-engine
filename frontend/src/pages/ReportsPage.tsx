@@ -1,16 +1,30 @@
+import { useState, useCallback } from 'react'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate } from '../lib/utils'
-import { BarChart3, Download, FileText, TrendingUp, FileDown } from 'lucide-react'
+import { BarChart3, Download, FileText, TrendingUp, FileDown, RefreshCw } from 'lucide-react'
 
 export default function ReportsPage() {
-  const { data: summary, loading } = usePolling(() => api.getSummary(), 30000)
+  const { data: summary, loading, refresh } = usePolling(() => api.getSummary(), 30000)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await refresh()
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refresh])
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">Reports</h1>
         <div className="flex items-center gap-2">
+          <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
+          </button>
           <a href={api.getCompareCsvUrl()} className="btn-secondary" download>
             <Download size={16} /> CSV
           </a>

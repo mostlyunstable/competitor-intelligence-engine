@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api } from '../lib/api'
 import { BarChart } from '../components/Charts'
-import { GitCompare, Check, Plus, X } from 'lucide-react'
+import { GitCompare, Check, Plus, X, RefreshCw } from 'lucide-react'
 
 interface CompetitorData {
   id: number
@@ -19,12 +19,31 @@ export default function CompetitorComparePage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [comparison, setComparison] = useState<CompetitorData[]>([])
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    api.getCompetitors({ page_size: 50 }).then(data => {
+  const loadCompetitors = useCallback(async () => {
+    try {
+      const data = await api.getCompetitors({ page_size: 50 })
       setCompetitors(data.competitors || data || [])
-    })
+    } catch {}
   }, [])
+
+  useEffect(() => { loadCompetitors() }, [loadCompetitors])
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await loadCompetitors()
+      if (selectedIds.length >= 2) {
+        setLoading(true)
+        const data = await api.compareCompetitors(selectedIds)
+        setComparison(data)
+        setLoading(false)
+      }
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadCompetitors, selectedIds])
 
   useEffect(() => {
     if (selectedIds.length >= 2) {
@@ -53,9 +72,14 @@ export default function CompetitorComparePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <GitCompare size={24} className="text-brand-500" />
-        <h1 className="text-2xl font-bold text-surface-900">Competitor Comparison</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <GitCompare size={24} className="text-brand-500" />
+          <h1 className="text-2xl font-bold text-surface-900">Competitor Comparison</h1>
+        </div>
+        <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
+        </button>
       </div>
 
       {/* Selector */}

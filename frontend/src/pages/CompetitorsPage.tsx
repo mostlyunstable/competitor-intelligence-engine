@@ -6,7 +6,7 @@ import { formatDate, timeAgo } from '../lib/utils'
 import {
   Plus, Search, Filter, Trash2, Edit, Copy, Play, Pause,
   ChevronLeft, ChevronRight, MoreVertical, ExternalLink, Globe,
-  AlertTriangle, XCircle
+  AlertTriangle, XCircle, RefreshCw
 } from 'lucide-react'
 
 export default function CompetitorsPage() {
@@ -30,6 +30,7 @@ export default function CompetitorsPage() {
   }), [debouncedSearch, filterEnabled, filterFrequency, page])
 
   const { data, loading, refresh } = usePolling(fetchData, 15000)
+  const [refreshing, setRefreshing] = useState(false)
 
   const competitors = data?.competitors || []
   const totalPages = data?.total_pages || 1
@@ -69,9 +70,14 @@ export default function CompetitorsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">Competitors</h1>
-        <button onClick={() => setShowAdd(true)} className="btn-primary">
-          <Plus size={16} /> Add Competitor
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={async () => { setRefreshing(true); try { await refresh() } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
+          </button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary">
+            <Plus size={16} /> Add Competitor
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

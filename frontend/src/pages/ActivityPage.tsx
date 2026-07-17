@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../lib/api'
 import { timeAgo } from '../lib/utils'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 
 export default function ActivityPage() {
   const [items, setItems] = useState<any[]>([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const pageSize = 30
 
   const loadPage = useCallback(async (p: number) => {
@@ -25,13 +26,27 @@ export default function ActivityPage() {
 
   useEffect(() => { loadPage(1) }, [loadPage])
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await loadPage(page)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadPage, page])
+
   const totalPages = Math.ceil(total / pageSize)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">All Activity</h1>
-        <span className="text-sm text-surface-500">{total} total events</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-surface-500">{total} total events</span>
+          <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="card">

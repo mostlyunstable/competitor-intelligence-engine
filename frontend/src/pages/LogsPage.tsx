@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate } from '../lib/utils'
-import { FileText, Filter, Download, ChevronLeft, ChevronRight } from 'lucide-react'
+import { FileText, Filter, Download, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 
 export default function LogsPage() {
   const [competitorId, setCompetitorId] = useState<number | undefined>()
@@ -17,6 +17,7 @@ export default function LogsPage() {
   }), [competitorId, successFilter, page])
 
   const { data, loading, refresh } = usePolling(fetchData, 15000)
+  const [refreshing, setRefreshing] = useState(false)
 
   const logs = data?.logs || []
   const totalPages = data?.total_pages || 1
@@ -25,7 +26,7 @@ export default function LogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">Collection Logs</h1>
-        <button onClick={refresh} className="btn-secondary">Refresh</button>
+        <button onClick={async () => { setRefreshing(true); try { await refresh() } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50"><RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh</button>
       </div>
 
       {/* Filters */}

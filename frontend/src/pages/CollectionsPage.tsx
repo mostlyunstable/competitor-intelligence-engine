@@ -9,6 +9,7 @@ import {
 
 export default function CollectionsPage() {
   const [competitorFilter, setCompetitorFilter] = useState<number | undefined>()
+  const [refreshing, setRefreshing] = useState(false)
 
   const fetchData = useCallback(() => api.getLogs({
     competitor_id: competitorFilter,
@@ -45,8 +46,8 @@ export default function CollectionsPage() {
               <Play size={16} /> Resume Scheduler
             </button>
           )}
-          <button onClick={refresh} className="btn-secondary">
-            <RefreshCw size={16} /> Refresh
+          <button onClick={async () => { setRefreshing(true); try { await refresh() } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
           </button>
         </div>
       </div>

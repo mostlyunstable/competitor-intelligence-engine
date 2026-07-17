@@ -37,6 +37,7 @@ export default function AdminPage() {
   const { data: config } = usePolling(() => api.getConfig(), 30000)
   const [resyncing, setResyncing] = useState(false)
   const [resyncResult, setResyncResult] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   const handleResync = async () => {
     setResyncing(true)
@@ -55,8 +56,8 @@ export default function AdminPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">System Administration</h1>
-        <button onClick={() => { refreshHealth(); refreshScheduler() }} className="btn-secondary">
-          <RefreshCw size={16} /> Refresh All
+        <button onClick={async () => { setRefreshing(true); try { await Promise.all([refreshHealth(), refreshScheduler()]) } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh All
         </button>
       </div>
 
