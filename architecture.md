@@ -12,70 +12,70 @@ Utservio is a full-stack competitor intelligence platform that automatically scr
 ┌─────────────────────────────────────────────────────────────────┐
 │                     COMPETITOR WEBSITES                         │
 │              (5 home warranty companies scraped)                │
-│  homewarranty.firstam.com │ choicehomewarranty.com │ ahs.com   │
+│  homewarranty.firstam.com │ choicehomewarranty.com │ ahs.com    │
 │  totalhomeprotection.com │ cinchhomeservices.com                │
 └──────────────────────────────┬──────────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    DISCOVERY ENGINE                              │
-│                                                                  │
+│                    DISCOVERY ENGINE                             │
+│                                                                 │
 │  Sources:                                                       │
 │  ├── sitemap.xml parsing                                        │
 │  ├── robots.txt analysis                                        │
 │  ├── HTML link extraction                                       │
-│  └── Common path guessing (/plans, /pricing, /about)           │
-│                                                                  │
+│  └── Common path guessing (/plans, /pricing, /about)            │
+│                                                                 │
 │  Output: List of DiscoveredURL objects with source tracking     │
 └──────────────────────────────┬──────────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                 HYBRID FETCHER (Playwright)                      │
-│                                                                  │
+│                 HYBRID FETCHER (Playwright)                     │
+│                                                                 │
 │  Two modes:                                                     │
-│  ├── HTTP (httpx) — fast, lightweight                          │
-│  └── Headless Browser (Chromium) — JS-rendered pages           │
-│                                                                  │
+│  ├── HTTP (httpx) — fast, lightweight                           │
+│  └── Headless Browser (Chromium) — JS-rendered pages            │
+│                                                                 │
 │  Features:                                                      │
-│  ├── Stealth initialization (anti-detection)                   │
-│  ├── 5 rotating user agents                                    │
-│  ├── Anti-detection browser arguments                          │
-│  ├── Response caching                                          │
-│  └── Handles Akamai, Cloudflare, bot protection                │
+│  ├── Stealth initialization (anti-detection)                    │
+│  ├── 5 rotating user agents                                     │
+│  ├── Anti-detection browser arguments                           │
+│  ├── Response caching                                           │
+│  └── Handles Akamai, Cloudflare, bot protection                 │
 └──────────────────────────────┬──────────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              SPECIALIZED COLLECTORS (5)                         │
-│                                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐│
-│  │ Company  │ │ Service  │ │ Pricing  │ │ Content  │ │ Social ││
-│  │Collector │ │Collector │ │Collector │ │Collector │ │Collect.││
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘│
-│                                                                  │
+│                                                                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
+│  │ Company  │ │ Service  │ │ Pricing  │ │ Content  │ │ Social │ │
+│  │Collector │ │Collector │ │Collector │ │Collector │ │Collect.│ │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘ │
+│                                                                 │
 │  Each collector:                                                │
-│  ├── Fetches relevant URLs                                     │
-│  ├── Parses HTML with BeautifulSoup                            │
-│  ├── Extracts structured data                                  │
-│  ├── Validates output (rejects nav/phone/questions)            │
-│  └── Stores in database with content hashes                    │
-│                                                                  │
-│  + TechnographicCollector (detects tech stack, no DB write)    │
+│  ├── Fetches relevant URLs                                      │
+│  ├── Parses HTML with BeautifulSoup                             │
+│  ├── Extracts structured data                                   │
+│  ├── Validates output (rejects nav/phone/questions)             │
+│  └── Stores in database with content hashes                     │
+│                                                                 │
+│  + TechnographicCollector (detects tech stack, no DB write)     │
 └──────────────────────────────┬──────────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    POSTGRESQL (8 tables)                         │
-│                                                                  │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐    │
+│                    POSTGRESQL (8 tables)                        │
+│                                                                 │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐     │
 │  │ competitors │  │   sources    │  │  competitor_services │    │
-│  │ (config)    │  │  (URLs)      │  │  (plans/coverage)   │    │
-│  └─────────────┘  └──────────────┘  └─────────────────────┘    │
+│  │ (config)    │  │  (URLs)      │  │  (plans/coverage)   │     │
+│  └─────────────┘  └──────────────┘  └─────────────────────┘     │
 │  ┌─────────────────────┐  ┌──────────────────────┐              │
-│  │ competitor_pricing  │  │ competitor_content    │              │
-│  │ (prices/offers)     │  │ (blogs/articles)      │              │
+│  │ competitor_pricing  │  │ competitor_content    │             │
+│  │ (prices/offers)     │  │ (blogs/articles)      │             │
 │  └─────────────────────┘  └──────────────────────┘              │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────┐   │
-│  │ competitor_social│  │  raw_storage     │  │collection_  │   │
-│  │ (profiles)       │  │ (raw HTML)       │  │logs         │   │
-│  └──────────────────┘  └──────────────────┘  └─────────────┘   │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────┐    │
+│  │ competitor_social│  │  raw_storage     │  │collection_  │    │
+│  │ (profiles)       │  │ (raw HTML)       │  │logs         │    │
+│  └──────────────────┘  └──────────────────┘  └─────────────┘    │
 │  ┌──────────────────┐                                           │
 │  │  change_logs     │                                           │
 │  │ (diff tracking)  │                                           │
@@ -100,35 +100,35 @@ Utservio is a full-stack competitor intelligence platform that automatically scr
             ▼                   └──────────────┬──────────────────┘
 ┌─────────────────────────────────────────────────────────────────┐
 │                    REACT DASHBOARD (9 pages)                    │
-│                                                                  │
-│  ┌──────────┐ ┌────────────┐ ┌───────────┐ ┌────────────────┐  │
-│  │Overview  │ │Competitors │ │ Competitor│ │   Competitor   │  │
-│  │(KPIs,    │ │(List,      │ │  Profile  │ │    Compare     │  │
-│  │ charts,  │ │ Search,    │ │ (Detail,  │ │  (2-4 side by  │  │
-│  │ activity)│ │ Filter)    │ │ Extract)  │ │    side)       │  │
-│  └──────────┘ └────────────┘ └───────────┘ └────────────────┘  │
-│  ┌────────────┐ ┌──────┐ ┌─────────┐ ┌──────────┐ ┌─────────┐ │
-│  │Collections │ │ Logs │ │Reports  │ │ Activity │ │  Admin  │ │
-│  │(Monitor,   │ │(Filter│ │(Summary,│ │ (Full    │ │(Health, │ │
-│  │ Pause)     │ │ Pagin.)│ │ Export) │ │ history) │ │ Config) │ │
-│  └────────────┘ └──────┘ └─────────┘ └──────────┘ └─────────┘ │
-│                                                                  │
-│  Tech: React 18 + TypeScript + Tailwind CSS                    │
-│  Theme: Orange (#ff8811) + Dark sidebar                        │
-│  Features: Refresh buttons, loading states, new-tab links      │
+│                                                                 │
+│  ┌──────────┐ ┌────────────┐ ┌───────────┐ ┌────────────────┐   │
+│  │Overview  │ │Competitors │ │ Competitor│ │   Competitor   │   │
+│  │(KPIs,    │ │(List,      │ │  Profile  │ │    Compare     │   │
+│  │ charts,  │ │ Search,    │ │ (Detail,  │ │  (2-4 side by  │   │
+│  │ activity)│ │ Filter)    │ │ Extract)  │ │    side)       │   │
+│  └──────────┘ └────────────┘ └───────────┘ └────────────────┘   │
+│  ┌────────────┐ ┌──────┐ ┌─────────┐ ┌──────────┐ ┌─────────┐   │
+│  │Collections │ │ Logs │ │Reports  │ │ Activity │ │  Admin  │   │ 
+│  │(Monitor,   │ │(Filter││(Summary,│ │ (Full    │ │(Health, │   │
+│  │ Pause)     │ │ Pagin.)│ │ Export) │ │ history) │Config)  │   │
+│  └────────────┘ └──────┘ └─────────┘ └──────────┘ └─────────┘   │
+│                                                                 │
+│  Tech: React 18 + TypeScript + Tailwind CSS                     │
+│  Theme: Orange (#ff8811) + Dark sidebar                         │
+│  Features: Refresh buttons, loading states, new-tab links       │
 └──────────────────────────────┬──────────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │               WEBSOCKET LIVE UPDATES                            │
-│                                                                  │
+│                                                                 │
 │  Events broadcast to all connected clients:                     │
-│  ├── collection_started     (competitor name, id)              │
-│  ├── collection_completed   (records, duration, changes)       │
-│  ├── collection_failed      (error message)                    │
-│  └── changes_detected       (change list)                      │
-│                                                                  │
-│  Auto-reconnect with 3s delay                                  │
-│  Ping/pong keepalive every 30s                                 │
+│  ├── collection_started     (competitor name, id)               │
+│  ├── collection_completed   (records, duration, changes)        │
+│  ├── collection_failed      (error message)                     │
+│  └── changes_detected       (change list)                       │
+│                                                                 │
+│  Auto-reconnect with 3s delay                                   │
+│  Ping/pong keepalive every 30s                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -185,16 +185,16 @@ Utservio is a full-stack competitor intelligence platform that automatically scr
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  DOCKER COMPOSE                      │
-│                                                      │
-│  ┌──────────────┐  ┌────────────┐  ┌──────────────┐│
-│  │  PostgreSQL   │  │  FastAPI    │  │    React     ││
-│  │  Port: 5432  │  │  Port: 8000│  │  Port: 3000  ││
-│  │              │  │            │  │              ││
-│  │  Database:   │  │  Backend:  │  │  Frontend:   ││
-│  │  utservio_ci │  │  API + WS  │  │  Vite proxy  ││
-│  └──────────────┘  └────────────┘  └──────────────┘│
-│                                                      │
+│                  DOCKER COMPOSE                     │
+│                                                     │
+│  ┌──────────────┐  ┌────────────┐  ┌──────────────┐ │
+│  │  PostgreSQL  │  │  FastAPI   │  │    React     │ │
+│  │  Port: 5432  │  │  Port: 8000│  │  Port: 3000  │ │
+│  │              │  │            │  │              │ │
+│  │  Database:   │  │  Backend:  │  │  Frontend:   │ │
+│  │  utservio_ci │  │  API + WS  │  │  Vite proxy  │ │
+│  └──────────────┘  └────────────┘  └──────────────┘ │
+│                                                     │
 │  ┌──────────────┐                                   │
 │  │   pgAdmin    │                                   │
 │  │  Port: 5050  │                                   │
