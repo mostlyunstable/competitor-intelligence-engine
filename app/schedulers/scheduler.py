@@ -96,7 +96,7 @@ class CollectionScheduler:
             try:
                 # Timeout of 30 minutes to prevent infinite hangs in one competitor affecting others
                 await asyncio.wait_for(
-                    collection_service.collect_competitor(comp_id), timeout=1800.0
+                    collection_service.collect_competitor(comp_id), timeout=3600.0
                 )
             except TimeoutError:
                 logger.error("scheduled_collection_timed_out", competitor_id=comp_id)

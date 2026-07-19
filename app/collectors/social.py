@@ -8,6 +8,7 @@ from app.collectors.base import BaseCollector
 from app.database.models import SocialPlatform
 from app.database.repositories.competitor_social_repository import CompetitorSocialRepository
 from app.parsers.strategy_parser import StrategyParser
+from app.utilities.content_hasher import compute_social_hash
 from app.utilities.url_normalizer import normalize_url
 
 
@@ -71,11 +72,14 @@ class SocialCollector(BaseCollector):
                 if username and len(username) > 255:
                     username = username[:255]
 
+                content_hash = compute_social_hash(platform_str, profile_url, username)
+
                 await social_repo.upsert(
                     competitor_id=competitor_id,
                     platform=platform,
                     profile_url=profile_url,
                     username=username,
+                    content_hash=content_hash,
                 )
                 profiles_created += 1
 

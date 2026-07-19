@@ -18,7 +18,7 @@ class CollectorSettings(BaseModel):
     user_agent: str = Field(default="UtservioCI/1.0")
     retry_attempts: int = Field(default=3, ge=1, le=10)
     retry_delay: float = Field(default=1.0, ge=0.1, le=10.0)
-    playwright_timeout: int = Field(default=30000, ge=5000, le=120000)
+    playwright_timeout: int = Field(default=60000, ge=5000, le=120000)
     primary_selector: str = Field(default="body")
     enable_conditional_get: bool = Field(default=True)
     enable_content_hash_skip: bool = Field(default=True)

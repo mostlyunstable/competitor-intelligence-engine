@@ -34,11 +34,13 @@ class CompetitorSocialRepository(BaseRepository[CompetitorSocial]):
         platform: SocialPlatform,
         profile_url: str,
         username: str | None = None,
+        content_hash: str | None = None,
     ) -> CompetitorSocial:
         existing = await self.get_by_platform(competitor_id, platform)
         if existing:
             existing.profile_url = profile_url
             existing.username = username
+            existing.content_hash = content_hash
             await self._session.flush()
             return existing
         return await self.create(
@@ -46,6 +48,7 @@ class CompetitorSocialRepository(BaseRepository[CompetitorSocial]):
             platform=platform,
             profile_url=profile_url,
             username=username,
+            content_hash=content_hash,
         )
 
     async def delete_by_competitor(self, competitor_id: int) -> None:
