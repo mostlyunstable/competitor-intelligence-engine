@@ -47,7 +47,7 @@ dev = [
     "mypy>=1.14,<2",
     "black>=24.10,<27",
     "types-psutil>=6.0,<7",
-    "types-aiofiles>=23.0,<25",
+    "types-aiofiles>=23.0,<26",
     "aiosqlite>=0.22.1",
 ]
 llm = [
