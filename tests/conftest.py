@@ -2,7 +2,6 @@ import os
 from collections.abc import AsyncGenerator
 
 import pytest_asyncio
-from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -14,22 +13,13 @@ from app.database.connection import Base
 
 TEST_DATABASE_URL = os.environ.get(
     "CI_TEST_DATABASE_URL",
-    "postgresql+asyncpg://localhost:5432/utservio_ci_test",
+    "postgresql+asyncpg://utservio:changeme@localhost:5434/utservio_ci_test",
 )
 
 
 @pytest_asyncio.fixture(scope="session")
 async def engine() -> AsyncGenerator[AsyncEngine, None]:
     eng = create_async_engine(TEST_DATABASE_URL, echo=False)
-
-    if "sqlite" in TEST_DATABASE_URL:
-
-        from typing import Any
-        @event.listens_for(eng.sync_engine, "connect")
-        def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
 
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

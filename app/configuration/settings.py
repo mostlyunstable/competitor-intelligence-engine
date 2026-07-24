@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseSettings(BaseModel):
-    url: str = Field(default="postgresql+asyncpg://utservio:changeme@localhost:5432/utservio_ci")
+    url: str = Field(default="postgresql+asyncpg://utservio:changeme@localhost:5434/utservio_ci")
     echo: bool = Field(default=False)
     pool_size: int = Field(default=10)
     max_overflow: int = Field(default=20)
@@ -65,6 +65,7 @@ class LLMSettings(BaseModel):
     provider: str = Field(default="gemini")
     api_key: str = Field(default="")
     model_name: str = Field(default="gemini-2.5-flash")
+    base_url: str = Field(default="")
 
 
 class StealthSettings(BaseModel):

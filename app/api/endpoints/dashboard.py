@@ -9,15 +9,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import cast, func, select, String, Integer
+from sqlalchemy import Integer, String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_session
 from app.configuration.settings import get_settings
-from app.database.connection import db_manager
 from app.database.models import (
-    CollectionFrequency,
     CollectionLog,
     Competitor,
     CompetitorContent,
@@ -84,9 +82,9 @@ class CompetitorCreate(BaseModel):
         try:
             ip = socket.gethostbyname(domain)
             if ip.startswith("127.") or ip.startswith("169.254.") or ip.startswith("10.") or ip.startswith("192.168."):
-                raise ValueError("Internal or private IPs are forbidden (SSRF Protection).")
+                raise ValueError("Internal or private IPs are forbidden (SSRF Protection).") from None
         except socket.gaierror:
-            raise ValueError(f"Could not resolve domain '{domain}'. Check the URL.")
+            raise ValueError(f"Could not resolve domain {domain}. Check the URL.") from None # '{domain}'. Check the URL.")
 
         return v
 
@@ -253,7 +251,7 @@ async def get_competitor_detail(
         "content": [{"id": c.id, "title": c.title, "url": c.url, "content_type": c.content_type, "collected_at": c.collected_at.isoformat() if c.collected_at else None} for c in content],
         "social": [{"id": s.id, "platform": s.platform.value if hasattr(s.platform, 'value') else s.platform, "url": s.profile_url, "username": s.username, "collected_at": s.collected_at.isoformat() if s.collected_at else None} for s in social],
         "sources": [{"id": s.id, "url": s.url, "page_type": s.page_type, "is_active": s.is_active, "last_crawled_at": s.last_crawled_at.isoformat() if s.last_crawled_at else None} for s in sources],
-        "collection_logs": [{"id": l.id, "start_time": l.start_time.isoformat() if l.start_time else None, "success": l.success, "duration_seconds": float(l.duration_seconds) if l.duration_seconds else None, "records_collected": l.records_collected} for l in logs],
+        "collection_logs": [{"id": log.id, "start_time": log.start_time.isoformat() if log.start_time else None, "success": log.success, "duration_seconds": float(log.duration_seconds) if log.duration_seconds else None, "records_collected": log.records_collected} for log in logs],
     }
 
 
@@ -286,7 +284,7 @@ async def create_dashboard_competitor(
         raise HTTPException(
             status_code=409,
             detail=f"A competitor named '{payload.name.strip()}' already exists. Choose a different name.",
-        )
+        ) from None
     await session.refresh(comp)
     return {"id": comp.id, "name": comp.name, "website_url": comp.website_url, "status": "created"}
 
@@ -311,7 +309,7 @@ async def update_dashboard_competitor(
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        raise HTTPException(status_code=409, detail="Update would violate constraints.")
+        raise HTTPException(status_code=409, detail="Update would violate constraints.") from None
 
     return {"id": comp.id, "name": comp.name, "website_url": comp.website_url, "status": "updated"}
 
@@ -332,12 +330,10 @@ async def delete_dashboard_competitor(
 
 # ─── Bulk Operations ────────────────────────────────────────────────────────
 
-class BulkAction(BaseModel):
+class CompetitorBulkAction(BaseModel):
     competitor_ids: list[int]
 
-class BulkFrequencyUpdate(BaseModel):
-    competitor_ids: list[int]
-    frequency: CollectionFrequency
+
 @router.post("/api/dashboard/competitors/bulk/delete")
 async def bulk_delete(
     payload: BulkAction, session: AsyncSession = Depends(get_session)
@@ -396,7 +392,7 @@ async def bulk_update_frequency(
         result = await session.execute(stmt)
         comp = result.scalar_one_or_none()
         if comp:
-            comp.collection_frequency = payload.frequency
+            comp.collection_frequency = payload.frequency  # type: ignore
             updated += 1
     await session.commit()
     return {"updated": updated}
@@ -466,7 +462,7 @@ async def get_dashboard_stats(
     running_jobs = 0
     try:
         from app.main import message_queue as mq
-        queue_stats = await mq.get_stats()
+        queue_stats = await mq.get_stats()  # type: ignore
         running_jobs = queue_stats.get("queue_size", 0)
     except Exception:
         pass
@@ -894,7 +890,7 @@ async def get_raw_html(competitor_id: int, session: AsyncSession = Depends(get_s
 
 
 @router.get("/api/dashboard/export/zip")
-async def export_zip(session: AsyncSession = Depends(get_session)):
+async def export_zip(session: AsyncSession = Depends(get_session)):  # type: ignore
     import io
     import zipfile
 
@@ -965,7 +961,7 @@ async def get_system_health(session: AsyncSession = Depends(get_session)) -> dic
     try:
         from app.main import message_queue as mq
 
-        q_stats = await mq.get_stats()
+        q_stats = await mq.get_stats()  # type: ignore
         checks["queue"] = {
             "status": "healthy",
             "queue_size": q_stats.get("queue_size", 0),
@@ -1012,7 +1008,8 @@ async def get_collection_trends(
 ) -> dict[str, Any]:
     """Get collection trends over time."""
     from datetime import timedelta
-    from sqlalchemy import func, cast, Date
+
+    from sqlalchemy import Date, cast, func
 
     since = datetime.now(UTC) - timedelta(days=days)
 

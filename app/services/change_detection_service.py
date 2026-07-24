@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -38,7 +37,7 @@ class ChangeDetectionService:
         self, competitor_id: int, data_type: str, session: AsyncSession
     ) -> list[dict[str, Any]]:
         """Compare current data against previous snapshot and record changes."""
-        model = DATA_MODELS.get(data_type)
+        model: Any = DATA_MODELS.get(data_type)
         if not model:
             return []
 
@@ -135,9 +134,9 @@ class ChangeDetectionService:
             if isinstance(val, Decimal):
                 val = float(val)
             elif hasattr(val, "isoformat"):
-                val = val.isoformat()
+                val = val.isoformat()  # type: ignore
             elif hasattr(val, "value"):
-                val = val.value
+                val = val.value  # type: ignore
             result[field] = val
         return result
 

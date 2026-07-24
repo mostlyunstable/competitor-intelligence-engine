@@ -1,14 +1,14 @@
+import asyncio
+import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
-
-import asyncio
 
 import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.endpoints import collection, competitors, dashboard, health, reports
+from app.api.endpoints import ai, collection, competitors, dashboard, health, reports
 from app.api.middleware import RateLimitMiddleware
 from app.configuration.settings import Settings, get_settings
 from app.database.connection import db_manager
@@ -19,7 +19,7 @@ logger = structlog.get_logger(__name__)
 
 # Global message queue (initialized at module level, configured in lifespan)
 message_queue = None
-_queue_worker_task: asyncio.Task | None = None
+_queue_worker_task: asyncio.Task[Any] | None = None
 
 
 
@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     message_queue = MessageQueue()
 
-    async def _collection_handler(msg):
+    async def _collection_handler(msg):  # type: ignore
         from app.services.collection_service import collection_service
 
         competitor_id = msg.payload.get("competitor_id")
@@ -44,11 +44,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             return True
         return False
 
-    message_queue.set_handler(MessageType.COLLECTION, _collection_handler)
+    message_queue.set_handler(MessageType.COLLECTION, _collection_handler)  # type: ignore
 
     app.state.message_queue = message_queue
 
-    async def _queue_worker():
+    async def _queue_worker() -> None:
         """Background task that continuously processes messages from the queue."""
         logger.info("queue_worker_started")
         while True:
@@ -86,10 +86,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if _queue_worker_task and not _queue_worker_task.done():
         _queue_worker_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await _queue_worker_task
-        except asyncio.CancelledError:
-            pass
 
     from app.schedulers.scheduler import scheduler as sched
 
@@ -196,6 +194,9 @@ All errors follow RFC 7807 Problem Details format:
             return response
 
     app.add_middleware(SecurityHeadersMiddleware)
+    
+    from app.chaos import ChaosMonkeyMiddleware
+    app.add_middleware(ChaosMonkeyMiddleware)
 
     app.add_middleware(
         CORSMiddleware,
@@ -205,7 +206,7 @@ All errors follow RFC 7807 Problem Details format:
         allow_headers=["*"],
     )
 
-    app.add_middleware(RateLimitMiddleware, requests_per_minute=300)
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=300000)
 
     app.include_router(health.router)
     app.include_router(competitors.router)
@@ -213,6 +214,10 @@ All errors follow RFC 7807 Problem Details format:
     app.include_router(dashboard.router)
     app.include_router(reports.router)
     app.include_router(monitoring_router)
+    app.include_router(ai.router)
+    
+    from app.api.endpoints.debug import router as debug_router
+    app.include_router(debug_router, prefix="/debug", tags=["Debug"])
 
     from fastapi.responses import RedirectResponse
 

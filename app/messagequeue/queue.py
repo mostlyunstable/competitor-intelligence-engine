@@ -212,7 +212,7 @@ class RedisQueueBackend(QueueBackend):
             try:
                 import redis.asyncio as aioredis
 
-                self._redis = aioredis.from_url(self._redis_url)
+                self._redis = aioredis.from_url(self._redis_url)  # type: ignore
             except ImportError:
                 logger.error("redis_not_installed")
                 raise

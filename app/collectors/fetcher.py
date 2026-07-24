@@ -228,9 +228,9 @@ class PlaywrightRenderer:
         from app.configuration.settings import get_settings
 
         if get_settings().stealth.enabled:
-            from playwright_stealth import Stealth
+            from playwright_stealth import stealth_async
 
-            await Stealth().apply_stealth_async(page)
+            await stealth_async(page)
 
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
@@ -733,6 +733,8 @@ class HybridFetcher:
             try:
                 client = await self._get_client()
                 headers = dict(conditional_headers) if conditional_headers else {}
+                from app.chaos import ChaosMonkey
+                await ChaosMonkey.maybe_fail_network()
                 response = await client.get(url, headers=headers)
 
                 redirect_chain = [str(r.url) for r in response.history]

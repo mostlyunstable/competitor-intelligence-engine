@@ -78,10 +78,7 @@ def _is_valid_service(name: str, description: str | None = None, price: float | 
         return True
 
     # Accept if has a meaningful description (> 30 chars)
-    if description and len(description) > 30:
-        return True
-
-    return False
+    return bool(description and len(description) > 30)
 
 
 class ServiceCollector(BaseCollector):

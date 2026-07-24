@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: competitor-intelligence-api-canary
+  labels:
+    app: competitor-intelligence
+    component: api
+    track: canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: competitor-intelligence
+      component: api
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: competitor-intelligence
+        component: api
+        track: canary
+    spec:
+      containers:
+        - name: api
+          image: competitor-intelligence:canary
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              value: "production"
+            - name: DEBUG
+              value: "false"
+            - name: CANARY
+              value: "true"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: competitor-intelligence-secrets
+                  key: database-url
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: competitor-intelligence-secrets
+                  key: api-key
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: competitor-intelligence-api-canary
+  labels:
+    app: competitor-intelligence
+    component: api
+    track: canary
+spec:
+  selector:
+    app: competitor-intelligence
+    component: api
+    track: canary
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP

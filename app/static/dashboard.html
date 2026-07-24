@@ -428,6 +428,58 @@
                         <span class="font-label-sm text-label-sm text-on-surface-variant" id="health-api-text">API: Checking</span>
                     </div>
                 </div>
+
+                <h2 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mt-stack-md font-semibold">AI Intelligence</h2>
+                <div id="ai-insights-panel" class="bg-surface-container-lowest border-2 border-black rounded-xl p-stack-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] min-h-[150px] flex flex-col justify-center items-center relative overflow-hidden">
+                    <div id="ai-state-empty" class="text-center w-full">
+                        <span class="material-symbols-outlined text-4xl text-outline-variant mb-2">auto_awesome</span>
+                        <p class="font-label-md text-outline">Select a competitor to view insights</p>
+                    </div>
+                    
+                    <div id="ai-state-loading" class="text-center w-full hidden">
+                        <span class="material-symbols-outlined text-4xl text-primary animate-spin mb-2">sync</span>
+                        <p class="font-label-md text-primary font-bold">Analyzing Competitor...</p>
+                    </div>
+                    
+                    <div id="ai-state-error" class="text-center w-full hidden">
+                        <span class="material-symbols-outlined text-4xl text-error mb-2">error</span>
+                        <p class="font-label-md text-error" id="ai-error-text">Failed to load insights</p>
+                        <button onclick="triggerAIAnalysis()" class="mt-2 text-primary hover:underline font-label-sm font-bold">Try Again</button>
+                    </div>
+                    
+                    <div id="ai-state-missing" class="text-center w-full hidden">
+                        <span class="material-symbols-outlined text-4xl text-outline mb-2">psychology_alt</span>
+                        <p class="font-label-md text-outline mb-3">No insights found for this competitor.</p>
+                        <button onclick="triggerAIAnalysis()" class="py-2 px-4 bg-primary text-white font-label-md rounded-lg hover:brightness-105 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                            Generate Insights
+                        </button>
+                    </div>
+                    
+                    <div id="ai-state-success" class="w-full hidden flex flex-col gap-3">
+                        <div class="flex justify-between items-start border-b-2 border-black pb-2">
+                            <h3 class="font-display font-bold text-lg flex items-center gap-2 text-primary">
+                                <span class="material-symbols-outlined">auto_awesome</span> 
+                                Executive Summary
+                            </h3>
+                            <span class="bg-green-100 text-green-800 text-[10px] px-2 py-1 rounded font-bold border border-green-800 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">verified</span> <span id="ai-score">--</span>% Confidence
+                            </span>
+                        </div>
+                        <p id="ai-summary-text" class="text-body-sm text-on-surface line-clamp-4 hover:line-clamp-none transition-all cursor-pointer"></p>
+                        
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div class="bg-green-50 border border-green-200 p-2 rounded">
+                                <h4 class="text-green-800 font-bold text-[11px] uppercase mb-1">Key Strengths</h4>
+                                <ul id="ai-strengths-list" class="list-disc pl-3 text-[11px] text-green-900 space-y-1"></ul>
+                            </div>
+                            <div class="bg-red-50 border border-red-200 p-2 rounded">
+                                <h4 class="text-red-800 font-bold text-[11px] uppercase mb-1">Weaknesses</h4>
+                                <ul id="ai-weaknesses-list" class="list-disc pl-3 text-[11px] text-red-900 space-y-1"></ul>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-outline text-right mt-1">Generated: <span id="ai-generated-at">--</span></p>
+                    </div>
+                </div>
             </div>
 
             <!-- Summary & Logs -->
@@ -758,14 +810,91 @@
             } else {
                 lcEl.textContent = 'Never collected';
             }
+            
+            // Load AI Insights
+            loadAIInsights(id);
         } else {
             targetUrlEl.textContent = 'No competitor selected';
             triggerBtn.setAttribute('disabled', 'true');
             viewJsonBtn.setAttribute('disabled', 'true');
             exportCsvBtn.setAttribute('disabled', 'true');
             document.getElementById('last-collected').textContent = '';
+            setAIState('empty');
         }
     });
+
+    function setAIState(state) {
+        ['empty', 'loading', 'error', 'missing', 'success'].forEach(s => {
+            document.getElementById(`ai-state-${s}`).classList.add('hidden');
+        });
+        document.getElementById(`ai-state-${state}`).classList.remove('hidden');
+    }
+
+    async function loadAIInsights(id) {
+        setAIState('loading');
+        try {
+            const res = await fetch(`/api/ai/competitor/${id}`);
+            if (res.status === 404) {
+                setAIState('missing');
+                return;
+            }
+            if (!res.ok) throw new Error('Failed to load AI insights');
+            
+            const data = await res.json();
+            
+            if (!data.insights_json) {
+                setAIState('missing');
+                return;
+            }
+            
+            const payload = typeof data.insights_json === 'string' ? JSON.parse(data.insights_json) : data.insights_json;
+            
+            document.getElementById('ai-summary-text').textContent = payload.executive_summary || 'No summary available.';
+            document.getElementById('ai-score').textContent = payload.confidence_score || '0';
+            
+            const renderList = (id, items) => {
+                const el = document.getElementById(id);
+                el.innerHTML = '';
+                if (!items || !items.length) {
+                    el.innerHTML = '<li>None found</li>';
+                } else {
+                    items.forEach(i => {
+                        const li = document.createElement('li');
+                        li.textContent = i;
+                        el.appendChild(li);
+                    });
+                }
+            };
+            
+            renderList('ai-strengths-list', payload.strengths);
+            renderList('ai-weaknesses-list', payload.weaknesses);
+            
+            document.getElementById('ai-generated-at').textContent = new Date(data.generated_at).toLocaleString();
+            
+            setAIState('success');
+            
+        } catch (e) {
+            console.error(e);
+            document.getElementById('ai-error-text').textContent = e.message;
+            setAIState('error');
+        }
+    }
+
+    window.triggerAIAnalysis = async function() {
+        if (!activeCompetitorId) return;
+        setAIState('loading');
+        try {
+            const res = await fetch(`/api/ai/analyze/${activeCompetitorId}`, { method: 'POST' });
+            if (!res.ok) throw new Error('Failed to trigger analysis');
+            showToast('AI Analysis triggered successfully', 'success');
+            // Poll for completion
+            setTimeout(() => loadAIInsights(activeCompetitorId), 5000);
+        } catch (e) {
+            console.error(e);
+            document.getElementById('ai-error-text').textContent = e.message;
+            setAIState('error');
+        }
+    }
 
     function timeAgo(date) {
         const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -1246,7 +1375,8 @@
         try {
             const resLogs = await fetch(`/api/dashboard/logs?t=${timestamp}`);
             if (resLogs.ok) {
-                const logs = await resLogs.json();
+                const logsData = await resLogs.json();
+                const logs = logsData.logs || logsData; // Handle both wrapped and direct array
                 const logsContainer = document.getElementById('logs-container');
                 logsContainer.innerHTML = '';
                 if (logs.length === 0) {
@@ -1394,7 +1524,8 @@
             const comp = competitorsMap[id];
             
             // Calculate health based on logs
-            fetch('/api/dashboard/logs?limit=100').then(r=>r.json()).then(logs => {
+            fetch('/api/dashboard/logs?limit=100').then(r=>r.json()).then(logsData => {
+                const logs = logsData.logs || logsData;
                 const compLogs = logs.filter(l => l.competitor_id === id);
                 const healthEl = document.getElementById('modal-health-score');
                 const successEl = document.getElementById('modal-last-success');

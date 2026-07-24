@@ -1,0 +1,10 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,/competitors/?search=stripe,"ConnectionResetError(54, 'Connection reset by peer')",38,2026-07-24T04:24:43Z,2026-07-24T04:24:50Z
+GET,/competitors/?search=google,"ConnectionResetError(54, 'Connection reset by peer')",43,2026-07-24T04:24:43Z,2026-07-24T04:24:49Z
+GET,/dashboard/stats,HTTPError('404 Client Error: Not Found for url: /dashboard/stats'),1082,2026-07-24T04:24:43Z,2026-07-24T04:24:53Z
+GET,/competitors/?search=linear,"ConnectionResetError(54, 'Connection reset by peer')",45,2026-07-24T04:24:43Z,2026-07-24T04:24:50Z
+GET,/competitors/?search=github,"ConnectionResetError(54, 'Connection reset by peer')",45,2026-07-24T04:24:43Z,2026-07-24T04:24:50Z
+GET,/dashboard/stats,"ConnectionResetError(54, 'Connection reset by peer')",552,2026-07-24T04:24:43Z,2026-07-24T04:24:50Z
+GET,/competitors/?skip=0&limit=50,"ConnectionResetError(54, 'Connection reset by peer')",379,2026-07-24T04:24:43Z,2026-07-24T04:24:50Z
+POST,/competitors/,HTTPError('422 Client Error: Unprocessable Entity for url: /competitors/'),328,2026-07-24T04:24:43Z,2026-07-24T04:24:53Z
+POST,/competitors/,"ConnectionResetError(54, 'Connection reset by peer')",169,2026-07-24T04:24:43Z,2026-07-24T04:24:50Z

@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: competitor-intelligence-api
+  labels:
+    app: competitor-intelligence
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: competitor-intelligence
+      component: api
+  template:
+    metadata:
+      labels:
+        app: competitor-intelligence
+        component: api
+    spec:
+      containers:
+        - name: api
+          image: competitor-intelligence:latest
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              value: "production"
+            - name: DEBUG
+              value: "false"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: competitor-intelligence-secrets
+                  key: database-url
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: competitor-intelligence-secrets
+                  key: api-key
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: competitor-intelligence-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: competitor-intelligence-api
+  labels:
+    app: competitor-intelligence
+    component: api
+spec:
+  selector:
+    app: competitor-intelligence
+    component: api
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: competitor-intelligence-data
+  labels:
+    app: competitor-intelligence
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

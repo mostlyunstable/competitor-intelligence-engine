@@ -49,13 +49,31 @@ class DatabaseManager:
         if not self._session_factory:
             raise RuntimeError("Database not connected. Call connect() first.")
 
-        async with self._session_factory() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
+        from app.chaos import ChaosMonkey
+        import tenacity
+        from sqlalchemy.exc import OperationalError, DBAPIError
+        
+        # Retry connection acquisition or commit errors on transient DB failures
+        @tenacity.retry(
+            retry=tenacity.retry_if_exception_type((OperationalError, DBAPIError, ConnectionError)),
+            wait=tenacity.wait_exponential(multiplier=1, min=1, max=10),
+            stop=tenacity.stop_after_attempt(5),
+            reraise=True
+        )
+        async def _execute_with_retry() -> AsyncGenerator[AsyncSession, None]:
+            await ChaosMonkey.maybe_fail_db()
+            async with self._session_factory() as session: # type: ignore
+                try:
+                    yield session
+                    await ChaosMonkey.maybe_fail_db()
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                    raise
+
+        # We must yield from the wrapped generator
+        async for s in _execute_with_retry():
+            yield s
 
     async def create_tables(self) -> None:
         if not self._engine:

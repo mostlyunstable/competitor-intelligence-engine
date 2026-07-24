@@ -1,0 +1,1 @@
+{"timestamp": "2026-07-24T09:46:19.227249", "competitor_id": 999, "error": "Mock pipeline failure", "raw_data_keys": ["foo"]}\n{"timestamp": "2026-07-24T09:46:37.929797", "competitor_id": 999, "error": "Mock pipeline failure", "raw_data_keys": ["foo"]}\n{"timestamp": "2026-07-24T09:46:49.138746", "competitor_id": 999, "error": "Mock pipeline failure", "raw_data_keys": ["foo"]}\n

@@ -12,6 +12,8 @@ class BaseParser(ABC):
     def parse(self, html: str, url: str) -> dict[str, Any]: ...
 
     def _soup(self, html: str) -> BeautifulSoup:
+        if "xml" in html[:100].lower() or html.strip().startswith("<?xml"):
+            return BeautifulSoup(html, "xml")
         return BeautifulSoup(html, "html.parser")
 
     def _text(self, soup: BeautifulSoup, selector: str) -> str | None:

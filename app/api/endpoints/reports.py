@@ -9,7 +9,6 @@ from sqlalchemy import func, select
 
 from app.api.auth import verify_api_key
 from app.api.dependencies import get_session
-from app.database.connection import db_manager
 from app.database.models import (
     CollectionLog,
     Competitor,

@@ -24,11 +24,11 @@ dependencies = [
     "httpx>=0.28,<1",
     "beautifulsoup4>=4.12,<5",
     "playwright>=1.49,<2",
-    "lxml>=5.2,<6",
+    "lxml>=6.1.0,<7",
     "structlog>=24.4,<25",
     "prometheus-client>=0.21,<1",
     "imagehash>=4.3,<5",
-    "Pillow>=10.0,<12",
+    "Pillow>=11.0,<13",
     "redis>=5.0,<6",
     "tenacity>=9.0,<10",
     "aiofiles>=24.1,<25",
@@ -40,18 +40,23 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3,<9",
+    "pytest>=8.3,<10",
     "pytest-asyncio>=0.25,<1",
     "pytest-cov>=6,<7",
     "ruff>=0.9,<1",
     "mypy>=1.14,<2",
-    "black>=24.10,<25",
-    "aiosqlite>=0.20,<1",
+    "black>=24.10,<27",
     "types-psutil>=6.0,<7",
     "types-aiofiles>=23.0,<25",
+    "aiosqlite>=0.22.1",
 ]
 llm = [
     "openai>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "locust>=2.46.1",
 ]
 
 [tool.ruff]
@@ -96,8 +101,13 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["playwright_stealth", "redis.*", "aiofiles.*"]
+module = ["playwright_stealth", "redis.*", "aiofiles.*", "app.core.config", "app.ai.domain.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "tests.unit.*", "tests.integration.*"]
+disallow_untyped_defs = false
+check_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

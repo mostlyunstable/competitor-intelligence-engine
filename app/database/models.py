@@ -3,11 +3,11 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
-    JSON,
     Boolean,
     Date,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -17,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
@@ -57,8 +58,8 @@ class Competitor(Base):
         default=CollectionFrequency.DAILY,
         nullable=False,
     )
-    modules: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    modules: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -80,6 +81,7 @@ class Competitor(Base):
     content: Mapped[list["CompetitorContent"]] = relationship(
         "CompetitorContent", back_populates="competitor", cascade="all, delete-orphan"
     )
+    ai_insight: Mapped["CompetitorAIInsight"] = relationship("CompetitorAIInsight", back_populates="competitor", cascade="all, delete-orphan", uselist=False)
     social_profiles: Mapped[list["CompetitorSocial"]] = relationship(
         "CompetitorSocial", back_populates="competitor", cascade="all, delete-orphan"
     )
@@ -129,12 +131,12 @@ class CompetitorService(Base):
     estimated_duration: Mapped[str | None] = mapped_column(String(100), nullable=True)
     starting_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
-    available_add_ons: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    available_add_ons: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     membership_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    offers: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    discounts: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    offers: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    discounts: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -162,10 +164,10 @@ class CompetitorPricing(Base):
     promotional_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
     discount: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    membership_pricing: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    subscription_plans: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    membership_pricing: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    subscription_plans: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -195,7 +197,7 @@ class CompetitorContent(Base):
     raw_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -252,7 +254,7 @@ class CollectionLog(Base):
     success: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     duration_seconds: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     records_collected: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    errors: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    errors: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -280,8 +282,8 @@ class RawStorage(Base):
     storage_uri: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
-    extracted_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB, nullable=True)
+    extracted_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -314,8 +316,8 @@ class ChangeLog(Base):
     data_type: Mapped[str] = mapped_column(String(50), nullable=False)  # services, pricing, content, social
     change_type: Mapped[str] = mapped_column(String(20), nullable=False)  # added, removed, modified
     record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    old_value: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    new_value: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    old_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    new_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     detected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -326,3 +328,48 @@ class ChangeLog(Base):
         Index("ix_change_log_detected_at", "detected_at"),
         {"comment": "Tracks changes between collections"},
     )
+
+
+class CompetitorAIInsight(Base):
+    """
+    Stores AI-generated intelligence and insights about a competitor.
+    Updated continuously as new data is collected.
+    """
+    __tablename__ = "competitor_ai_insights"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    competitor_id: Mapped[int] = mapped_column(
+        ForeignKey("competitors.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    # Core attributes from AI analysis
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    key_differentiators: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    market_position: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+    # Complex nested JSON data
+    pricing_analysis: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    feature_gaps: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    strategic_moves: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+
+    # Recommendations
+    recommendations: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    latest_updates: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+
+    # Provenance
+    llm_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="unknown")
+    llm_model: Mapped[str] = mapped_column(String(100), nullable=False, default="unknown")
+    prompt_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now()
+    )
+
+    competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="ai_insight")

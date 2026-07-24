@@ -1,46 +1,22 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: competitor_intel_db
     environment:
       POSTGRES_USER: utservio
       POSTGRES_PASSWORD: changeme
       POSTGRES_DB: utservio_ci
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U utservio -d utservio_ci"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  backend:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - CI_DATABASE__URL=postgresql+asyncpg://utservio:changeme@db:5432/utservio_ci
-      - CI_API_KEY=
-      - CI_DEBUG=true
-      - CI_ENVIRONMENT=development
-      - CI_LOG_LEVEL=INFO
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./competitors.json:/app/competitors.json:ro
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
 volumes:
-  postgres-data:
+  postgres_data:

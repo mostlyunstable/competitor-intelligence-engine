@@ -55,7 +55,7 @@ class CollectionService:
         for attempt in range(max_retries + 1):
             try:
                 async with db_manager.session() as session:
-                    return await collector.collect(competitor_id, url, session=session)
+                    return await collector.collect(competitor_id, url, session=session)  # type: ignore
             except Exception as e:
                 last_error = e
                 error_str = str(e).lower()
@@ -263,6 +263,15 @@ class CollectionService:
                     data_type="Data Collection",
                     message=f"Collection completed successfully in {elapsed}s. {records_collected} new/updated records found.",
                 )
+
+            # Trigger AI Analysis pipeline in background
+            try:
+                from app.ai.application.worker import trigger_ai_analysis
+                # Pass results as raw data to AI
+                await trigger_ai_analysis(competitor_id, results)
+            except ImportError:
+                log.warning("AI Intelligence Layer not available")
+
 
             return {
                 "status": "success",

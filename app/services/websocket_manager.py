@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
 logger = structlog.get_logger(__name__)
 

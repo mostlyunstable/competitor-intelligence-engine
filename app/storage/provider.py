@@ -40,6 +40,8 @@ class LocalStorageProvider(StorageProvider):
         filepath = os.path.join(directory, filename)
 
         async with aiofiles.open(filepath, mode) as f:
+            from app.chaos import ChaosMonkey
+            ChaosMonkey.maybe_fail_filesystem()
             await f.write(content)
 
         return f"file://{filepath}"

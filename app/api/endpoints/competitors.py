@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Security
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import verify_api_key
+from app.api.auth import verify_any_auth
 from app.api.dependencies import get_session
 from app.configuration.models import CollectionModule
 from app.database.models import CollectionFrequency, Competitor
@@ -189,7 +189,7 @@ def _serialize_competitor(c: Competitor) -> CompetitorResponse:
 )
 async def list_competitors(
     session: AsyncSession = Depends(get_session),
-    _auth: str = Security(verify_api_key),
+    _auth: str = Security(verify_any_auth),
 ) -> list[CompetitorResponse]:
     repo = CompetitorRepository(session)
     competitors = await repo.get_all()
@@ -230,7 +230,7 @@ async def list_competitors(
 async def get_competitor(
     competitor_id: int,
     session: AsyncSession = Depends(get_session),
-    _auth: str = Security(verify_api_key),
+    _auth: str = Security(verify_any_auth),
 ) -> CompetitorResponse:
     repo = CompetitorRepository(session)
     competitor = await repo.get_by_id(competitor_id)
@@ -276,7 +276,7 @@ async def get_competitor(
 async def create_competitor(
     data: CompetitorCreate,
     session: AsyncSession = Depends(get_session),
-    _auth: str = Security(verify_api_key),
+    _auth: str = Security(verify_any_auth),
 ) -> CompetitorResponse:
     repo = CompetitorRepository(session)
     existing = await repo.get_by_name(data.name)
@@ -329,7 +329,7 @@ async def update_competitor(
     competitor_id: int,
     data: CompetitorUpdate,
     session: AsyncSession = Depends(get_session),
-    _auth: str = Security(verify_api_key),
+    _auth: str = Security(verify_any_auth),
 ) -> CompetitorResponse:
     repo = CompetitorRepository(session)
     update_data = data.model_dump(exclude_unset=True)
@@ -359,7 +359,7 @@ async def update_competitor(
 async def delete_competitor(
     competitor_id: int,
     session: AsyncSession = Depends(get_session),
-    _auth: str = Security(verify_api_key),
+    _auth: str = Security(verify_any_auth),
 ) -> None:
     repo = CompetitorRepository(session)
     deleted = await repo.delete(competitor_id)
