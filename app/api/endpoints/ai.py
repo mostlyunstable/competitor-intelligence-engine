@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +31,7 @@ async def get_competitor_insights(competitor_id: int, db: AsyncSession = Depends
 
 @router.post("/analyze/{competitor_id}")
 async def refresh_ai_analysis(
-    competitor_id: int, 
+    competitor_id: int,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:

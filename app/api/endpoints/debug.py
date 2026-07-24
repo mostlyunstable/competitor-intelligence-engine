@@ -1,31 +1,33 @@
 import os
+from typing import Any
+
 import psutil
 from fastapi import APIRouter
-from sqlalchemy import text
-from app.database.connection import db_manager
+
 from app.ai.application.worker import _bg_tasks
+from app.database.connection import db_manager
 
 router = APIRouter()
 
+
 @router.get("/metrics")
-async def get_metrics():
+async def get_metrics() -> dict[str, Any]:
     # CPU & RAM of current process
     process = psutil.Process(os.getpid())
     cpu_percent = process.cpu_percent(interval=0.1)
     memory_info = process.memory_info()
 
     # DB Connection Pool
-    pool_size = 0
-    checkedin = 0
-    checkedout = 0
+    pool_size, checkedin, checkedout = 0, 0, 0
     try:
-        pool = db_manager._engine.pool
-        pool_size = pool.size()
-        checkedin = pool.checkedin()
-        checkedout = pool.checkedout()
+        if db_manager._engine is not None:
+            pool = db_manager._engine.pool
+            pool_size = pool.size()  # type: ignore
+            checkedin = pool.checkedin()  # type: ignore
+            checkedout = pool.checkedout()  # type: ignore
     except Exception:
         pass
-        
+
     # Worker Queue Depth
     queue_depth = len(_bg_tasks)
 

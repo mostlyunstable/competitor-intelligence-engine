@@ -1,7 +1,8 @@
 import asyncio
 import os
 import random
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import structlog
 from fastapi import Request, Response
@@ -13,7 +14,7 @@ class ChaosMonkey:
     """
     Simulates systemic failures across the application when CHAOS_MODE=1 is set.
     """
-    
+
     @staticmethod
     def is_active() -> bool:
         return os.getenv("CHAOS_MODE") == "1"
@@ -46,7 +47,7 @@ class ChaosMonkey:
             return
         import httpx
         from openai import APIConnectionError, APIStatusError, RateLimitError
-        
+
         rand = random.random()
         if os.getenv("CHAOS_OPENAI_429") == "1" and rand < 0.2:
             logger.warning("CHAOS: Simulating OpenAI 429 Rate Limit.")
@@ -91,11 +92,11 @@ class ChaosMonkey:
 class ChaosMonkeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         if not ChaosMonkey.is_active():
-            return await call_next(request)
-        
+            return await call_next(request)  # type: ignore
+
         # Simulate partial HTTP responses or process termination midway
         if os.getenv("CHAOS_PROCESS_TERMINATION") == "1" and random.random() < 0.05:
             logger.error("CHAOS: Simulating process termination during request.")
             os._exit(1)
-            
-        return await call_next(request)
+
+        return await call_next(request)  # type: ignore

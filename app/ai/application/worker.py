@@ -19,8 +19,8 @@ class AIWorker:
     Background worker that listens for scraping completion events and triggers AI analysis.
     """
 
-    def __init__(self) -> None:  
-        self.provider = OpenAIProvider()
+    def __init__(self) -> None:
+        self.provider = OpenAIProvider()  # type: ignore
         self.pipeline = AIPipeline(self.provider)
 
     async def process_task(self, competitor_id: int, raw_data: dict[str, Any]) -> None:

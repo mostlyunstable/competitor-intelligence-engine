@@ -194,7 +194,7 @@ All errors follow RFC 7807 Problem Details format:
             return response
 
     app.add_middleware(SecurityHeadersMiddleware)
-    
+
     from app.chaos import ChaosMonkeyMiddleware
     app.add_middleware(ChaosMonkeyMiddleware)
 
@@ -215,9 +215,10 @@ All errors follow RFC 7807 Problem Details format:
     app.include_router(reports.router)
     app.include_router(monitoring_router)
     app.include_router(ai.router)
-    
-    from app.api.endpoints.debug import router as debug_router
-    app.include_router(debug_router, prefix="/debug", tags=["Debug"])
+
+    if settings.debug:
+        from app.api.endpoints.debug import router as debug_router
+        app.include_router(debug_router, prefix="/debug", tags=["Debug"])
 
     from fastapi.responses import RedirectResponse
 

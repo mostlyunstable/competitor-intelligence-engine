@@ -49,10 +49,11 @@ class DatabaseManager:
         if not self._session_factory:
             raise RuntimeError("Database not connected. Call connect() first.")
 
-        from app.chaos import ChaosMonkey
         import tenacity
-        from sqlalchemy.exc import OperationalError, DBAPIError
-        
+        from sqlalchemy.exc import DBAPIError, OperationalError
+
+        from app.chaos import ChaosMonkey
+
         # Retry connection acquisition or commit errors on transient DB failures
         @tenacity.retry(
             retry=tenacity.retry_if_exception_type((OperationalError, DBAPIError, ConnectionError)),
