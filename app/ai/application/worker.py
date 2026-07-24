@@ -25,8 +25,8 @@ _bg_tasks: set[asyncio.Task[Any]] = set()
 # DB fields the pipeline output maps to
 _DB_FIELDS = {
     "summary", "key_differentiators", "market_position", "confidence_score",
-    "pricing_analysis", "feature_gaps", "strategic_moves", "recommendations",
-    "latest_updates",
+    "data_quality_score", "pricing_analysis", "feature_gaps", "strategic_moves",
+    "recommendations", "latest_updates",
 }
 
 

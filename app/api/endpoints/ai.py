@@ -128,6 +128,7 @@ def _insight_to_response(insight: CompetitorAIInsight) -> dict[str, Any]:
         "key_differentiators": insight.key_differentiators,
         "market_position": insight.market_position,
         "confidence_score": insight.confidence_score,
+        "data_quality_score": insight.data_quality_score,
         "pricing_analysis": insight.pricing_analysis,
         "feature_gaps": insight.feature_gaps,
         "strategic_moves": insight.strategic_moves,

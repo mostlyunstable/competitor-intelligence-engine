@@ -350,6 +350,7 @@ class CompetitorAIInsight(Base):
     key_differentiators: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
     market_position: Mapped[str] = mapped_column(Text, nullable=False, default="")
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    data_quality_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     # Complex nested JSON data
     pricing_analysis: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)

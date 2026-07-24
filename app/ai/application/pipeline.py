@@ -199,10 +199,12 @@ class AIPipeline:
             calibrated = round(0.6 * data_quality + 0.4 * llm_confidence, 3)
             validated.confidence_score = calibrated
 
-            # 8. Return as dict
+            # 8. Return as dict (carry _token_usage through since model_dump strips it)
             result = validated.model_dump()
             result["prompt_version"] = prompt_builder.prompt_version
             result["data_quality_score"] = data_quality
+            if "_token_usage" in raw_result:
+                result["_token_usage"] = raw_result["_token_usage"]
             return result
 
         except Exception as e:
