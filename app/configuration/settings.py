@@ -62,10 +62,16 @@ class WebhookSettings(BaseModel):
 
 class LLMSettings(BaseModel):
     enabled: bool = Field(default=False)
-    provider: str = Field(default="gemini")
+    provider: str = Field(default="openai")
     api_key: str = Field(default="")
-    model_name: str = Field(default="gemini-2.5-flash")
+    model_name: str = Field(default="meta/llama-3.1-70b-instruct")
     base_url: str = Field(default="")
+    max_tokens: int = Field(default=4096)
+    temperature: float = Field(default=0.1)
+    timeout: int = Field(default=120)
+    max_retries: int = Field(default=3)
+    confidence_threshold: float = Field(default=0.5)
+    max_concurrent: int = Field(default=3)
 
 
 class StealthSettings(BaseModel):

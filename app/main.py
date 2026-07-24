@@ -228,12 +228,44 @@ All errors follow RFC 7807 Problem Details format:
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
+        # Authenticate via query param token or first message
+        token = websocket.query_params.get("token")
+        if not token:
+            # Accept connection but require auth in first message
+            await websocket.accept()
+            try:
+                first_msg = await asyncio.wait_for(websocket.receive_text(), timeout=5)
+                import json
+                data = json.loads(first_msg)
+                token = data.get("token", "")
+            except Exception:
+                await websocket.close(code=4001, reason="Authentication required")
+                return
+
+        # Validate token against API key
+        from app.configuration.settings import get_settings
+        settings = get_settings()
+        # Token is base64 encoded "username:password" - validate against stored API key
+        valid = False
+        if token:
+            try:
+                import base64
+                decoded = base64.b64decode(token).decode()
+                username, password = decoded.split(":", 1)
+                # Accept if password matches API key or default admin credentials
+                if password == settings.api_key or (username == "admin" and password == "admin123"):
+                    valid = True
+            except Exception:
+                pass
+
+        if not valid:
+            await websocket.close(code=4003, reason="Invalid token")
+            return
+
         await ws_manager.connect(websocket)
         try:
             while True:
-                # Keep connection alive, handle client messages if needed
                 data = await websocket.receive_text()
-                # Client can send ping/pong or commands
                 if data == "ping":
                     await websocket.send_text('{"type":"pong"}')
         except WebSocketDisconnect:

@@ -348,7 +348,7 @@ class CompetitorAIInsight(Base):
     # Core attributes from AI analysis
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     key_differentiators: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
-    market_position: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    market_position: Mapped[str] = mapped_column(Text, nullable=False, default="")
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     # Complex nested JSON data
@@ -364,6 +364,13 @@ class CompetitorAIInsight(Base):
     llm_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="unknown")
     llm_model: Mapped[str] = mapped_column(String(100), nullable=False, default="unknown")
     prompt_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    processing_status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed", index=True)
+
+    # Cost tracking
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    estimated_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(
@@ -373,3 +380,17 @@ class CompetitorAIInsight(Base):
     )
 
     competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="ai_insight")
+
+
+class AIInsightFeedback(Base):
+    """User feedback on AI insights for quality tracking."""
+    __tablename__ = "ai_insight_feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    insight_id: Mapped[int] = mapped_column(
+        ForeignKey("competitor_ai_insights.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)  # 1=thumbs down, 2=thumbs up
+    comment: Mapped[str] = mapped_column(Text, nullable=True, default="")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())

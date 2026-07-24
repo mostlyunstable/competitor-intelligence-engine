@@ -4,7 +4,7 @@ Manual collection runner.
 
 Usage:
     python scripts/collect.py --all
-    python scripts/collect.py --competitor "HomeServe"
+    python scripts/collect.py --competitor "Choice Home Warranty"
     python scripts/collect.py --id 1
 """
 

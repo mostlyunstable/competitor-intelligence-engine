@@ -18,5 +18,65 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: competitor_intel_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    container_name: competitor_intel_app
+    environment:
+      CI_DB__URL: postgresql+asyncpg://utservio:changeme@db:5432/utservio_ci
+      CI_DB__HOST: db
+      CI_DB__PORT: 5432
+      CI_DB__NAME: utservio_ci
+      CI_DB__USER: utservio
+      CI_DB__PASSWORD: changeme
+      CI_QUEUE__REDIS_URL: redis://redis:6379
+      CI_QUEUE__BACKEND: redis
+      CI_LLM__ENABLED: "true"
+      CI_LLM__PROVIDER: openai
+      CI_LLM__BASE_URL: https://integrate.api.nvidia.com/v1
+      CI_LLM__MODEL_NAME: meta/llama-3.1-70b-instruct
+      CI_LLM__API_KEY: ${CI_LLM__API_KEY:-}
+      CI_API_KEY__SECRET_KEY: ${CI_API_KEY__SECRET_KEY:-changeme}
+      CI_AI__API_KEY: ${CI_AI__API_KEY:-changeme}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./competitors.json:/app/competitors.json:ro
+      - app_dlq:/app/dlq
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-alpine
+    container_name: competitor_intel_frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8000
+
 volumes:
   postgres_data:
+  redis_data:
+  app_dlq:
+  frontend_node_modules:

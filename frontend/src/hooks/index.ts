@@ -9,26 +9,31 @@ export function usePolling<T>(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fetcherRef = useRef(fetcher)
+  const mountedRef = useRef(true)
   fetcherRef.current = fetcher
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (initial = false) => {
+    if (!mountedRef.current) return
+    if (initial) setLoading(true)
     try {
-      setLoading(true)
       const result = await fetcherRef.current()
-      setData(result)
-      setError(null)
+      if (mountedRef.current) {
+        setData(result)
+        setError(null)
+      }
     } catch (e: any) {
-      setError(e.message || 'Failed to fetch')
+      if (mountedRef.current) setError(e.message || 'Failed to fetch')
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    mountedRef.current = true
     if (!enabled) return
-    refresh()
-    const id = setInterval(refresh, intervalMs)
-    return () => clearInterval(id)
+    refresh(true)
+    const id = setInterval(() => refresh(false), intervalMs)
+    return () => { mountedRef.current = false; clearInterval(id) }
   }, [enabled, intervalMs, refresh])
 
   return { data, loading, error, refresh }

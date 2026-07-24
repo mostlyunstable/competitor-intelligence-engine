@@ -255,6 +255,30 @@ class ApiClient {
     return `${API_BASE}/api/dashboard/raw/${competitorId}`
   }
 
+  // AI
+  async getAiInsights(competitorId: number) {
+    return this.request<any>(`/api/ai/competitor/${competitorId}`)
+  }
+
+  async analyzeCompetitor(competitorId: number) {
+    return this.request<any>(`/api/ai/analyze/${competitorId}`, { method: 'POST' })
+  }
+
+  async analyzeBatch(competitorIds?: number[]) {
+    return this.request<any>('/api/ai/analyze/batch', {
+      method: 'POST',
+      body: JSON.stringify(competitorIds),
+    })
+  }
+
+  async deleteAiInsights(competitorId: number) {
+    return this.request<any>(`/api/ai/competitor/${competitorId}`, { method: 'DELETE' })
+  }
+
+  async getAiStatus() {
+    return this.request<any>('/api/ai/status')
+  }
+
   // Metrics
   async getMetricsJson() {
     return this.request<any>('/metrics/json')

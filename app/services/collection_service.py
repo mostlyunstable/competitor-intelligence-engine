@@ -267,8 +267,13 @@ class CollectionService:
             # Trigger AI Analysis pipeline in background
             try:
                 from app.ai.application.worker import trigger_ai_analysis
-                # Pass results as raw data to AI
-                await trigger_ai_analysis(competitor_id, results)
+                from app.api.endpoints.ai import _gather_competitor_data
+                # Gather real data from DB for AI analysis
+                async with db_manager.session() as session:
+                    ai_data = await _gather_competitor_data(competitor_id, session)
+                ai_data["name"] = competitor_name
+                ai_data["url"] = competitor.website_url
+                await trigger_ai_analysis(competitor_id, ai_data)
             except ImportError:
                 log.warning("AI Intelligence Layer not available")
 

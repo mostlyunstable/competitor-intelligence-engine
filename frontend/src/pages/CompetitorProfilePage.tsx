@@ -6,7 +6,8 @@ import { formatDate, timeAgo } from '../lib/utils'
 import {
   ArrowLeft, Globe, Play, Edit, ExternalLink, Clock,
   CheckCircle, XCircle, Code, DollarSign, FileText,
-  Users, Share2, Database, History, RefreshCw
+  Users, Share2, Database, History, RefreshCw, GitCompare,
+  Brain, Plus, Minus
 } from 'lucide-react'
 
 export default function CompetitorProfilePage() {
@@ -16,6 +17,8 @@ export default function CompetitorProfilePage() {
 
   const { data, loading, refresh } = usePolling(() => api.getCompetitor(competitorId), 30000)
   const { data: extracted, refresh: refreshExtracted } = usePolling(() => api.getExtracted(competitorId), 60000)
+  const { data: changes } = usePolling(() => api.getChanges(competitorId, 20), 30000)
+  const { data: aiInsight } = usePolling(() => api.getAiInsights(competitorId).catch(() => null), 60000)
   const [refreshing, setRefreshing] = useState(false)
 
   const handleRefresh = useCallback(async () => {
@@ -222,6 +225,92 @@ export default function CompetitorProfilePage() {
                   <div className="text-sm text-surface-500">{l.records_collected} records</div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Changes */}
+        {changes && changes.length > 0 && (
+          <div className="card">
+            <div className="px-5 py-4 border-b border-surface-100 flex items-center gap-2">
+              <GitCompare size={16} className="text-blue-600" />
+              <h2 className="font-semibold text-surface-900">Recent Changes ({changes.length})</h2>
+            </div>
+            <div className="divide-y divide-surface-50 max-h-80 overflow-auto">
+              {changes.map((ch: any) => (
+                <div key={ch.id} className="px-5 py-3 flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    {ch.change_type === 'added' ? (
+                      <Plus size={16} className="text-emerald-500" />
+                    ) : ch.change_type === 'removed' ? (
+                      <Minus size={16} className="text-red-500" />
+                    ) : (
+                      <GitCompare size={16} className="text-blue-500" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm text-surface-900">
+                      <span className="font-medium">{ch.entity_type}</span>
+                      {ch.entity_name && <span className="text-surface-600"> — {ch.entity_name}</span>}
+                    </div>
+                    <div className="text-xs text-surface-400">{ch.change_type}</div>
+                  </div>
+                  <div className="text-xs text-surface-400">{timeAgo(ch.detected_at)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Insights */}
+        {aiInsight && (
+          <div className="card">
+            <div className="px-5 py-4 border-b border-surface-100 flex items-center gap-2">
+              <Brain size={16} className="text-brand-600" />
+              <h2 className="font-semibold text-surface-900">AI Insights</h2>
+              <span className="ml-auto text-xs text-surface-500">
+                Confidence: {(aiInsight.confidence_score * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="p-5 space-y-4">
+              {aiInsight.summary && (
+                <div>
+                  <div className="text-xs font-medium text-surface-500 uppercase mb-1">Summary</div>
+                  <p className="text-sm text-surface-700">{aiInsight.summary}</p>
+                </div>
+              )}
+              {aiInsight.market_position && (
+                <div>
+                  <div className="text-xs font-medium text-surface-500 uppercase mb-1">Market Position</div>
+                  <p className="text-sm text-surface-700">{aiInsight.market_position}</p>
+                </div>
+              )}
+              {aiInsight.key_differentiators?.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-surface-500 uppercase mb-1">Key Differentiators</div>
+                  <ul className="space-y-1">
+                    {aiInsight.key_differentiators.map((d: string, i: number) => (
+                      <li key={i} className="text-sm text-surface-700 flex items-start gap-2">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />
+                        {d}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {aiInsight.recommendations?.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-surface-500 uppercase mb-1">Recommendations</div>
+                  <ul className="space-y-1">
+                    {aiInsight.recommendations.map((r: string, i: number) => (
+                      <li key={i} className="text-sm text-surface-700 flex items-start gap-2">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}

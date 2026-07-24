@@ -34,7 +34,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     function connect() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
-      const url = `${protocol}//${host}/ws`;
+      // Send auth token from localStorage
+      const auth = localStorage.getItem('auth') || '';
+      const url = `${protocol}//${host}/ws?token=${auth}`;
 
       ws = new WebSocket(url);
       wsRef.current = ws;

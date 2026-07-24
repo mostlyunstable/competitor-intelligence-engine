@@ -1,0 +1,40 @@
+{
+  "competitors": [
+    {
+      "name": "American Home Shield",
+      "website_url": "https://www.ahs.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["home-warranty", "major-player"],
+      "notes": "Largest home warranty company in the US"
+    },
+    {
+      "name": "First American Home Warranty",
+      "website_url": "https://homewarranty.firstam.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["home-warranty", "first-american"],
+      "notes": "Subsidiary of First American Financial"
+    },
+    {
+      "name": "Cinch Home Services",
+      "website_url": "https://www.cinchhomeservices.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["home-warranty", "cinch"],
+      "notes": "Home warranty and home services company"
+    },
+    {
+      "name": "Choice Home Warranty",
+      "website_url": "https://www.choicehomewarranty.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["home-warranty", "choice"],
+      "notes": "Replaced previous competitor oxhomeservices.com"
+    }
+  ]
+}
