@@ -33,7 +33,7 @@ dependencies = [
     "tenacity>=9.0,<10",
     "aiofiles>=24.1,<25",
     "openai>=1.58,<2",
-    "psutil>=6.1,<7",
+    "psutil>=6.1,<8",
     "playwright-stealth>=1.0.6,<2",
     "requests>=2.31,<3",
 ]
