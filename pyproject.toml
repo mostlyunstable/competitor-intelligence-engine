@@ -46,7 +46,7 @@ dev = [
     "ruff>=0.9,<1",
     "mypy>=1.14,<2",
     "black>=24.10,<27",
-    "types-psutil>=6.0,<7",
+    "types-psutil>=6.0,<8",
     "types-aiofiles>=23.0,<25",
     "aiosqlite>=0.22.1",
 ]
