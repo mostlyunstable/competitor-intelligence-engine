@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate } from '../lib/utils'
-import { FileText, Filter, Download, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { Filter, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import type { CollectionLog } from '../types'
 
 export default function LogsPage() {
   const [competitorId, setCompetitorId] = useState<number | undefined>()
@@ -26,7 +27,7 @@ export default function LogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">Collection Logs</h1>
-        <button onClick={async () => { setRefreshing(true); try { await refresh() } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50"><RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh</button>
+        <button onClick={async () => { setRefreshing(true); try { await refresh() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50"><RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh</button>
       </div>
 
       {/* Filters */}
@@ -81,7 +82,7 @@ export default function LogsPage() {
             ) : logs.length === 0 ? (
               <tr><td colSpan={7} className="p-8 text-center text-surface-400">No logs found</td></tr>
             ) : (
-              logs.map((log: any) => (
+              logs.map((log: CollectionLog) => (
                 <tr key={log.id} className="hover:bg-surface-50">
                   <td className="table-cell">
                     {log.success ? (

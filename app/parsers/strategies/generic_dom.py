@@ -3,7 +3,9 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from app.parsers.constants import SOCIAL_PLATFORMS
 from app.parsers.page_segmenter import PageSegment
+from app.parsers.price_utils import detect_currency, parse_price
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 
@@ -41,26 +43,16 @@ class GenericDomHeuristicStrategy(ParsingStrategy):
             result.company_name = h1_tags[0].get_text(strip=True)
 
     def _analyze_link_density(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
-        social_platforms = {
-            "linkedin.com": "linkedin",
-            "facebook.com": "facebook",
-            "instagram.com": "instagram",
-            "twitter.com": "twitter",
-            "x.com": "twitter",
-            "youtube.com": "youtube",
-            "pinterest.com": "pinterest",
-            "threads.net": "threads",
-        }
         for a_tag in soup.select("a[href]"):
             href = str(a_tag.get("href", ""))
-            for domain, platform in social_platforms.items():
+            for domain, platform in SOCIAL_PLATFORMS.items():
                 if domain in href and platform not in result.social_links:
                     result.social_links[platform] = urljoin(url, href)
 
     def _analyze_price_elements(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         if result.pricing:
             return
-        price_pattern = re.compile(r"\$\d+(?:\.\d{2})?|\d+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)")
+        price_pattern = re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{2})?|rs\.?\s*[\d,]+(?:\.\d{2})?|\d+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)|\d+[\d,]*(?:\.\d{2})?/-")
         for element in soup.select("th, td, li, span, strong, em"):
             text = element.get_text(strip=True)
             if not text or len(text) > 60:
@@ -93,31 +85,27 @@ class GenericDomHeuristicStrategy(ParsingStrategy):
             email_link = soup.select_one("a[href^='mailto:']")
             if email_link:
                 result.contact_email = str(email_link["href"]).replace("mailto:", "")
+            else:
+                # Extract plain text email
+                import re as re_mod
+                text = soup.get_text(" ", strip=True)
+                email_match = re_mod.search(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', text)
+                if email_match:
+                    result.contact_email = email_match.group(0)
         if not result.contact_phone:
             phone_link = soup.select_one("a[href^='tel:']")
             if phone_link:
                 result.contact_phone = str(phone_link["href"]).replace("tel:", "")
+            else:
+                # Extract plain text Indian phone number
+                import re as re_mod
+                text = soup.get_text(" ", strip=True)
+                phone_match = re_mod.search(r'(?:\+91[-.\s]?)?\d{5}\s?\d{5}|\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', text)
+                if phone_match:
+                    result.contact_phone = phone_match.group(0).strip()
 
     def _parse_price(self, price_text: str | None) -> float | None:
-        if not price_text:
-            return None
-        numbers = re.findall(r"[\d,]+\.?\d*", price_text.replace(",", ""))
-        if numbers:
-            try:
-                return float(numbers[0])
-            except ValueError:
-                return None
-        return None
+        return parse_price(price_text)
 
     def _detect_currency(self, price_text: str | None) -> str:
-        if not price_text:
-            return "USD"
-        if "$" in price_text:
-            return "USD"
-        if "€" in price_text:
-            return "EUR"
-        if "£" in price_text:
-            return "GBP"
-        if "₹" in price_text:
-            return "INR"
-        return "USD"
+        return detect_currency(price_text)

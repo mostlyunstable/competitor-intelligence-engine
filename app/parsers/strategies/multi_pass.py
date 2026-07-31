@@ -28,6 +28,8 @@ import re
 from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import urljoin
 
+from app.parsers.constants import SOCIAL_PLATFORMS
+
 from bs4 import BeautifulSoup, Tag
 
 from app.parsers.strategy import ParsedResult, ParsingStrategy
@@ -38,18 +40,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Shared constants
 # ---------------------------------------------------------------------------
-
-_SOCIAL_DOMAINS: dict[str, str] = {
-    "linkedin.com": "linkedin",
-    "facebook.com": "facebook",
-    "instagram.com": "instagram",
-    "twitter.com": "twitter",
-    "x.com": "twitter",
-    "youtube.com": "youtube",
-    "pinterest.com": "pinterest",
-    "tiktok.com": "tiktok",
-    "threads.net": "threads",
-}
 
 _PRICE_RE = re.compile(
     r"""
@@ -66,7 +56,7 @@ _PRICE_RE = re.compile(
 )
 
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
-_PHONE_RE = re.compile(r"(?:\+?\d[\d\s\-().]{6,17}\d)")
+_PHONE_RE = re.compile(r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{2,5}[-.\s]?\d{2,5}")
 
 _CURRENCY_MAP: dict[str, str] = {
     "$": "USD",
@@ -78,11 +68,13 @@ _CURRENCY_MAP: dict[str, str] = {
 
 _SERVICE_KW = frozenset(
     [
+        # Core services
         "service",
         "repair",
         "install",
         "maintenance",
         "plan",
+        # Home services
         "cleaning",
         "plumb",
         "hvac",
@@ -91,6 +83,91 @@ _SERVICE_KW = frozenset(
         "lawn",
         "paint",
         "handyman",
+        "carpenter",
+        "electrician",
+        "plumber",
+        "mason",
+        "welder",
+        "fabricator",
+        # Specific services
+        "ac repair",
+        "appliance repair",
+        "pest control",
+        "deep clean",
+        "sofa cleaning",
+        "bathroom cleaning",
+        "kitchen cleaning",
+        "office cleaning",
+        "home renovation",
+        "false ceiling",
+        "wall painting",
+        "wooden flooring",
+        "waterproofing",
+        "tank cleaning",
+        # Beauty & personal care
+        "salon",
+        "beauty",
+        "massage",
+        "tailor",
+        "laundry",
+        "dry cleaning",
+        # Professional services
+        "consulting",
+        "legal",
+        "ca",
+        "chartered accountant",
+        "tax",
+        "gst",
+        "audit",
+        "real estate",
+        "property",
+        "broker",
+        # Logistics
+        "courier",
+        "delivery",
+        "moving",
+        "packers",
+        "movers",
+        "storage",
+        # Security
+        "security",
+        "guard",
+        "alarm",
+        "surveillance",
+        # Solar & electrical
+        "solar",
+        "inverter",
+        "ups",
+        "battery",
+        "generator",
+        # Plumbing
+        "water tank",
+        "ro plant",
+        "sewage",
+        "plumbing fitting",
+        # Furniture
+        "furniture",
+        "wardrobe",
+        "bed",
+        "sofa",
+        "table",
+        "chair",
+        "cupboard",
+        "shelf",
+        # Construction
+        "renovation",
+        "remodeling",
+        "construction",
+        "contractor",
+        "builder",
+        "flooring",
+        "marble",
+        "granite",
+        "tile",
+        # Indian market terms
+        "seva",
+        "marammat",
+        "safai",
     ]
 )
 
@@ -120,22 +197,42 @@ _BLOG_KW = frozenset(["article", "blog", "post", "news", "update", "guide", "tip
 
 def _parse_price(text: str) -> tuple[float | None, str]:
     """Return (amount, currency_code) from arbitrary text."""
+    # Check for Rs. prefix before numeric parsing
+    if re.search(r'rs\.?\s*\d', text.lower()):
+        m = _PRICE_RE.search(text.replace(",", ""))
+        if m:
+            amount_str = m.group("amount").replace(",", "")
+            try:
+                amount = float(amount_str)
+            except ValueError:
+                return None, "INR"
+            return amount, "INR"
+        # Fallback: extract number after Rs.
+        rs_match = re.search(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', text.lower())
+        if rs_match:
+            try:
+                amount = float(rs_match.group(1).replace(",", ""))
+                return amount, "INR"
+            except ValueError:
+                pass
+        return None, "INR"
+
     m = _PRICE_RE.search(text.replace(",", ""))
     if not m:
-        return None, "USD"
+        return None, "INR"
     amount_str = m.group("amount").replace(",", "")
     try:
         amount = float(amount_str)
     except ValueError:
-        return None, "USD"
+        return None, "INR"
     sym = m.group("sym") or ""
     code = m.group("code") or ""
-    currency = code.upper() if code else _CURRENCY_MAP.get(sym, "USD")
+    currency = code.upper() if code else _CURRENCY_MAP.get(sym, "INR")
     return amount, currency
 
 
 def _detect_social(href: str) -> str | None:
-    for domain, name in _SOCIAL_DOMAINS.items():
+    for domain, name in SOCIAL_PLATFORMS.items():
         if domain in href:
             return name
     return None
@@ -151,6 +248,16 @@ def _add_service(result: ParsedResult, name: str, **kwargs: Any) -> None:
     if not name:
         return
     name = name.strip()[:200]
+    # Skip page headings, navigation items, and overly long names
+    lower = name.lower()
+    if any(kw in lower for kw in ("click here", "read more", "learn more", "get started", "contact us", "call now", "book now", "whatsapp")):
+        return
+    # Skip names that look like page titles or promotional text
+    if len(name) > 100 or name.endswith("|") or name.endswith("-") or name.endswith(":"):
+        return
+    # Skip names that are just numbers or dates
+    if name.isdigit() or all(c.isdigit() or c in " -/" for c in name):
+        return
     if any(s.get("name") == name for s in result.services):
         return
     result.services.append(
@@ -159,7 +266,7 @@ def _add_service(result: ParsedResult, name: str, **kwargs: Any) -> None:
             "description": kwargs.get("description"),
             "category": kwargs.get("category"),
             "starting_price": kwargs.get("starting_price"),
-            "currency": kwargs.get("currency", "USD"),
+            "currency": kwargs.get("currency", "INR"),
             "estimated_duration": kwargs.get("estimated_duration"),
         }
     )
@@ -577,6 +684,36 @@ class _Pass3RepeatedStructure:
         self._repeated_card_grids(soup, result, url)
         self._figure_cards(soup, result)
         self._data_attr_blocks(soup, result)
+        self._link_services(soup, result, url)
+
+    def _link_services(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
+        """Extract services from links with embedded prices (e.g., '⚡Electrician₹299')."""
+        price_re = re.compile(r'₹\s*([\d,]+(?:\.\d{2})?)')
+        for a_tag in soup.select('a[href]'):
+            text = a_tag.get_text(strip=True)
+            if not text or len(text) > 120:
+                continue
+            m = price_re.search(text)
+            if not m:
+                continue
+            price_str = m.group(1).replace(',', '')
+            try:
+                price = float(price_str)
+            except ValueError:
+                continue
+            # Extract service name: text before the price symbol
+            name_part = text[:m.start()].strip()
+            # Strip leading emoji/whitespace
+            name_part = re.sub(r'^[\U0001F300-\U0001FAFF\s]+', '', name_part).strip()
+            if not name_part or len(name_part) < 2:
+                continue
+            link = urljoin(url, str(a_tag.get('href', '')))
+            _add_service(
+                result, name_part,
+                description=f"Listed on {url}",
+                starting_price=price,
+                currency="INR",
+            )
 
     def _repeated_card_grids(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
         """
@@ -875,18 +1012,29 @@ class _Pass6Regex:
 
         # Prices in raw text where nothing was found earlier
         if not result.pricing:
-            for match in _PRICE_RE.finditer(body.replace(",", "")):
-                amount_str = match.group("amount")
-                sym = match.group("sym") or ""
-                code = match.group("code") or ""
-                currency = code.upper() if code else _CURRENCY_MAP.get(sym, "USD")
+            # First try Rs. pattern
+            rs_match = re.search(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', body.lower())
+            if rs_match:
                 try:
-                    amount = float(amount_str)
+                    amount = float(rs_match.group(1).replace(",", ""))
+                    if amount > 0:
+                        _add_pricing(result, "Detected Price", base_price=amount, currency="INR")
                 except ValueError:
-                    continue
-                if amount > 0:
-                    _add_pricing(result, "Detected Price", base_price=amount, currency=currency)
-                    break  # one fallback price is enough; others are noise
+                    pass
+
+            if not result.pricing:
+                for match in _PRICE_RE.finditer(body.replace(",", "")):
+                    amount_str = match.group("amount")
+                    sym = match.group("sym") or ""
+                    code = match.group("code") or ""
+                    currency = code.upper() if code else _CURRENCY_MAP.get(sym, "INR")
+                    try:
+                        amount = float(amount_str)
+                    except ValueError:
+                        continue
+                    if amount > 0:
+                        _add_pricing(result, "Detected Price", base_price=amount, currency=currency)
+                        break  # one fallback price is enough; others are noise
 
 
 # ---------------------------------------------------------------------------
@@ -951,10 +1099,15 @@ class MultiPassStrategy(ParsingStrategy):
         for seg in segments:
             _Pass2Semantic().run(seg.to_soup(), result, url)
 
-        # Pass 3 — Repeated Structure Extraction (cards, grids, containers) (services/pricing segments)
+        # Pass 3 — Repeated Structure Extraction (cards, grids, containers)
+        # Full grid analysis runs only on structural segments; _link_services runs
+        # on ALL segments because service+price links can appear anywhere.
         for seg in segments:
             if seg.segment_type in ("services", "pricing", "hero", "about"):
-                _Pass3RepeatedStructure().run(seg.to_soup(), result, url)
+                _Pass3RepeatedStructure()._repeated_card_grids(seg.to_soup(), result, url)
+                _Pass3RepeatedStructure()._figure_cards(seg.to_soup(), result)
+                _Pass3RepeatedStructure()._data_attr_blocks(seg.to_soup(), result)
+            _Pass3RepeatedStructure()._link_services(seg.to_soup(), result, url)
 
         # Pass 4 — DOM relationship traversal (per segment)
         for seg in segments:

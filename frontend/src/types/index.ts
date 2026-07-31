@@ -118,7 +118,8 @@ export interface FeedItem {
   type: string
   message: string
   timestamp: string
-  competitor_id: number
+  competitor_id?: number
+  competitor_name?: string
   duration_seconds?: number
 }
 
@@ -140,4 +141,78 @@ export interface Telemetry {
   memory_mb: number
   memory_total_gb: number
   active_crawls: number
+}
+
+export interface SchedulerStatus {
+  is_running: boolean
+  running: boolean
+  next_run: string | null
+  interval_seconds: number | null
+}
+
+export interface ScoreBreakdownDimension {
+  score: number
+  details: Record<string, unknown>
+}
+
+export interface CompetitorScoreResponse {
+  competitor_id: number
+  name: string
+  score: {
+    total: number
+    grade: string
+    tier: string
+    breakdown: {
+      location: ScoreBreakdownDimension
+      digital_presence: ScoreBreakdownDimension
+      service_quality: ScoreBreakdownDimension
+      trust: ScoreBreakdownDimension
+      market_relevance: ScoreBreakdownDimension
+    }
+  }
+  location: {
+    is_indian: boolean
+    is_chennai: boolean
+    city: string | null
+    state: string | null
+    confidence: number
+    evidence: string[]
+  }
+  enhanced_data: Record<string, unknown>
+}
+
+export interface AiInsight {
+  id: number
+  competitor_id: number
+  summary: string | null
+  key_differentiators: string[] | null
+  market_position: string | null
+  confidence_score: number | null
+  data_quality_score: number | null
+  pricing_analysis: Record<string, unknown> | null
+  feature_gaps: string[] | null
+  strategic_moves: string[] | null
+  recommendations: string[] | null
+  latest_updates: string[] | null
+  llm_provider: string | null
+  llm_model: string | null
+  prompt_version: string | null
+  processing_status: string | null
+  prompt_tokens: number | null
+  completion_tokens: number | null
+  total_tokens: number | null
+  estimated_cost_usd: number | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface Change {
+  id?: number
+  change_type: string
+  entity_type?: string
+  entity_name?: string
+  data_type?: string
+  old_value: string | null
+  new_value: string | null
+  detected_at: string
 }

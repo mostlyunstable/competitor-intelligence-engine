@@ -12,6 +12,7 @@ import json
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -132,7 +133,7 @@ class InMemoryQueueBackend(QueueBackend):
     """In-memory queue backend for testing."""
 
     def __init__(self) -> None:
-        self._queue: list[QueueMessage] = []
+        self._queue: deque[QueueMessage] = deque()
         self._processing: dict[str, QueueMessage] = {}
 
     async def publish(self, message: QueueMessage) -> bool:
@@ -146,7 +147,7 @@ class InMemoryQueueBackend(QueueBackend):
         if not self._queue:
             return None
 
-        message = self._queue.pop(0)
+        message = self._queue.popleft()
         message.status = MessageStatus.PROCESSING
         message.processed_at = time.time()
         self._processing[message.message_id] = message
@@ -299,7 +300,8 @@ class RedisQueueBackend(QueueBackend):
             redis = self._get_redis()
             result = await redis.llen(self._queue_name)
             return int(result) if result else 0
-        except Exception:
+        except Exception as e:
+            logger.warning("queue_size_failed", error=str(e))
             return 0
 
     async def purge(self) -> int:
@@ -309,7 +311,8 @@ class RedisQueueBackend(QueueBackend):
             count = await redis.llen(self._queue_name)
             await redis.delete(self._queue_name)
             return int(count) if count else 0
-        except Exception:
+        except Exception as e:
+            logger.warning("queue_purge_failed", error=str(e))
             return 0
 
 

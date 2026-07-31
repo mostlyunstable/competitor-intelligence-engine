@@ -2,23 +2,28 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../lib/api'
 import { timeAgo } from '../lib/utils'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import type { FeedItem } from '../types'
 
 export default function ActivityPage() {
-  const [items, setItems] = useState<any[]>([])
+  const [items, setItems] = useState<FeedItem[]>([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const pageSize = 30
 
   const loadPage = useCallback(async (p: number) => {
     setLoading(true)
+    setError(null)
     try {
       const offset = (p - 1) * pageSize
       const result = await api.getFeed(pageSize, offset)
       setItems(result.items)
       setTotal(result.total)
       setPage(p)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load activity')
     } finally {
       setLoading(false)
     }
@@ -53,10 +58,12 @@ export default function ActivityPage() {
         <div className="divide-y divide-surface-50">
           {loading && items.length === 0 ? (
             <div className="p-8 text-center text-surface-400 text-sm">Loading...</div>
+          ) : error ? (
+            <div className="p-8 text-center text-red-500 text-sm">{error}</div>
           ) : items.length === 0 ? (
             <div className="p-8 text-center text-surface-400 text-sm">No activity yet</div>
           ) : (
-            items.map((item: any, i: number) => (
+            items.map((item, i) => (
               <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-surface-50">
                 <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
                   item.type === 'collection_success' ? 'bg-emerald-500' :

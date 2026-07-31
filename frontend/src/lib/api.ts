@@ -1,4 +1,74 @@
+import type {
+  Competitor,
+  CompetitorDetail,
+  CollectionLog,
+  DashboardStats,
+  FeedItem,
+  SystemHealth,
+  Telemetry,
+  Service,
+  Pricing,
+  Content,
+  Social,
+  AiInsight,
+  CompetitorScoreResponse,
+  SchedulerStatus,
+} from '../types'
+
 const API_BASE = ''
+
+interface CompetitorListResponse {
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+  competitors: Competitor[]
+  items?: Competitor[]
+}
+
+interface BulkActionResponse {
+  status: string
+  message: string
+  deleted?: number
+  enabled?: number
+  disabled?: number
+  reloaded?: boolean
+  synced?: boolean
+}
+
+interface SearchResult {
+  query: string
+  results: { competitor_id: number; name: string; context: string }[]
+  total: number
+}
+
+interface AiStatus {
+  total_insights: number
+  average_confidence: number
+  last_analysis: string | null
+  pending_analyses: number
+}
+
+interface DiscoveryResult {
+  discovered: { name: string; url: string; score: number }[]
+}
+
+interface SystemConfig {
+  environment: string
+  debug: boolean
+  queue_backend: string
+  webhooks_enabled: boolean
+  webhooks_slack: boolean
+  webhooks_teams: boolean
+  llm_enabled: boolean
+  llm_provider: string
+  llm_model: string
+  cache_enabled: boolean
+  stealth_enabled: boolean
+  scheduler_enabled: boolean
+  scheduler_interval: number
+  config_path: string
+}
 
 class ApiClient {
   private credentials: string | null = null
@@ -36,7 +106,7 @@ class ApiClient {
         ...options,
         headers,
       })
-    } catch (e: any) {
+    } catch {
       throw new Error('Backend is unreachable — try again in a moment')
     }
 
@@ -49,7 +119,7 @@ class ApiClient {
       try {
         const body = await response.json()
         if (body.detail) detail = body.detail
-      } catch {}
+      } catch { /* ignore parse error */ }
       throw new Error(detail)
     }
 
@@ -58,22 +128,20 @@ class ApiClient {
   }
 
   // Dashboard
-  async getStats() {
-    return this.request<any>('/api/dashboard/stats')
+  async getStats(): Promise<DashboardStats> {
+    return this.request<DashboardStats>('/api/dashboard/stats')
   }
 
-  async getFeed(limit = 20, offset = 0) {
-    return this.request<{ items: any[]; total: number; has_more: boolean }>(
-      `/api/dashboard/feed?limit=${limit}&offset=${offset}`
-    )
+  async getFeed(limit = 20, offset = 0): Promise<{ items: FeedItem[]; total: number; has_more: boolean }> {
+    return this.request(`/api/dashboard/feed?limit=${limit}&offset=${offset}`)
   }
 
-  async getSummary() {
-    return this.request<any[]>('/api/dashboard/summary')
+  async getSummary(): Promise<{ competitor_id: number; name: string; last_collected: string | null; services_count: number; pricing_count: number; content_count: number; social_count: number }[]> {
+    return this.request('/api/dashboard/summary')
   }
 
   // Competitors
-  async getCompetitors(params?: { search?: string; enabled?: boolean; frequency?: string; page?: number; page_size?: number }) {
+  async getCompetitors(params?: { search?: string; enabled?: boolean; frequency?: string; page?: number; page_size?: number }): Promise<CompetitorListResponse> {
     const searchParams = new URLSearchParams()
     if (params?.search) searchParams.set('search', params.search)
     if (params?.enabled !== undefined) searchParams.set('enabled', String(params.enabled))
@@ -81,221 +149,221 @@ class ApiClient {
     if (params?.page) searchParams.set('page', String(params.page))
     if (params?.page_size) searchParams.set('page_size', String(params.page_size))
     const qs = searchParams.toString()
-    return this.request<any>(`/api/dashboard/competitors${qs ? `?${qs}` : ''}`)
+    return this.request(`/api/dashboard/competitors${qs ? `?${qs}` : ''}`)
   }
 
-  async getCompetitor(id: number) {
-    return this.request<any>(`/api/dashboard/competitors/${id}`)
+  async getCompetitor(id: number): Promise<CompetitorDetail> {
+    return this.request(`/api/dashboard/competitors/${id}`)
   }
 
-  async createCompetitor(data: any) {
-    return this.request<any>('/api/dashboard/competitors', {
+  async createCompetitor(data: Partial<Competitor>): Promise<{ status: string; competitor: Competitor }> {
+    return this.request('/api/dashboard/competitors', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async updateCompetitor(id: number, data: any) {
-    return this.request<any>(`/api/dashboard/competitors/${id}`, {
+  async updateCompetitor(id: number, data: Partial<Competitor>): Promise<{ status: string; competitor: Competitor }> {
+    return this.request(`/api/dashboard/competitors/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
-  async deleteCompetitor(id: number) {
-    return this.request<any>(`/api/dashboard/competitors/${id}`, {
+  async deleteCompetitor(id: number): Promise<BulkActionResponse> {
+    return this.request(`/api/dashboard/competitors/${id}`, {
       method: 'DELETE',
     })
   }
 
-  async duplicateCompetitor(id: number) {
-    return this.request<any>(`/api/dashboard/competitors/${id}/duplicate`, {
+  async duplicateCompetitor(id: number): Promise<{ status: string; competitor: Competitor }> {
+    return this.request(`/api/dashboard/competitors/${id}/duplicate`, {
       method: 'POST',
     })
   }
 
-  async bulkDelete(ids: number[]) {
-    return this.request<any>('/api/dashboard/competitors/bulk/delete', {
-      method: 'POST',
-      body: JSON.stringify({ competitor_ids: ids }),
-    })
-  }
-
-  async bulkEnable(ids: number[]) {
-    return this.request<any>('/api/dashboard/competitors/bulk/enable', {
+  async bulkDelete(ids: number[]): Promise<BulkActionResponse> {
+    return this.request('/api/dashboard/competitors/bulk/delete', {
       method: 'POST',
       body: JSON.stringify({ competitor_ids: ids }),
     })
   }
 
-  async bulkDisable(ids: number[]) {
-    return this.request<any>('/api/dashboard/competitors/bulk/disable', {
+  async bulkEnable(ids: number[]): Promise<BulkActionResponse> {
+    return this.request('/api/dashboard/competitors/bulk/enable', {
       method: 'POST',
       body: JSON.stringify({ competitor_ids: ids }),
     })
   }
 
-  async bulkUpdateFrequency(ids: number[], frequency: string) {
-    return this.request<any>('/api/dashboard/competitors/bulk/frequency', {
+  async bulkDisable(ids: number[]): Promise<BulkActionResponse> {
+    return this.request('/api/dashboard/competitors/bulk/disable', {
+      method: 'POST',
+      body: JSON.stringify({ competitor_ids: ids }),
+    })
+  }
+
+  async bulkUpdateFrequency(ids: number[], frequency: string): Promise<BulkActionResponse> {
+    return this.request('/api/dashboard/competitors/bulk/frequency', {
       method: 'POST',
       body: JSON.stringify({ competitor_ids: ids, frequency }),
     })
   }
 
   // Collection
-  async triggerCollection(competitorId: number) {
-    return this.request<any>(`/api/dashboard/collect/${competitorId}`, {
+  async triggerCollection(competitorId: number): Promise<{ status: string; competitor_id: number }> {
+    return this.request(`/api/dashboard/collect/${competitorId}`, {
       method: 'POST',
     })
   }
 
-  async cancelCollection(competitorId: number) {
-    return this.request<any>(`/api/dashboard/collect/${competitorId}/cancel`, {
+  async cancelCollection(competitorId: number): Promise<{ status: string }> {
+    return this.request(`/api/dashboard/collect/${competitorId}/cancel`, {
       method: 'POST',
     })
   }
 
-  async retryCollection(competitorId: number) {
-    return this.request<any>(`/api/dashboard/collect/${competitorId}/retry`, {
+  async retryCollection(competitorId: number): Promise<{ status: string }> {
+    return this.request(`/api/dashboard/collect/${competitorId}/retry`, {
       method: 'POST',
     })
   }
 
   // Logs
-  async getLogs(params?: { competitor_id?: number; success?: boolean; page?: number; page_size?: number }) {
+  async getLogs(params?: { competitor_id?: number; success?: boolean; page?: number; page_size?: number }): Promise<{ total: number; logs: CollectionLog[]; page: number; page_size: number; total_pages: number }> {
     const searchParams = new URLSearchParams()
     if (params?.competitor_id) searchParams.set('competitor_id', String(params.competitor_id))
     if (params?.success !== undefined) searchParams.set('success', String(params.success))
     if (params?.page) searchParams.set('page', String(params.page))
     if (params?.page_size) searchParams.set('page_size', String(params.page_size))
     const qs = searchParams.toString()
-    return this.request<any>(`/api/dashboard/logs${qs ? `?${qs}` : ''}`)
+    return this.request(`/api/dashboard/logs${qs ? `?${qs}` : ''}`)
   }
 
   // Health
-  async getHealth() {
-    return this.request<any>('/api/dashboard/health')
+  async getHealth(): Promise<SystemHealth> {
+    return this.request('/api/dashboard/health')
   }
 
-  async getSystemHealth() {
-    return this.request<any>('/health')
+  async getSystemHealth(): Promise<SystemHealth> {
+    return this.request('/health')
   }
 
   // Scheduler
-  async getSchedulerStatus() {
-    return this.request<any>('/api/dashboard/scheduler/status')
+  async getSchedulerStatus(): Promise<SchedulerStatus> {
+    return this.request('/api/dashboard/scheduler/status')
   }
 
-  async pauseScheduler() {
-    return this.request<any>('/api/dashboard/scheduler/pause', { method: 'POST' })
+  async pauseScheduler(): Promise<{ status: string }> {
+    return this.request('/api/dashboard/scheduler/pause', { method: 'POST' })
   }
 
-  async resumeScheduler() {
-    return this.request<any>('/api/dashboard/scheduler/resume', { method: 'POST' })
+  async resumeScheduler(): Promise<{ status: string }> {
+    return this.request('/api/dashboard/scheduler/resume', { method: 'POST' })
   }
 
   // Search
-  async search(q: string) {
-    return this.request<any>(`/api/dashboard/search?q=${encodeURIComponent(q)}`)
+  async search(q: string): Promise<SearchResult> {
+    return this.request(`/api/dashboard/search?q=${encodeURIComponent(q)}`)
   }
 
   // Telemetry
-  async getTelemetry() {
-    return this.request<any>('/api/dashboard/telemetry')
+  async getTelemetry(): Promise<Telemetry> {
+    return this.request('/api/dashboard/telemetry')
   }
 
   // Config
-  async getConfig() {
-    return this.request<any>('/api/dashboard/config')
+  async getConfig(): Promise<SystemConfig> {
+    return this.request('/api/dashboard/config')
   }
 
-  async resyncConfig() {
-    return this.request<any>('/api/dashboard/config/resync', { method: 'POST' })
+  async resyncConfig(): Promise<{ status: string; synced: { status: string; synced: number; skipped: number } }> {
+    return this.request('/api/dashboard/config/resync', { method: 'POST' })
   }
 
   // Trends
-  async getTrends(days = 30) {
-    return this.request<any>(`/api/dashboard/trends?days=${days}`)
+  async getTrends(days = 30): Promise<{ days: number; trends: { date: string; collections: number; successful: number; failed: number; records: number }[] }> {
+    return this.request(`/api/dashboard/trends?days=${days}`)
   }
 
   // Compare
-  async compareCompetitors(ids: number[]) {
-    return this.request<any[]>(`/api/dashboard/compare?competitor_ids=${ids.join(',')}`)
+  async compareCompetitors(ids: number[]): Promise<(Competitor & { services: Service[]; pricing: Pricing[]; content: Content[]; social: Social[]; services_count: number; pricing_count: number; social_count: number; content_count: number })[]> {
+    return this.request(`/api/dashboard/compare?competitor_ids=${ids.join(',')}`)
   }
 
   // Changes
-  async getChanges(competitorId: number, limit = 50) {
-    return this.request<any[]>(`/api/dashboard/competitors/${competitorId}/changes?limit=${limit}`)
+  async getChanges(competitorId: number, limit = 50): Promise<{ change_type: string; data_type: string; old_value: string | null; new_value: string | null; detected_at: string }[]> {
+    return this.request(`/api/dashboard/competitors/${competitorId}/changes?limit=${limit}`)
   }
 
   // Extracted Data
-  async getExtracted(competitorId: number) {
-    return this.request<any>(`/api/dashboard/extracted/${competitorId}`)
+  async getExtracted(competitorId: number): Promise<Record<string, unknown>> {
+    return this.request(`/api/dashboard/extracted/${competitorId}`)
   }
 
   // Live Logs
-  async getLiveLogs(competitorId: number) {
-    return this.request<any[]>(`/api/dashboard/live_logs/${competitorId}`)
+  async getLiveLogs(competitorId: number): Promise<CollectionLog[]> {
+    return this.request(`/api/dashboard/live_logs/${competitorId}`)
   }
 
   // Exports
-  getCompareCsvUrl() {
+  getCompareCsvUrl(): string {
     return `${API_BASE}/api/dashboard/compare/csv`
   }
 
-  getExportZipUrl() {
+  getExportZipUrl(): string {
     return `${API_BASE}/api/dashboard/export/zip`
   }
 
-  getPdfExportUrl() {
+  getPdfExportUrl(): string {
     return `${API_BASE}/api/dashboard/export/pdf`
   }
 
-  getRawHtmlUrl(competitorId: number) {
+  getRawHtmlUrl(competitorId: number): string {
     return `${API_BASE}/api/dashboard/raw/${competitorId}`
   }
 
   // AI
-  async getAiInsights(competitorId: number) {
-    return this.request<any>(`/api/ai/competitor/${competitorId}`)
+  async getAiInsights(competitorId: number): Promise<AiInsight> {
+    return this.request(`/api/ai/competitor/${competitorId}`)
   }
 
-  async analyzeCompetitor(competitorId: number) {
-    return this.request<any>(`/api/ai/analyze/${competitorId}`, { method: 'POST' })
+  async analyzeCompetitor(competitorId: number): Promise<{ status: string; competitor_id: number }> {
+    return this.request(`/api/ai/analyze/${competitorId}`, { method: 'POST' })
   }
 
-  async analyzeBatch(competitorIds?: number[]) {
-    return this.request<any>('/api/ai/analyze/batch', {
+  async analyzeBatch(competitorIds?: number[]): Promise<{ status: string; queued: number }> {
+    return this.request('/api/ai/analyze/batch', {
       method: 'POST',
       body: JSON.stringify(competitorIds),
     })
   }
 
-  async deleteAiInsights(competitorId: number) {
-    return this.request<any>(`/api/ai/competitor/${competitorId}`, { method: 'DELETE' })
+  async deleteAiInsights(competitorId: number): Promise<{ status: string }> {
+    return this.request(`/api/ai/competitor/${competitorId}`, { method: 'DELETE' })
   }
 
-  async getAiStatus() {
-    return this.request<any>('/api/ai/status')
+  async getAiStatus(): Promise<AiStatus> {
+    return this.request('/api/ai/status')
   }
 
   // Metrics
-  async getMetricsJson() {
-    return this.request<any>('/metrics/json')
+  async getMetricsJson(): Promise<Record<string, unknown>> {
+    return this.request('/metrics/json')
   }
 
   // Competitor Scoring
-  async getCompetitorScore(competitorId: number) {
-    return this.request<any>(`/competitor/${competitorId}/score`)
+  async getCompetitorScore(competitorId: number): Promise<CompetitorScoreResponse> {
+    return this.request(`/competitor/${competitorId}/score`)
   }
 
-  async getAllScores() {
-    return this.request<any>('/scores')
+  async getAllScores(): Promise<{ total: number; scores: { competitor_id: number; name: string; total_score: number; grade: string; tier: string; is_chennai: boolean; is_indian: boolean }[] }> {
+    return this.request('/scores')
   }
 
   // Competitor Discovery
-  async discoverCompetitors(queries?: string[], numResults?: number) {
-    return this.request<any>('/discover', {
+  async discoverCompetitors(queries?: string[], numResults?: number): Promise<DiscoveryResult> {
+    return this.request('/discover', {
       method: 'POST',
       body: JSON.stringify({ queries: queries || [], num_results: numResults || 10 }),
     })

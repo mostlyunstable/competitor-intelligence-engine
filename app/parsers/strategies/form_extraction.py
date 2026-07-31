@@ -370,7 +370,7 @@ class FormExtractionStrategy(ParsingStrategy):
                         "description": None,
                         "category": cat,
                         "starting_price": None,
-                        "currency": "USD",
+                        "currency": "INR",
                         "estimated_duration": None,
                         "source": "form_category",
                     }
@@ -389,7 +389,7 @@ class FormExtractionStrategy(ParsingStrategy):
                         "description": None,
                         "category": "Location",
                         "starting_price": None,
-                        "currency": "USD",
+                        "currency": "INR",
                         "estimated_duration": None,
                         "source": "form_city",
                     }

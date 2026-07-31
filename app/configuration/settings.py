@@ -3,11 +3,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseSettings(BaseModel):
-    url: str = Field(default="postgresql+asyncpg://utservio:changeme@localhost:5434/utservio_ci")
+    url: str = Field(default="")
     echo: bool = Field(default=False)
-    pool_size: int = Field(default=10)
-    max_overflow: int = Field(default=20)
-    pool_timeout: int = Field(default=30)
+    pool_size: int = Field(default=20)
+    max_overflow: int = Field(default=30)
+    pool_timeout: int = Field(default=60)
     pool_recycle: int = Field(default=1800)
 
 
@@ -63,7 +63,7 @@ class WebhookSettings(BaseModel):
 class LLMSettings(BaseModel):
     enabled: bool = Field(default=False)
     provider: str = Field(default="openai")
-    api_key: str = Field(default="intern_live_7e6b8f5d3a9142d9b4c81f6e2a7c5d9f3e1b8a6c4d2f9a7")
+    api_key: str = Field(default="")
     model_name: str = Field(default="gpt-4o-mini")
     base_url: str = Field(default="https://llm-proxy.utservio.workers.dev/")
     max_tokens: int = Field(default=4096)
@@ -94,10 +94,11 @@ class Settings(BaseSettings):
     log_level: str = Field(default="info")
     debug: bool = Field(default=False)
     api_key: str = Field(default="")
+    admin_user: str = Field(default="", alias="ADMIN_USER")
+    admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
+    cors_origins: list[str] = Field(default=["http://localhost:3000", "http://localhost:5173"])
 
-    staging_database_url: str = Field(
-        default="postgresql+asyncpg://utservio:changeme@localhost:5433/utservio_ci_staging"
-    )
+    staging_database_url: str = Field(default="")
     staging_redis_url: str = Field(default="redis://localhost:6380")
     staging_vault_url: str = Field(default="http://localhost:8201")
 

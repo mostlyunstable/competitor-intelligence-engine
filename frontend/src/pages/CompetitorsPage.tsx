@@ -4,10 +4,11 @@ import { usePolling, useDebounce } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate, timeAgo } from '../lib/utils'
 import {
-  Plus, Search, Filter, Trash2, Edit, Copy, Play, Pause,
-  ChevronLeft, ChevronRight, MoreVertical, ExternalLink, Globe,
+  Plus, Search, Filter, Trash2, Edit, Copy, Play,
+  ChevronLeft, ChevronRight, ExternalLink, Globe,
   AlertTriangle, XCircle, RefreshCw
 } from 'lucide-react'
+import type { Competitor } from '../types'
 
 export default function CompetitorsPage() {
   const navigate = useNavigate()
@@ -17,7 +18,7 @@ export default function CompetitorsPage() {
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [showAdd, setShowAdd] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
+  const [editing, setEditing] = useState<Competitor | null>(null)
 
   const debouncedSearch = useDebounce(search, 300)
 
@@ -44,26 +45,32 @@ export default function CompetitorsPage() {
 
   const selectAll = () => {
     if (selected.size === competitors.length) setSelected(new Set())
-    else setSelected(new Set(competitors.map((c: any) => c.id)))
+    else setSelected(new Set(competitors.map((c) => c.id)))
   }
 
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selected.size} competitors?`)) return
-    await api.bulkDelete(Array.from(selected))
-    setSelected(new Set())
-    refresh()
+    try {
+      await api.bulkDelete(Array.from(selected))
+      setSelected(new Set())
+      refresh()
+    } catch { /* errors shown by usePolling */ }
   }
 
   const handleBulkEnable = async () => {
-    await api.bulkEnable(Array.from(selected))
-    setSelected(new Set())
-    refresh()
+    try {
+      await api.bulkEnable(Array.from(selected))
+      setSelected(new Set())
+      refresh()
+    } catch { /* errors shown by usePolling */ }
   }
 
   const handleBulkDisable = async () => {
-    await api.bulkDisable(Array.from(selected))
-    setSelected(new Set())
-    refresh()
+    try {
+      await api.bulkDisable(Array.from(selected))
+      setSelected(new Set())
+      refresh()
+    } catch { /* errors shown by usePolling */ }
   }
 
   return (
@@ -71,7 +78,7 @@ export default function CompetitorsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">Competitors</h1>
         <div className="flex items-center gap-2">
-          <button onClick={async () => { setRefreshing(true); try { await refresh() } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+          <button onClick={async () => { setRefreshing(true); try { await refresh() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
           </button>
           <button onClick={() => setShowAdd(true)} className="btn-primary">
@@ -202,7 +209,7 @@ export default function CompetitorsPage() {
                   <td className="table-cell">
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={async () => { await api.triggerCollection(c.id); refresh() }}
+                        onClick={async () => { try { await api.triggerCollection(c.id); refresh() } catch { /* errors shown by usePolling */ } }}
                         className="p-1.5 text-green-600 hover:bg-green-50 rounded"
                         title="Trigger Collection"
                       >
@@ -216,14 +223,14 @@ export default function CompetitorsPage() {
                         <Edit size={14} />
                       </button>
                       <button
-                        onClick={async () => { await api.duplicateCompetitor(c.id); refresh() }}
+                        onClick={async () => { try { await api.duplicateCompetitor(c.id); refresh() } catch { /* errors shown by usePolling */ } }}
                         className="p-1.5 text-surface-500 hover:bg-surface-100 rounded"
                         title="Duplicate"
                       >
                         <Copy size={14} />
                       </button>
                       <button
-                        onClick={async () => { if (confirm('Delete this competitor?')) { await api.deleteCompetitor(c.id); refresh() } }}
+                        onClick={async () => { if (confirm('Delete this competitor?')) { try { await api.deleteCompetitor(c.id); refresh() } catch { /* errors shown by usePolling */ } } }}
                         className="p-1.5 text-red-500 hover:bg-red-50 rounded"
                         title="Delete"
                       >
@@ -274,7 +281,7 @@ export default function CompetitorsPage() {
 }
 
 function CompetitorModal({ competitor, onClose, onSaved }: {
-  competitor?: any; onClose: () => void; onSaved: () => void
+  competitor?: Competitor | null; onClose: () => void; onSaved: () => void
 }) {
   const [form, setForm] = useState({
     name: competitor?.name || '',

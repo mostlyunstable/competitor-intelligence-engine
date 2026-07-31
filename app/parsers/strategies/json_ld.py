@@ -1,16 +1,17 @@
 import contextlib
 import json
-import logging
 import re
 from typing import Any
 from urllib.parse import urljoin
 
+import structlog
 from bs4 import BeautifulSoup
 
+from app.parsers.constants import SOCIAL_PLATFORMS
 from app.parsers.page_segmenter import PageSegment
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 SCHEMA_ORG_TYPES = {
     "LocalBusiness",
@@ -31,17 +32,6 @@ SCHEMA_ORG_TYPES = {
     "Person",
     "ContactPage",
     "BreadcrumbList",
-}
-
-SOCIAL_PLATFORMS: dict[str, str] = {
-    "linkedin.com": "linkedin",
-    "facebook.com": "facebook",
-    "instagram.com": "instagram",
-    "twitter.com": "twitter",
-    "x.com": "twitter",
-    "youtube.com": "youtube",
-    "pinterest.com": "pinterest",
-    "threads.net": "threads",
 }
 
 

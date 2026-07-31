@@ -59,7 +59,6 @@ _SKIP_TAGS: frozenset[str] = frozenset(
     {
         "script",
         "style",
-        "noscript",
         "template",
         "br",
         "hr",
@@ -79,12 +78,6 @@ _SKIP_TAGS: frozenset[str] = frozenset(
         "label",
         "select",
         "textarea",
-        "ul",
-        "ol",
-        "li",
-        "dl",
-        "dt",
-        "dd",
         "h1",
         "h2",
         "h3",
@@ -221,19 +214,37 @@ class DomBlockExtractor:
     def _is_repeated(children: list[Tag]) -> bool:
         """Check if children form a repeated grid/card pattern.
 
-        All children must share the same tag name and have similar
-        internal structure (at least one heading or paragraph).
+        Children can be same tag OR mixed tags (div, article, section, li)
+        as long as they have similar structure (at least one heading or paragraph).
         """
         if not children:
             return False
+
+        # Check same tag first (original behavior)
         first_tag = children[0].name
-        if not all(c.name == first_tag for c in children):
+        same_tag = all(c.name == first_tag for c in children)
+
+        # Allow mixed tags if they are all block-level containers
+        block_tags = {"div", "article", "section", "li", "td", "th", "figure", "blockquote"}
+        all_block = all(c.name in block_tags for c in children)
+
+        if not same_tag and not all_block:
             return False
+
         # Each child should have some content (heading, paragraph, or list)
         for c in children:
             text_len = len(c.get_text(strip=True))
             if text_len < 10:
                 return False
+
+        # Check structural similarity: at least half should have a heading or paragraph
+        has_heading_or_para = 0
+        for c in children:
+            if c.select_one("h1, h2, h3, h4, h5, h6, p"):
+                has_heading_or_para += 1
+        if has_heading_or_para < len(children) // 2:
+            return False
+
         return True
 
     @staticmethod

@@ -193,49 +193,13 @@ class TeamExtractionStrategy(ParsingStrategy):
                 continue
 
             # Walk siblings after this heading to find team cards
-            section = self._collect_section_content(heading)
+            section = self._collect_section(heading)
             if not section:
                 continue
 
             # Look for card-like patterns within the section
             for card in section.select("div, article, section, li, figure"):
                 self._extract_person_from_card(card, result, url)
-
-    def _collect_section_content(self, heading: Tag) -> Tag | None:
-        """Collect sibling elements after a heading until the next heading of same or higher level."""
-        heading_level = int(heading.name[1]) if heading.name and heading.name[0] == "h" else 3
-        container = heading.parent
-        if not container:
-            return None
-
-        # Find all siblings between this heading and the next same-or-higher-level heading
-        collecting = False
-        elements: list[Tag] = []
-        for sibling in container.children:
-            if not isinstance(sibling, Tag):
-                continue
-            if sibling is heading:
-                collecting = True
-                continue
-            if collecting:
-                # Stop at next heading of same or higher level
-                if sibling.name and sibling.name[0] == "h":
-                    try:
-                        sib_level = int(sibling.name[1])
-                        if sib_level <= heading_level:
-                            break
-                    except (ValueError, IndexError):
-                        pass
-                elements.append(sibling)
-
-        if not elements:
-            return None
-
-        # Wrap in a temporary container
-        wrapper = BeautifulSoup("", "html.parser").new_tag("div")
-        for el in elements:
-            wrapper.append(el)
-        return wrapper
 
     def _extract_person_from_card(self, card: Tag, result: ParsedResult, url: str) -> None:
         """Extract a person from a card-like element."""

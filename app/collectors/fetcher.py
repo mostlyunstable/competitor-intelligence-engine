@@ -53,6 +53,23 @@ class PageAnalyzer:
         r"backbone",
         r"preact",
         r"solid\.js",
+        r"gatsby",
+        r"remix",
+        r"astro",
+        r"hydrogen",
+        r"shopify",
+        r"wordpress",
+        r"elementor",
+        r"divi",
+        r"wp-",
+        r"jquery",
+        r"bootstrap",
+        r"tailwind",
+        r"material",
+        r"ant\.design",
+        r"chakra",
+        r"radix",
+        r"headlessui",
     ]
 
     DYNAMIC_INDICATORS: ClassVar[list[str]] = [
@@ -70,17 +87,39 @@ class PageAnalyzer:
         r"data-svelte",
         r"__gatsby",
         r"___gatsby",
+        r"__remix",
+        r"__astro",
+        r"__shopify",
+        r"__wp",
+        r"__elementor",
+        r"__divi",
+        r"__bootstrap",
+        r"__tailwind",
+        r"__material",
+        r"__ant",
+        r"__chakra",
+        r"__radix",
+        r"__headless",
+        r"window\.__PRELOADED_STATE__",
+        r"window\.__APP_STATE__",
+        r"window\.__DATA__",
+        r"window\.__INITIAL_DATA__",
+        r"window\.__SERVER_DATA__",
+        r"window\.__CLIENT_DATA__",
     ]
 
     CONTENT_QUALITY_INDICATORS: ClassVar[list[str]] = [
-        r"<script[^>]*>.*?</script>",
-        r"<noscript>.*?</noscript>",
-        r"Loading\.\.\.\.",
         r"Please enable JavaScript",
         r"JavaScript is required",
+        r"This page requires JavaScript",
+        r"JavaScript must be enabled",
+        r"You need to enable JavaScript",
+        r"enable JavaScript to run",
+        r"<div id=[\"']root[\"']></div>",
+        r"<div id=[\"']app[\"']></div>",
     ]
 
-    def __init__(self, *, min_content_length: int = 500) -> None:
+    def __init__(self, *, min_content_length: int = 1000) -> None:
         self._min_content_length = min_content_length
         self._compiled_frameworks = [re.compile(p, re.IGNORECASE) for p in self.JS_FRAMEWORKS]
         self._compiled_indicators = [re.compile(p, re.IGNORECASE) for p in self.DYNAMIC_INDICATORS]
@@ -143,10 +182,11 @@ class PageAnalyzer:
 class PlaywrightRenderer:
     """Renders JavaScript-heavy pages using Playwright."""
 
-    def __init__(self) -> None:
+    def __init__(self, stealth_settings: Any = None) -> None:
         self._browser: Any = None
         self._context: Any = None
         self._playwright: Any = None
+        self._stealth_settings = stealth_settings
 
     async def _ensure_browser(self) -> Any:
         """Ensure browser is initialized."""
@@ -155,16 +195,13 @@ class PlaywrightRenderer:
 
             from playwright.async_api import async_playwright
 
-            from app.configuration.settings import get_settings
-
-            settings = get_settings()
             proxy = None
-            if settings.stealth.enabled:
+            if self._stealth_settings and self._stealth_settings.enabled:
                 proxy_str = ""
-                if settings.stealth.proxy_urls:
-                    proxy_str = random.choice(settings.stealth.proxy_urls)
-                elif settings.stealth.proxy_url:
-                    proxy_str = settings.stealth.proxy_url
+                if self._stealth_settings.proxy_urls:
+                    proxy_str = random.choice(self._stealth_settings.proxy_urls)
+                elif self._stealth_settings.proxy_url:
+                    proxy_str = self._stealth_settings.proxy_url
 
                 if proxy_str:
                     proxy = {"server": proxy_str}
@@ -194,8 +231,8 @@ class PlaywrightRenderer:
             self._context = await self._browser.new_context(
                 user_agent=random.choice(user_agents),
                 viewport={"width": 1920, "height": 1080},
-                locale="en-US",
-                timezone_id="America/New_York",
+                locale="en-IN",
+                timezone_id="Asia/Kolkata",
                 color_scheme="light",
                 java_script_enabled=True,
                 has_touch=False,
@@ -225,15 +262,13 @@ class PlaywrightRenderer:
         context = await self._ensure_browser()
         page = await context.new_page()
 
-        from app.configuration.settings import get_settings
+        if self._stealth_settings.enabled:
+            from playwright_stealth import Stealth
 
-        if get_settings().stealth.enabled:
-            from playwright_stealth import stealth_async
-
-            await stealth_async(page)
+            await Stealth().apply_stealth_async(page)
 
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+            await page.goto(url, wait_until="networkidle", timeout=timeout)
 
             with contextlib.suppress(Exception):
                 await page.wait_for_selector(primary_selector, timeout=min(timeout, 10000))
@@ -465,15 +500,16 @@ class HybridFetcher:
     """
 
     def __init__(self) -> None:
-        self._settings = get_settings().collector
+        settings = get_settings()
+        self._settings = settings.collector
+        self._stealth_settings = settings.stealth
         self._clients: dict[str, httpx.AsyncClient] = {}
         self._analyzer = PageAnalyzer()
         self._renderer: PlaywrightRenderer | None = None
         self._domain_limiters: dict[str, RateLimiter] = {}
-        cache_settings = get_settings().cache
         self._cache_layer = HttpCacheLayer(
-            max_size=cache_settings.max_entries,
-            ttl_seconds=cache_settings.default_ttl_seconds,
+            max_size=settings.cache.max_entries,
+            ttl_seconds=settings.cache.default_ttl_seconds,
         )
 
     def _get_domain_limiter(self, url: str) -> RateLimiter:
@@ -489,17 +525,14 @@ class HybridFetcher:
         """Get or create httpx client."""
         import random
 
-        from app.configuration.settings import get_settings
-
-        settings = get_settings()
         proxy = None
         proxy_key = "default"
-        if settings.stealth.enabled:
+        if self._stealth_settings.enabled:
             proxy_str = ""
-            if settings.stealth.proxy_urls:
-                proxy_str = random.choice(settings.stealth.proxy_urls)
-            elif settings.stealth.proxy_url:
-                proxy_str = settings.stealth.proxy_url
+            if self._stealth_settings.proxy_urls:
+                proxy_str = random.choice(self._stealth_settings.proxy_urls)
+            elif self._stealth_settings.proxy_url:
+                proxy_str = self._stealth_settings.proxy_url
 
             if proxy_str:
                 proxy = proxy_str
@@ -520,7 +553,7 @@ class HybridFetcher:
     async def _get_renderer(self) -> PlaywrightRenderer:
         """Get or create Playwright renderer."""
         if self._renderer is None:
-            self._renderer = PlaywrightRenderer()
+            self._renderer = PlaywrightRenderer(self._stealth_settings)
         return self._renderer
 
     async def fetch(
@@ -851,11 +884,10 @@ class HybridFetcher:
         await self._get_domain_limiter(url).acquire()
 
         renderer = await self._get_renderer()
-        settings = get_settings().collector
         html = await renderer.render(
             url,
-            timeout=settings.playwright_timeout,
-            primary_selector=get_settings().collector.primary_selector,
+            timeout=self._settings.playwright_timeout,
+            primary_selector=self._settings.primary_selector,
             competitor_id=competitor_id,
         )
 
@@ -870,8 +902,6 @@ class HybridFetcher:
 
     async def close(self) -> None:
         """Close resources."""
-        import asyncio
-
         close_tasks = []
         for client in self._clients.values():
             if not client.is_closed:

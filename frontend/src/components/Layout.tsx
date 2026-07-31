@@ -24,7 +24,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<any[] | null>(null)
+  const [searchResults, setSearchResults] = useState<{ competitor_id: number; name: string; context: string }[] | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [notifications, setNotifications] = useState<{ type: string; message: string; time: string }[]>([])
   const [showNotifications, setShowNotifications] = useState(false)

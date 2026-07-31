@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { api } from '../lib/api'
 import { GitCompare, Check, Plus, X, RefreshCw, BarChart3, PieChart, Radar } from 'lucide-react'
+import type { Competitor } from '../types'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   RadarChart, Radar as RechartsRadar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -22,7 +23,7 @@ interface CompetitorData {
 const COLORS = ['#ff8811', '#10b981', '#8b5cf6', '#f59e0b']
 
 export default function CompetitorComparePage() {
-  const [competitors, setCompetitors] = useState<any[]>([])
+  const [competitors, setCompetitors] = useState<Competitor[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [comparison, setComparison] = useState<CompetitorData[]>([])
   const [loading, setLoading] = useState(false)
@@ -32,7 +33,7 @@ export default function CompetitorComparePage() {
   const loadCompetitors = useCallback(async () => {
     try {
       const data = await api.getCompetitors({ page_size: 50 })
-      setCompetitors(data.competitors || data || [])
+      setCompetitors(data.competitors || data.items || [])
     } catch {}
   }, [])
 
@@ -46,9 +47,11 @@ export default function CompetitorComparePage() {
         setLoading(true)
         const data = await api.compareCompetitors(selectedIds)
         setComparison(data)
-        setLoading(false)
       }
+    } catch {
+      // errors shown by usePolling
     } finally {
+      setLoading(false)
       setRefreshing(false)
     }
   }, [loadCompetitors, selectedIds])
@@ -58,8 +61,7 @@ export default function CompetitorComparePage() {
       setLoading(true)
       api.compareCompetitors(selectedIds).then(data => {
         setComparison(data)
-        setLoading(false)
-      }).catch(() => setLoading(false))
+      }).catch(() => {}).finally(() => setLoading(false))
     } else {
       setComparison([])
     }
@@ -96,7 +98,7 @@ export default function CompetitorComparePage() {
       social: Math.max(...comparison.map(c => c.social_count), 1),
     }
     return ['Services', 'Pricing', 'Content', 'Social'].map(cat => {
-      const entry: Record<string, any> = { category: cat }
+      const entry: Record<string, number | string> = { category: cat }
       comparison.forEach(c => {
         const key = cat.toLowerCase() as keyof Pick<CompetitorData, 'services_count' | 'pricing_count' | 'content_count' | 'social_count'>
         const countKey = `${key}_count` as keyof CompetitorData
@@ -124,12 +126,12 @@ export default function CompetitorComparePage() {
     [comparison]
   )
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
     if (!active || !payload?.length) return null
     return (
       <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg shadow-lg p-3">
         <p className="text-sm font-medium text-surface-900 dark:text-white mb-1">{label}</p>
-        {payload.map((p: any, i: number) => (
+        {payload.map((p, i) => (
           <p key={i} className="text-xs" style={{ color: p.color }}>
             {p.name}: {p.value}
           </p>
@@ -154,7 +156,7 @@ export default function CompetitorComparePage() {
       <div className="card p-5">
         <h2 className="font-semibold text-surface-900 mb-3">Select competitors to compare (2-4)</h2>
         <div className="flex flex-wrap gap-2">
-          {competitors.map((c: any) => {
+          {competitors.map((c) => {
             const selected = selectedIds.includes(c.id)
             const disabled = !selected && selectedIds.length >= 4
             return (
@@ -336,7 +338,7 @@ export default function CompetitorComparePage() {
                       outerRadius={120}
                       paddingAngle={3}
                       dataKey="value"
-                      label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
                     >
                       {pieData.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -358,13 +360,15 @@ export default function CompetitorComparePage() {
                     nameKey="name"
                     stroke="#fff"
                     fill="#8884d8"
-                    content={({ x, y, width, height, name, color }: any) => (
+                    content={(props: Record<string, unknown>) => {
+                      const x = props.x as number; const y = props.y as number; const width = props.width as number; const height = props.height as number; const name = props.name as string; const color = props.color as string
+                      return (
                       <g>
                         <rect x={x} y={y} width={width} height={height} fill={color} stroke="#fff" strokeWidth={2} rx={4} />
                         {width > 60 && height > 30 && (
                           <>
                             <text x={x + width / 2} y={y + height / 2 - 6} textAnchor="middle" fill="#fff" fontSize={11} fontWeight={600}>
-                              {name.split(' ').pop()}
+                              {(name || '').split(' ').pop()}
                             </text>
                             <text x={x + width / 2} y={y + height / 2 + 10} textAnchor="middle" fill="#fff" fontSize={10} opacity={0.8}>
                               {treemapData.find(d => d.name === name)?.size}
@@ -372,7 +376,7 @@ export default function CompetitorComparePage() {
                           </>
                         )}
                       </g>
-                    )}
+                    )}}
                   />
                 </ResponsiveContainer>
               </div>

@@ -4,11 +4,12 @@ import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate, timeAgo } from '../lib/utils'
 import {
-  ArrowLeft, Globe, Play, Edit, ExternalLink, Clock,
+  ArrowLeft, Globe, Play, ExternalLink,
   CheckCircle, XCircle, Code, DollarSign, FileText,
-  Users, Share2, Database, History, RefreshCw, GitCompare,
+  Share2, Database, History, RefreshCw, GitCompare,
   Brain, Plus, Minus
 } from 'lucide-react'
+import type { Service, Pricing, TechStack, Content, Social, CollectionLog, Change, CompetitorScoreResponse, AiInsight } from '../types'
 
 export default function CompetitorProfilePage() {
   const { id } = useParams<{ id: string }>()
@@ -61,7 +62,7 @@ export default function CompetitorProfilePage() {
         <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary disabled:opacity-50">
           <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
         </button>
-        <button onClick={async () => { await api.triggerCollection(competitorId) }} className="btn-primary">
+        <button onClick={async () => { try { await api.triggerCollection(competitorId) } catch { /* errors shown by usePolling */ } }} className="btn-primary">
           <Play size={16} /> Collect Now
         </button>
       </div>
@@ -155,7 +156,7 @@ export default function CompetitorProfilePage() {
               <h2 className="font-semibold text-surface-900">Services ({services.length})</h2>
             </div>
             <div className="divide-y divide-surface-50">
-              {services.map((s: any) => (
+              {services.map((s: Service) => (
                 <div key={s.id} className="px-5 py-3">
                   <div className="font-medium text-sm text-surface-900">{s.name}</div>
                   {s.description && <div className="text-xs text-surface-500 mt-1">{s.description}</div>}
@@ -183,7 +184,7 @@ export default function CompetitorProfilePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-50">
-                  {pricing.map((p: any) => (
+                  {pricing.map((p: Pricing) => (
                     <tr key={p.id}>
                       <td className="table-cell font-medium">{p.service_name}</td>
                       <td className="table-cell">{p.base_price || '-'}</td>
@@ -205,7 +206,7 @@ export default function CompetitorProfilePage() {
               <h2 className="font-semibold text-surface-900">Technology Stack ({tech_stack.length})</h2>
             </div>
             <div className="p-5 flex flex-wrap gap-2">
-              {tech_stack.map((t: any) => (
+              {tech_stack.map((t: TechStack) => (
                 <div key={t.id} className="px-3 py-2 bg-surface-50 rounded-lg border border-surface-200">
                   <div className="text-sm font-medium text-surface-900">{t.technology_name}</div>
                   {t.category && <div className="text-xs text-surface-500">{t.category}</div>}
@@ -223,13 +224,13 @@ export default function CompetitorProfilePage() {
               <h2 className="font-semibold text-surface-900">Content ({content.length})</h2>
             </div>
             <div className="divide-y divide-surface-50 max-h-80 overflow-auto">
-              {content.map((c: any) => (
-                <div key={c.id} className="px-5 py-3 flex items-center justify-between">
+              {content.map((item: Content) => (
+                <div key={item.id} className="px-5 py-3 flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-medium text-surface-900">{c.title}</div>
-                    <div className="text-xs text-surface-400">{c.content_type}</div>
+                    <div className="text-sm font-medium text-surface-900">{item.title}</div>
+                    <div className="text-xs text-surface-400">{item.content_type}</div>
                   </div>
-                  <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline text-xs flex items-center gap-1">
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline text-xs flex items-center gap-1">
                     View <ExternalLink size={10} />
                   </a>
                 </div>
@@ -246,7 +247,7 @@ export default function CompetitorProfilePage() {
               <h2 className="font-semibold text-surface-900">Social Profiles ({social.length})</h2>
             </div>
             <div className="divide-y divide-surface-50">
-              {social.map((s: any) => (
+              {social.map((s: Social) => (
                 <div key={s.id} className="px-5 py-3 flex items-center justify-between">
                   <div>
                     <span className="badge-info">{s.platform}</span>
@@ -269,7 +270,7 @@ export default function CompetitorProfilePage() {
               <h2 className="font-semibold text-surface-900">Collection History ({collection_logs.length})</h2>
             </div>
             <div className="divide-y divide-surface-50 max-h-80 overflow-auto">
-              {collection_logs.map((l: any) => (
+              {collection_logs.map((l: CollectionLog) => (
                 <div key={l.id} className="px-5 py-3 flex items-center gap-3">
                   {l.success ? (
                     <CheckCircle size={16} className="text-emerald-500" />
@@ -299,7 +300,7 @@ export default function CompetitorProfilePage() {
               <h2 className="font-semibold text-surface-900">Recent Changes ({changes.length})</h2>
             </div>
             <div className="divide-y divide-surface-50 max-h-80 overflow-auto">
-              {changes.map((ch: any) => (
+              {changes.map((ch: Change) => (
                 <div key={ch.id} className="px-5 py-3 flex items-center gap-3">
                   <div className="flex-shrink-0">
                     {ch.change_type === 'added' ? (
@@ -331,7 +332,7 @@ export default function CompetitorProfilePage() {
               <Brain size={16} className="text-brand-600" />
               <h2 className="font-semibold text-surface-900">AI Insights</h2>
               <span className="ml-auto text-xs text-surface-500">
-                Confidence: {(aiInsight.confidence_score * 100).toFixed(0)}%
+                Confidence: {aiInsight.confidence_score != null ? `${(aiInsight.confidence_score * 100).toFixed(0)}%` : 'N/A'}
               </span>
             </div>
             <div className="p-5 space-y-4">
@@ -347,7 +348,7 @@ export default function CompetitorProfilePage() {
                   <p className="text-sm text-surface-700">{aiInsight.market_position}</p>
                 </div>
               )}
-              {aiInsight.key_differentiators?.length > 0 && (
+              {aiInsight.key_differentiators && aiInsight.key_differentiators.length > 0 && (
                 <div>
                   <div className="text-xs font-medium text-surface-500 uppercase mb-1">Key Differentiators</div>
                   <ul className="space-y-1">
@@ -360,7 +361,7 @@ export default function CompetitorProfilePage() {
                   </ul>
                 </div>
               )}
-              {aiInsight.recommendations?.length > 0 && (
+              {aiInsight.recommendations && aiInsight.recommendations.length > 0 && (
                 <div>
                   <div className="text-xs font-medium text-surface-500 uppercase mb-1">Recommendations</div>
                   <ul className="space-y-1">

@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING, Any
+
+from app.parsers.price_utils import detect_currency, parse_price
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
@@ -27,8 +29,8 @@ from app.parsers.strategy import ParsedResult, ParsingStrategy
 if TYPE_CHECKING:
     from app.parsers.page_segmenter import PageSegment
 
-_PRICE_RE = re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{1,2})?")
-_RATING_RE = re.compile(r"([\d.]+)\s*/\s*[\d.]+|\b(\d)\s*star|\b(\d)\s*-star")
+_PRICE_RE = re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{1,2})?|rs\.?\s*[\d,]+(?:\.\d{1,2})?|\d+[\d,]*(?:\.\d{1,2})?/-")
+_RATING_RE = re.compile(r"([\d.]+)\s*/\s*[\d.]+|\b(\d)\s*star|\b(\d)\s*-star|(\d+(?:\.\d+)?)\s*out of\s*\d+|(\d+(?:\.\d+)?)\s*rating")
 
 
 class CardExtractionStrategy(ParsingStrategy):
@@ -159,7 +161,8 @@ class CardExtractionStrategy(ParsingStrategy):
         lower_title = title.lower()
         has_svc_kw = any(
             kw in lower_title
-            for kw in ("service", "plan", "package", "tier", "membership", "subscription")
+            for kw in ("service", "plan", "package", "tier", "membership", "subscription",
+                       "seva", "yojana", "course", "batch", "class", "session", "treatment", "consultation")
         )
 
         if price_val is not None:
@@ -245,26 +248,8 @@ class CardExtractionStrategy(ParsingStrategy):
 
     @staticmethod
     def _parse_price(price_text: str | None) -> float | None:
-        if not price_text:
-            return None
-        numbers = re.findall(r"[\d,]+\.?\d*", price_text.replace(",", ""))
-        if numbers:
-            try:
-                return float(numbers[0])
-            except ValueError:
-                return None
-        return None
+        return parse_price(price_text)
 
     @staticmethod
     def _detect_currency(price_text: str | None) -> str:
-        if not price_text:
-            return "USD"
-        if "$" in price_text:
-            return "USD"
-        if "€" in price_text:
-            return "EUR"
-        if "£" in price_text:
-            return "GBP"
-        if "₹" in price_text:
-            return "INR"
-        return "USD"
+        return detect_currency(price_text)

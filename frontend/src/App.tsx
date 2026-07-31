@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, createContext, useContext } from 'react'
 import { api } from './lib/api'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -14,6 +14,7 @@ import ReportsPage from './pages/ReportsPage'
 import AdminPage from './pages/AdminPage'
 import ActivityPage from './pages/ActivityPage'
 import AiInsightsPage from './pages/AiInsightsPage'
+import { DashboardProvider } from './context/DashboardContext'
 
 const AuthContext = createContext<{
   isAuthenticated: boolean
@@ -56,22 +57,24 @@ export default function App() {
             path="/*"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <ErrorBoundary>
-                    <Routes>
-                      <Route path="/" element={<OverviewPage />} />
-                      <Route path="/competitors" element={<CompetitorsPage />} />
-                      <Route path="/competitors/compare" element={<CompetitorComparePage />} />
-                      <Route path="/competitors/:id" element={<CompetitorProfilePage />} />
-                      <Route path="/collections" element={<CollectionsPage />} />
-                      <Route path="/logs" element={<LogsPage />} />
-                      <Route path="/reports" element={<ReportsPage />} />
-                      <Route path="/activity" element={<ActivityPage />} />
-                      <Route path="/ai" element={<AiInsightsPage />} />
-                      <Route path="/admin" element={<AdminPage />} />
-                    </Routes>
-                  </ErrorBoundary>
-                </Layout>
+                <DashboardProvider>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Routes>
+                        <Route path="/" element={<OverviewPage />} />
+                        <Route path="/competitors" element={<CompetitorsPage />} />
+                        <Route path="/competitors/compare" element={<CompetitorComparePage />} />
+                        <Route path="/competitors/:id" element={<CompetitorProfilePage />} />
+                        <Route path="/collections" element={<CollectionsPage />} />
+                        <Route path="/logs" element={<LogsPage />} />
+                        <Route path="/reports" element={<ReportsPage />} />
+                        <Route path="/activity" element={<ActivityPage />} />
+                        <Route path="/ai" element={<AiInsightsPage />} />
+                        <Route path="/admin" element={<AdminPage />} />
+                      </Routes>
+                    </ErrorBoundary>
+                  </Layout>
+                </DashboardProvider>
               </ProtectedRoute>
             }
           />

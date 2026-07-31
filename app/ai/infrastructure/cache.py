@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import time
 from typing import Any
 
 import structlog
@@ -52,11 +53,10 @@ class LLMResponseCache:
                 if raw:
                     logger.debug("cache_hit_redis", key=key)
                     return json.loads(raw)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("redis_get_failed", key=key, error=str(e))
 
         # Fallback to in-memory
-        import time
         entry = self._memory_cache.get(key)
         if entry:
             value, ts = entry
@@ -81,11 +81,10 @@ class LLMResponseCache:
                 await redis.setex(f"ai_cache:{key}", ttl, json.dumps(response, default=str))
                 logger.debug("cache_set_redis", key=key)
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("redis_set_failed", key=key, error=str(e))
 
         # Fallback to in-memory
-        import time
         self._memory_cache[key] = (response, time.monotonic())
         logger.debug("cache_set_memory", key=key)
 
@@ -95,8 +94,8 @@ class LLMResponseCache:
         if redis:
             try:
                 await redis.delete(f"ai_cache:{key}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("redis_delete_failed", key=key, error=str(e))
         self._memory_cache.pop(key, None)
 
     async def clear(self) -> int:
@@ -110,8 +109,8 @@ class LLMResponseCache:
                 if keys:
                     await redis.delete(*keys)
                     return len(keys)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("redis_clear_failed", error=str(e))
         return 0
 
 

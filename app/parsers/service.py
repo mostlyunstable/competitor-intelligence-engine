@@ -78,7 +78,7 @@ class ServiceParser(BaseParser):
     def _extract_from_definition_lists(self, soup: Any) -> list[dict[str, Any]]:
         """Extract service name/description pairs from <dl> definition lists."""
         services: list[dict[str, Any]] = []
-        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plan"]
+        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plan", "seva", "marammat", "safai", "rangai", "banai", "lagai"]
         for dl in soup.select("dl"):
             terms = dl.select("dt")
             defs = dl.select("dd")
@@ -106,7 +106,7 @@ class ServiceParser(BaseParser):
             text = heading.get_text(strip=True)
             if any(
                 keyword in text.lower()
-                for keyword in ["service", "repair", "install", "maintenance", "plan"]
+                for keyword in ["service", "repair", "install", "maintenance", "plan", "seva", "marammat", "safai", "rangai", "banai", "lagai"]
             ):
                 desc_el = heading.find_next_sibling("p")
                 services.append(
@@ -124,6 +124,13 @@ class ServiceParser(BaseParser):
     def _parse_price(self, price_text: str | None) -> float | None:
         if not price_text:
             return None
+        # Check for Rs. prefix
+        rs_match = re.search(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', price_text.lower())
+        if rs_match:
+            try:
+                return float(rs_match.group(1).replace(",", ""))
+            except ValueError:
+                pass
         numbers = re.findall(r"[\d,]+\.?\d*", price_text.replace(",", ""))
         if numbers:
             try:
@@ -134,13 +141,13 @@ class ServiceParser(BaseParser):
 
     def _detect_currency(self, price_text: str | None) -> str:
         if not price_text:
-            return "USD"
+            return "INR"
         if "$" in price_text:
             return "USD"
         if "€" in price_text:
             return "EUR"
         if "£" in price_text:
             return "GBP"
-        if "₹" in price_text:
+        if "₹" in price_text or "rs" in price_text.lower() or "inr" in price_text.lower():
             return "INR"
-        return "USD"
+        return "INR"

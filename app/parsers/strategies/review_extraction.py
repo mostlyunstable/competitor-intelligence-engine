@@ -37,19 +37,28 @@ _REVIEW_HEADING_KW = frozenset(
         "feedback",
         "ratings",
         "imonials",
+        "satisfied customers",
+        "hamare grahak",
+        "prashiksha",
+        "raay",
+        "star ratings",
+        "google reviews",
+        "justdial reviews",
+        "sulekha reviews",
     }
 )
 
 # Rating patterns
 _RATING_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)|"  # 4.5/5
+    r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)|"  # 4.5/5 or 8/10
     r"(\d+(?:\.\d+)?)\s*stars?|"  # 4.5 stars
-    r"(\d+(?:\.\d+)?)\s*out of\s*(\d+)",  # 4.5 out of 5
+    r"(\d+(?:\.\d+)?)\s*out of\s*(\d+)|"  # 4.5 out of 5
+    r"(\d+(?:\.\d+)?)\s*rating",  # 4.5 rating
     re.IGNORECASE,
 )
 
 # Star rating unicode characters
-_STAR_CHARS = {"★", "☆", "⭐"}
+_STAR_CHARS = {"★", "☆", "⭐", "🌟", "✨"}
 
 
 class ReviewExtractionStrategy(ParsingStrategy):
@@ -225,7 +234,7 @@ class ReviewExtractionStrategy(ParsingStrategy):
                 continue
 
             # Look for review cards/blocks
-            for card in section.select("div, article, section, li, blockquote"):
+            for card in section.select("div, article, section, li, blockquote, [class*='testimonial'], [class*='review']"):
                 self._extract_review_from_card(card, result, url)
 
     def _extract_review_from_card(self, card: Tag, result: ParsedResult, url: str) -> None:
@@ -324,6 +333,11 @@ class ReviewExtractionStrategy(ParsingStrategy):
                     return float(groups[3])
                 except ValueError:
                     pass
+            if groups[5]:
+                try:
+                    return float(groups[5])
+                except ValueError:
+                    pass
 
         # Try star characters
         stars = text.count("★")
@@ -344,35 +358,3 @@ class ReviewExtractionStrategy(ParsingStrategy):
                     pass
 
         return None
-
-    def _collect_section(self, heading: Tag) -> Tag | None:
-        heading_level = int(heading.name[1]) if heading.name and heading.name[0] == "h" else 3
-        container = heading.parent
-        if not container:
-            return None
-
-        collecting = False
-        elements: list[Tag] = []
-        for sibling in container.children:
-            if not isinstance(sibling, Tag):
-                continue
-            if sibling is heading:
-                collecting = True
-                continue
-            if collecting:
-                if sibling.name and sibling.name[0] == "h":
-                    try:
-                        sib_level = int(sibling.name[1])
-                        if sib_level <= heading_level:
-                            break
-                    except (ValueError, IndexError):
-                        pass
-                elements.append(sibling)
-
-        if not elements:
-            return None
-
-        wrapper = BeautifulSoup("", "html.parser").new_tag("div")
-        for el in elements:
-            wrapper.append(el)
-        return wrapper

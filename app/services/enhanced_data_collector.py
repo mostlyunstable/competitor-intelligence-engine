@@ -159,10 +159,12 @@ class EnhancedDataCollector:
     def _detect_payment_methods(self, data: EnhancedBusinessData, html: str) -> None:
         """Detect accepted payment methods."""
         payment_keywords = {
-            "upi": ["upi", "gpay", "google pay", "phonepe", "paytm", "bhim"],
-            "card": ["credit card", "debit card", "visa", "mastercard", "rupay"],
-            "cash": ["cash", "cash on delivery", "cod"],
-            "netbanking": ["net banking", "netbanking", "online transfer", "neft", "imps"],
+            "upi": ["upi", "gpay", "google pay", "phonepe", "paytm", "bhim", "upi payment", "upi id", "qr code", "scan to pay"],
+            "card": ["credit card", "debit card", "visa", "mastercard", "rupay", "amex", "american express", "diners"],
+            "cash": ["cash", "cash on delivery", "cod", "cash payment", "pay cash"],
+            "netbanking": ["net banking", "netbanking", "online transfer", "neft", "imps", "rtgs", "bank transfer", "online payment"],
+            "wallet": ["wallet", "olamoney", "mobikwik", "freecharge", "airtel money", "jio money", "amazon pay"],
+            "emi": ["emi", "easy installments", "monthly payment", "no cost emi", "zero emi", "bajaj finserv", "credit card emi"],
         }
 
         for method, keywords in payment_keywords.items():
@@ -182,13 +184,16 @@ class EnhancedDataCollector:
     def _detect_service_features(self, data: EnhancedBusinessData, html: str) -> None:
         """Detect service features and policies."""
         features = {
-            "has_verified_professionals": ["verified", "trained", "certified professionals"],
-            "has_background_check": ["background check", "police verified", "bgv"],
-            "offers_guarantee": ["guarantee", "warranty", "assurance"],
-            "has_24_7_support": ["24/7", "24x7", "round the clock", "24 hours"],
-            "has_online_booking": ["book online", "online booking", "book now"],
-            "offers_emi": ["emi", "easy installments", "monthly payment"],
-            "offers_insurance": ["insurance", "insured", "coverage"],
+            "has_verified_professionals": ["verified", "trained", "certified professionals", "verified professional", "trained professional", "bgv verified", "police verified", "background verified"],
+            "has_background_check": ["background check", "police verified", "bgv", "background verification", "character verification", "antecedent verification"],
+            "offers_guarantee": ["guarantee", "warranty", "assurance", "satisfaction guarantee", "quality guarantee", "service guarantee", "money back guarantee", "no questions asked"],
+            "has_24_7_support": ["24/7", "24x7", "round the clock", "24 hours", "24 hours support", "24/7 support", "anytime support", "emergency support"],
+            "has_online_booking": ["book online", "online booking", "book now", "schedule online", "instant booking", "one click booking", "whatsapp booking", "app booking"],
+            "offers_emi": ["emi", "easy installments", "monthly payment", "no cost emi", "zero emi", "installment payment", "easy payment"],
+            "offers_insurance": ["insurance", "insured", "coverage", "insured service", "service insurance", "damage protection", "accidental damage"],
+            "has_walk_in": ["walk-in", "walk in", "store visit", "visit us", "showroom", "experience center", "service center", "branch"],
+            "offers_free_quotes": ["free quote", "free estimate", "free inspection", "free assessment", "free consultation", "free survey", "no obligation quote"],
+            "has_price_match": ["price match", "best price", "lowest price", "price guarantee", "price match guarantee", "beat any price", "cheapest price"],
         }
 
         for field_name, keywords in features.items():
@@ -200,41 +205,41 @@ class EnhancedDataCollector:
     def _detect_business_hours(self, data: EnhancedBusinessData, html: str) -> None:
         """Detect business hours and availability."""
         # 24/7 detection
-        if "24/7" in html or "24x7" in html or "24 hours" in html:
+        if "24/7" in html or "24x7" in html or "24 hours" in html or "24 ghante" in html or "din rat" in html or "subah se sham" in html:
             data.business_hours = "24/7"
             data.offers_weekend_service = True
             data.offers_emergency_service = True
         else:
             # Try to extract hours
-            hours_pattern = r'(\d{1,2})\s*(?:am|pm)\s*(?:to|-)\s*(\d{1,2})\s*(?:am|pm)'
+            hours_pattern = r'(\d{1,2})\s*(?:am|pm|baje|bajkar)\s*(?:to|-|se)\s*(\d{1,2})\s*(?:am|pm|baje|tak)'
             match = re.search(hours_pattern, html.lower())
             if match:
                 data.business_hours = f"{match.group(1)} - {match.group(2)}"
 
         # Weekend service
-        if "weekend" in html or "saturday" in html or "sunday" in html:
+        if "weekend" in html or "saturday" in html or "sunday" in html or "saturday sunday" in html or "weekend service" in html or "holiday service" in html or "chhutti" in html:
             data.offers_weekend_service = True
 
         # Emergency service
-        if "emergency" in html or "urgent" in html or "same day" in html:
+        if "emergency" in html or "urgent" in html or "same day" in html or "emergency service" in html or "urgent service" in html or "emergency repair" in html or "urgent repair" in html:
             data.offers_emergency_service = True
             data.same_day_service = True
 
     def _detect_pricing_signals(self, data: EnhancedBusinessData, html: str) -> None:
         """Detect pricing transparency and offers."""
-        if "transparent pricing" in html or "no hidden charges" in html:
+        if "transparent pricing" in html or "no hidden charges" in html or "no hidden cost" in html or "fixed price" in html or "price transparency" in html or "no surprise" in html or "what you see is what you pay" in html:
             data.has_transparent_pricing = True
 
-        if "free quote" in html or "free estimate" in html or "free inspection" in html:
+        if "free quote" in html or "free estimate" in html or "free inspection" in html or "free assessment" in html or "free consultation" in html or "free survey" in html or "no obligation" in html:
             data.offers_free_quotes = True
 
-        if "price match" in html or "best price" in html or "lowest price" in html:
+        if "price match" in html or "best price" in html or "lowest price" in html or "price guarantee" in html or "beat any price" in html or "cheapest price" in html or "price match guarantee" in html:
             data.has_price_match = True
 
     def _detect_trust_signals(self, data: EnhancedBusinessData, html: str) -> None:
         """Detect trust and credibility signals."""
         # Years in business
-        years_pattern = r'(\d+)\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|service|in business)'
+        years_pattern = r'(\d+)\s*(?:years?|yrs?|saal|varsh)\s*(?:of\s+)?(?:experience|service|in business|ka anubhav|ka experience)'
         match = re.search(years_pattern, html)
         if match:
             try:
@@ -243,42 +248,50 @@ class EnhancedDataCollector:
                 pass
 
         # Certifications
-        if "certified" in html or "iso" in html or "accredited" in html:
+        if "certified" in html or "iso" in html or "accredited" in html or "approved" in html or "certified by" in html or "authorized" in html:
             data.has_certifications = True
 
         # Insurance
-        if "insured" in html or "insurance" in html:
+        if "insured" in html or "insurance" in html or "insured service" in html or "service insurance" in html:
             data.has_insurance = True
 
         # License
-        if "licensed" in html or "license" in html or "registration" in html:
+        if "licensed" in html or "license" in html or "registration" in html or "registered" in html or "gst registered" in html or "gst number" in html or "gstin" in html:
             data.has_license = True
 
-        # Professional associations
-        associations = ["nasci", "bcci", "iaop", "cleaning association"]
+        # Professional associations (Indian associations)
+        associations = [
+            "nasci", "bcci", "iaop", "cleaning association",
+            "cama", "naredco", "crepai", "ibha", "ficci", "cii", "phd chamber",
+            "indian plumbing association", "electrical contractors association",
+            "painting contractors association", "cleaning services association",
+            "home services association", "facility management association",
+        ]
         for assoc in associations:
             if assoc in html:
                 data.member_of_associations.append(assoc)
 
     def _detect_social_proof(self, data: EnhancedBusinessData, html: str) -> None:
         """Detect social proof elements."""
-        if "testimonial" in html or "what our customers" in html or "client says" in html:
+        if "testimonial" in html or "what our customers" in html or "client says" in html or "customer review" in html or "customer feedback" in html or "happy customers" in html or "satisfied customers" in html or "hamare grahak" in html:
             data.has_testimonials = True
 
-        if "case study" in html or "success story" in html:
+        if "case study" in html or "success story" in html or "project showcase" in html or "portfolio" in html or "our projects" in html or "completed projects" in html:
             data.has_case_studies = True
 
-        if "portfolio" in html or "our work" in html or "gallery" in html:
+        if "portfolio" in html or "our work" in html or "gallery" in html or "photo gallery" in html or "work gallery" in html or "project gallery" in html or "before after" in html or "before and after" in html:
             data.has_portfolio = True
 
         # Social media followers (rough detection)
-        follower_pattern = r'(\d[\d,.]*k?)\s*(?:followers?|fans?)'
+        follower_pattern = r'(\d[\d,.]*k?)\s*(?:followers?|fans?|subscribers?|members?)'
         match = re.search(follower_pattern, html)
         if match:
             try:
                 count_str = match.group(1).lower().replace(",", "")
                 if "k" in count_str:
                     data.social_media_followers = int(float(count_str.replace("k", "")) * 1000)
+                elif "m" in count_str or "lakh" in count_str or "lac" in count_str:
+                    data.social_media_followers = int(float(count_str.replace("m", "").replace("lakh", "").replace("lac", "")) * 100000)
                 else:
                     data.social_media_followers = int(count_str)
             except ValueError:
@@ -287,19 +300,24 @@ class EnhancedDataCollector:
     def _detect_response_metrics(self, data: EnhancedBusinessData, html: str) -> None:
         """Detect response time and service speed."""
         # Same day service
-        if "same day" in html or "within 24 hours" in html:
+        if "same day" in html or "within 24 hours" in html or "aaj hi" in html or "isi din" in html or "turant" in html or "instant" in html:
             data.same_day_service = True
             data.response_time_hours = 24
 
         # Next day service
-        if "next day" in html or "within 48 hours" in html:
+        if "next day" in html or "within 48 hours" in html or "agle din" in html or "kal hi" in html:
             data.next_day_service = True
             if not data.response_time_hours:
                 data.response_time_hours = 48
 
         # Quick response
-        if "quick response" in html or "instant response" in html:
+        if "quick response" in html or "instant response" in html or "fast response" in html or "immediate response" in html or "tat" in html or "turnaround time" in html:
             data.response_time_hours = 2
+
+        # Emergency service
+        if "emergency" in html or "urgent" in html or "emergency service" in html or "urgent service" in html or "emergency repair" in html or "urgent repair" in html:
+            data.offers_emergency_service = True
+            data.same_day_service = True
 
     def to_dict(self, data: EnhancedBusinessData) -> dict:
         """Convert to dictionary for storage."""

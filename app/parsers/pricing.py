@@ -85,7 +85,8 @@ class PricingParser(BaseParser):
         # Multi-currency price pattern: symbol or ISO code
         price_pattern = re.compile(
             r"([\u20B9$\u20AC\xA3\xA5])[\s]?[\d,]+(?:\.\d{1,2})?"
-            r"|\d[\d,]*(?:\.\d{1,2})?[\s]?(?:INR|USD|EUR|GBP|JPY)\b",
+            r"|\d[\d,]*(?:\.\d{1,2})?[\s]?(?:INR|USD|EUR|GBP|JPY)\b"
+            r"|rs\.?\s*[\d,]+(?:\.\d{1,2})?",
             re.IGNORECASE,
         )
         # Price range pattern: e.g. "499 - 999" or "500 to 1500"
@@ -118,27 +119,56 @@ class PricingParser(BaseParser):
 
         # Single prices (skip if already have ranges)
         if not pricing_items:
-            for m in price_pattern.finditer(text):
-                if len(pricing_items) >= 10:
-                    break
-                match_text = m.group(0)
-                pricing_items.append(
-                    {
-                        "service_name": "Detected Price",
-                        "category": None,
-                        "base_price": self._parse_price(match_text),
-                        "promotional_price": None,
-                        "currency": self._detect_currency(match_text),
-                        "discount": None,
-                        "subscription_plans": {},
-                        "membership_pricing": None,
-                    }
-                )
+            # First try Rs. pattern
+            rs_matches = re.findall(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', text.lower())
+            for match_text in rs_matches[:10]:
+                try:
+                    price = float(match_text.replace(",", ""))
+                    if price > 0:
+                        pricing_items.append(
+                            {
+                                "service_name": "Detected Price",
+                                "category": None,
+                                "base_price": price,
+                                "promotional_price": None,
+                                "currency": "INR",
+                                "discount": None,
+                                "subscription_plans": {},
+                                "membership_pricing": None,
+                            }
+                        )
+                except ValueError:
+                    pass
+
+            if not pricing_items:
+                for m in price_pattern.finditer(text):
+                    if len(pricing_items) >= 10:
+                        break
+                    match_text = m.group(0)
+                    pricing_items.append(
+                        {
+                            "service_name": "Detected Price",
+                            "category": None,
+                            "base_price": self._parse_price(match_text),
+                            "promotional_price": None,
+                            "currency": self._detect_currency(match_text),
+                            "discount": None,
+                            "subscription_plans": {},
+                            "membership_pricing": None,
+                        }
+                    )
         return pricing_items
 
     def _parse_price(self, price_text: str | None) -> float | None:
         if not price_text:
             return None
+        # Check for Rs. prefix
+        rs_match = re.search(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', price_text.lower())
+        if rs_match:
+            try:
+                return float(rs_match.group(1).replace(",", ""))
+            except ValueError:
+                pass
         # Remove currency symbols and ISO codes before parsing
         cleaned = re.sub(
             r"[\u20B9$\u20AC\xA3\xA5]|\b(?:INR|USD|EUR|GBP|JPY)\b",
@@ -156,8 +186,8 @@ class PricingParser(BaseParser):
 
     def _detect_currency(self, price_text: str | None) -> str:
         if not price_text:
-            return "USD"
-        if "₹" in price_text or "INR" in price_text.upper():
+            return "INR"
+        if "₹" in price_text or "INR" in price_text.upper() or "rs" in price_text.lower():
             return "INR"
         if "$" in price_text or "USD" in price_text.upper():
             return "USD"
@@ -167,7 +197,7 @@ class PricingParser(BaseParser):
             return "GBP"
         if "¥" in price_text or "JPY" in price_text.upper():
             return "JPY"
-        return "USD"
+        return "INR"
 
     def _parse_subscriptions(
         self, subscription_text: str | None, features: list[str]

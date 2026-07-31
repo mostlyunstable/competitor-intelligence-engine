@@ -51,6 +51,18 @@ _TRUST_HEADING_KW = frozenset(
         "affiliations",
         "memberships",
         "associations",
+        "empaneled",
+        "government approved",
+        "aicte approved",
+        "ugc recognized",
+        "bis certified",
+        "fssai license",
+        "gst registered",
+        "msme registered",
+        "startup india",
+        "make in india",
+        "swachh bharat",
+        "nsdc certified",
     }
 )
 
@@ -60,14 +72,19 @@ _CERT_PATTERN = re.compile(
     r"bbb|better business|epa|osha|ansi|ul[\s-]listed|"
     r"certified|accredited|licensed|insured|bonded|"
     r"award[\s-]winning|top[\s-]rated|best[\s-]of|"
-    r"guarantee|warranty|satisfaction)\b",
+    r"guarantee|warranty|satisfaction|"
+    r"bis|fssai|aicte|ugc|nsdc|nabl|nabh|irdai|sebi|rbi|trai|dot|"
+    r"msme|gst|pan|tan|empaneled|government approved|"
+    r"startup india|make in india|swachh bharat)\b",
     re.IGNORECASE,
 )
 
 # Image alt text patterns that indicate badges/certifications
 _BADGE_ALT_PATTERN = re.compile(
     r"(certified|award|badge|accredited|licensed|insured|bonded|"
-    r"partner|member|compliance|iso|soc|bbb|top rated|best of)",
+    r"partner|member|compliance|iso|soc|bbb|top rated|best of|"
+    r"bis|fssai|aicte|ugc|nsdc|msme|gst|empaneled|government approved|"
+    r"startup india|make in india|swachh bharat)",
     re.IGNORECASE,
 )
 
@@ -208,39 +225,6 @@ class TrustSignalExtractionStrategy(ParsingStrategy):
                 category = self._classify_signal(segment)
                 self._add_signal(result, category, segment)
 
-    def _collect_section(self, heading: Tag) -> Tag | None:
-        """Collect sibling elements after a heading until the next heading."""
-        heading_level = int(heading.name[1]) if heading.name and heading.name[0] == "h" else 3
-        container = heading.parent
-        if not container:
-            return None
-
-        collecting = False
-        elements: list[Tag] = []
-        for sibling in container.children:
-            if not isinstance(sibling, Tag):
-                continue
-            if sibling is heading:
-                collecting = True
-                continue
-            if collecting:
-                if sibling.name and sibling.name[0] == "h":
-                    try:
-                        sib_level = int(sibling.name[1])
-                        if sib_level <= heading_level:
-                            break
-                    except (ValueError, IndexError):
-                        pass
-                elements.append(sibling)
-
-        if not elements:
-            return None
-
-        wrapper = BeautifulSoup("", "html.parser").new_tag("div")
-        for el in elements:
-            wrapper.append(el)
-        return wrapper
-
     @staticmethod
     def _classify_signal(text: str) -> str:
         lower = text.lower()
@@ -250,12 +234,14 @@ class TrustSignalExtractionStrategy(ParsingStrategy):
             return "guarantee"
         if "partner" in lower or "partnership" in lower or "affiliate" in lower:
             return "partnership"
-        if "license" in lower or "licensed" in lower:
+        if "license" in lower or "licensed" in lower or "fssai" in lower or "gst" in lower:
             return "license"
         if "insured" in lower or "insurance" in lower:
             return "insurance"
         if "bonded" in lower:
             return "bonded"
+        if "empaneled" in lower or "government" in lower or "approved" in lower:
+            return "government_approval"
         return "certification"
 
     @staticmethod

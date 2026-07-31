@@ -6,6 +6,7 @@ import {
   Lightbulb, BarChart3, Shield, RefreshCw, Zap, Loader2,
   Clock, ThumbsUp, ThumbsDown, Coins, Download
 } from 'lucide-react'
+import type { Competitor, AiInsight } from '../types'
 
 export default function AiInsightsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -30,7 +31,7 @@ export default function AiInsightsPage() {
 
       {/* Competitor selector */}
       <div className="flex flex-wrap gap-2">
-        {competitorList.map((c: any) => (
+        {competitorList.map((c: Competitor) => (
           <button
             key={c.id}
             onClick={() => setSelectedId(c.id)}
@@ -65,7 +66,7 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
     60000
   )
   const [analyzing, setAnalyzing] = useState(false)
-  const [insight, setInsight] = useState<any>(existing)
+  const [insight, setInsight] = useState<AiInsight | null>(existing)
   const [analyzeError, setAnalyzeError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
 
@@ -103,8 +104,8 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
           if (attempts > 30) { clearInterval(poll); setAnalyzing(false) }
         }
       }, 2000)
-    } catch (e: any) {
-      setAnalyzeError(e.message || 'Analysis failed')
+    } catch (e: unknown) {
+      setAnalyzeError(e instanceof Error ? e.message : 'Analysis failed')
       setAnalyzing(false)
     }
   }, [competitorId, refresh])
@@ -112,12 +113,13 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
   const handleFeedback = useCallback(async (rating: 'up' | 'down') => {
     if (!insight?.id) return
     try {
+      const auth = localStorage.getItem('auth') || ''
       await fetch(`/api/ai/insight/${insight.id}/feedback?rating=${rating === 'up' ? 2 : 1}`, {
         method: 'POST',
-        headers: { 'Authorization': `Basic ${localStorage.getItem('auth') || ''}` },
+        headers: { 'Authorization': `Basic ${auth}` },
       })
       setFeedback(rating)
-    } catch {}
+    } catch { /* feedback is best-effort */ }
   }, [insight])
 
   const handleExport = useCallback(() => {
@@ -125,7 +127,7 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
     const text = [
       `# AI Intelligence Report`,
       `Competitor ID: ${competitorId}`,
-      `Confidence: ${(insight.confidence_score * 100).toFixed(0)}%`,
+      `Confidence: ${insight.confidence_score != null ? `${(insight.confidence_score * 100).toFixed(0)}%` : 'N/A'}`,
       `Model: ${insight.llm_model}`,
       `Tokens: ${insight.total_tokens?.toLocaleString() || 'N/A'}`,
       `Cost: $${insight.estimated_cost_usd?.toFixed(4) || 'N/A'}`,
@@ -237,11 +239,11 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
             <p className="text-sm text-surface-700">{insight.market_position}</p>
           </Card>}
 
-          {insight.key_differentiators?.length > 0 && <Card icon={Zap} color="text-yellow-600" title="Key Differentiators">
+          {insight.key_differentiators && insight.key_differentiators.length > 0 && <Card icon={Zap} color="text-yellow-600" title="Key Differentiators">
             <Bullets items={insight.key_differentiators} color="bg-yellow-500" />
           </Card>}
 
-          {insight.feature_gaps?.length > 0 && <Card icon={AlertTriangle} color="text-orange-600" title="Feature Gaps">
+          {insight.feature_gaps && insight.feature_gaps.length > 0 && <Card icon={AlertTriangle} color="text-orange-600" title="Feature Gaps">
             <Bullets items={insight.feature_gaps} color="bg-orange-500" />
           </Card>}
 
@@ -258,28 +260,28 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
             </Card>
           )}
 
-          {insight.strategic_moves?.length > 0 && <Card icon={Shield} color="text-blue-600" title="Strategic Moves">
+          {insight.strategic_moves && insight.strategic_moves.length > 0 && <Card icon={Shield} color="text-blue-600" title="Strategic Moves">
             <Bullets items={insight.strategic_moves} color="bg-blue-500" />
           </Card>}
 
-          {insight.recommendations?.length > 0 && <Card icon={Lightbulb} color="text-brand-600" title="Recommendations">
+          {insight.recommendations && insight.recommendations.length > 0 && <Card icon={Lightbulb} color="text-brand-600" title="Recommendations">
             <Bullets items={insight.recommendations} color="bg-brand-500" />
           </Card>}
 
-          {insight.latest_updates?.length > 0 && <Card icon={Clock} color="text-surface-600" title="Latest Updates">
+          {insight.latest_updates && insight.latest_updates.length > 0 && <Card icon={Clock} color="text-surface-600" title="Latest Updates">
             <Bullets items={insight.latest_updates} color="bg-surface-500" />
           </Card>}
 
           {/* Cost & Feedback */}
           <div className="card p-4 flex items-center justify-between">
             <div className="flex items-center gap-4 text-sm text-surface-500">
-              {insight.total_tokens > 0 && (
+              {insight.total_tokens != null && insight.total_tokens > 0 && (
                 <span className="flex items-center gap-1">
                   <Coins size={14} />
                   {insight.total_tokens.toLocaleString()} tokens
                 </span>
               )}
-              {insight.estimated_cost_usd > 0 && (
+              {insight.estimated_cost_usd != null && insight.estimated_cost_usd > 0 && (
                 <span>${insight.estimated_cost_usd.toFixed(4)}</span>
               )}
               {insight.llm_model && (

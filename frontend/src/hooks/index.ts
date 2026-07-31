@@ -21,8 +21,8 @@ export function usePolling<T>(
         setData(result)
         setError(null)
       }
-    } catch (e: any) {
-      if (mountedRef.current) setError(e.message || 'Failed to fetch')
+    } catch (e: unknown) {
+      if (mountedRef.current) setError(e instanceof Error ? e.message : 'Failed to fetch')
     } finally {
       if (mountedRef.current) setLoading(false)
     }

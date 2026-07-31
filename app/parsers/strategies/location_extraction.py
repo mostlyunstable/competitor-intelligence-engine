@@ -44,6 +44,21 @@ _LOCATION_HEADING_KW = frozenset(
         "our offices",
         "serving",
         "serving areas",
+        "hamare kaaryalaya",
+        "hamari shakhaayein",
+        "hum kahan hain",
+        "pincode",
+        "district",
+        "state",
+        "taluka",
+        "mandal",
+        "sector",
+        "phase",
+        "block",
+        "branches",
+        "franchise locations",
+        "service centers",
+        "care centers",
     }
 )
 
@@ -58,6 +73,11 @@ _COVERAGE_HEADING_KW = frozenset(
         "serving",
         "serving areas",
         "our reach",
+        "pan india",
+        "all india",
+        "nationwide",
+        "pan-india coverage",
+        "hum poore desh mein",
     }
 )
 
@@ -273,38 +293,6 @@ class LocationExtractionStrategy(ParsingStrategy):
                                 result, part, "section_heuristic", area_type=area_type
                             )
 
-    def _collect_section(self, heading: Tag) -> Tag | None:
-        heading_level = int(heading.name[1]) if heading.name and heading.name[0] == "h" else 3
-        container = heading.parent
-        if not container:
-            return None
-
-        collecting = False
-        elements: list[Tag] = []
-        for sibling in container.children:
-            if not isinstance(sibling, Tag):
-                continue
-            if sibling is heading:
-                collecting = True
-                continue
-            if collecting:
-                if sibling.name and sibling.name[0] == "h":
-                    try:
-                        sib_level = int(sibling.name[1])
-                        if sib_level <= heading_level:
-                            break
-                    except (ValueError, IndexError):
-                        pass
-                elements.append(sibling)
-
-        if not elements:
-            return None
-
-        wrapper = BeautifulSoup("", "html.parser").new_tag("div")
-        for el in elements:
-            wrapper.append(el)
-        return wrapper
-
     @staticmethod
     def _looks_like_location(text: str) -> bool:
         """Heuristic: does this text look like a location name?
@@ -349,16 +337,6 @@ class LocationExtractionStrategy(ParsingStrategy):
                 "support",
                 "blog",
                 "news",
-                "real estate plans",
-                "home warranty cost",
-                "warranty renewal",
-                "promos & discounts",
-                "member testimonials",
-                "site map",
-                "frontdoor",
-                "hsa home",
-                "landmark",
-                "oneguard",
             }
         )
         if lower in nav_patterns:
@@ -401,6 +379,15 @@ class LocationExtractionStrategy(ParsingStrategy):
 
         # Accept if contains comma (likely "City, State" format)
         if "," in text:
+            return True
+
+        # Accept Indian pincodes (6 digits)
+        import re as re_mod
+        if re_mod.match(r'^\d{6}$', text):
+            return True
+        # Accept landmark-based addresses (Near, Behind, Opposite, etc.)
+        landmark_starters = ("near ", "behind ", "opposite ", "adjacent to ", "next to ", "above ", "below ", "floor ", "flat ")
+        if any(lower.startswith(s) for s in landmark_starters):
             return True
 
         # Accept if 2+ words and all capitalized (proper nouns = place names)

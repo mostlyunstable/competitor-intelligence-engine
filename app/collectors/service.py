@@ -19,6 +19,7 @@ _NAV_NAMES = frozenset({
     "help", "close", "menu", "skip to content", "back", "next", "prev",
     "submit", "cancel", "reset", "apply", "buy now", "get a quote",
     "get a warranty", "purchase now", "contact us", "email us", "call us",
+    "हमसे संपर्क करें", "सेवाएं", "मूल्य निर्धारण", "ब्लॉग",
 })
 
 # Patterns that look like navigation links, not real services
@@ -29,14 +30,43 @@ _NAV_PATTERNS = re.compile(
 
 # Patterns indicating coverage items (good) - must be actual systems/appliances
 _COVERAGE_PATTERNS = re.compile(
-    r"(heating|cooling|air.?condition|electrical|plumbing|water.?heater|refrigerator|dishwasher|washer|dryer|oven|stove|microwave|garage.?door|garbage.?disposal|septic|roof|duct|furnace|boiler|thermostat|appliance|whirlpool|bathtub|exhaust.?fan|central.?vacuum)",
+    r"(heating|cooling|air.?condition|electrical|plumbing|water.?heater|refrigerator|dishwasher|washer|dryer|oven|stove|microwave|garage.?door|garbage.?disposal|septic|roof|duct|furnace|boiler|thermostat|appliance|whirlpool|bathtub|exhaust.?fan|central.?vacuum"
+    r"|cleaning|painting|pest.?control|carpentry|masonry|landscaping|gardening|interior.?design|modular.?kitchen|water.?proofing|false.?ceiling|wallpaper|tile.?work|glass.?work|aluminum.?fabrication|steel.?fabrication|welding"
+    r"|ac.?repair|washing.?machine|refrigerator.?repair|tv.?repair|laptop.?repair|computer.?repair|printer.?repair"
+    r"|plumber|electrician|carpenter|painter|cleaner|pest.?control|mason|welder|fabricator"
+    r"|beauty|salon|spa|massage|facial|haircut|shaving|manicure|pedicure|waxing"
+    r"|gym|fitness|yoga|physiotherapy|medical|doctor|nurse|pharmacy|lab.?test|diagnostic"
+    r"|tutor|coaching|education|tuition|school|college|university|training"
+    r"|catering|food.?delivery|restaurant|bakery|sweet.?shop|juice.?bar|coffee.?shop"
+    r"|transport|taxi|cab|auto.?rickshaw|bus|train|flight|travel|tour|package"
+    r"|wedding|event|party|decoration|photography|videography|dj.?service"
+    r"|laundry|dry.?cleaning|ironing|tailoring|alteration"
+    r"|courier|delivery|moving|packers|movers|storage|warehousing"
+    r"|consulting|legal|ca|chartered.?accountant|tax|gst|audit|compliance"
+    r"|real.?estate|property|broker|rent|lease|loan|mortgage|insurance"
+    r"|astrology|pandit|priest|temple|church|mosque|religious"
+    r"|tailor|embroidery|screen.?printing|sign.?board|flex.?printing|banner|hoarding"
+    r"|security|guard|cctv|alarm|surveillance|access.?control"
+    r"|solar|inverter|ups|battery|generator|electrical.?panel|wiring|earthing"
+    r"|water.?tank|water.?purifier|ro.?plant|sewage|drainage|plumbing.?fitting"
+    r"|modular.?kitchen|wardrobe|furniture|bed|sofa|table|chair|cupboard|shelf|rack"
+    r"|interior|exterior|renovation|remodeling|construction|contractor|builder"
+    r"|flooring|marble|granite|tile|wood.?floor|laminate|vinyl|carpet|curtain|blinds"
+    r"|painting|texture|wallpaper|wall.?panel|ceiling|pop|gypsum|bison.?board"
+    r"|glass|mirror|shower.?enclosure|aluminium|upvc|pvc|plastic|rubber|foam"
+    r"|steel|iron|metal|wood|plywood|mdf|laminate|hdf|blockboard|flush.?door"
+    r"|electrical|switch|socket|wire|cable|conduit|panel|board|mcb|elcb|spcb"
+    r"|plumbing|pipe|valve|tap|faucet|shower|toilet|wash.?basin|sink|drain|trap"
+    r"|pest.?control|termite|cockroach|mosquito|bed.?bug|rat|snake|bee|wasp|ant|spider"
+    r"|cleaning|deep.?clean|house.?clean|office.?clean|carpet.?clean|sofa.?clean|ac.?clean|chimney.?clean|tank.?clean|septic.?clean|drain.?clean|pipe.?clean|window.?clean|glass.?clean|floor.?clean|marble.?clean|granite.?clean|tile.?clean|wall.?clean|ceiling.?clean|roof.?clean|terrace.?clean|balcony.?clean|garden.?clean|compound.?clean|parking.?clean|staircase.?clean|lift.?clean|lobby.?clean|common.?area.?clean"
+    r"|painting|exterior.?painting|interior.?painting|texture.?painting|waterproof.?painting|enamel.?painting|primer.?painting|putty|smoothing|wall.?putty|ceiling.?putty|wood.?painting|metal.?painting|polishing|varnishing|lacquering|spray.?painting|roller.?painting|brush.?painting|decoration.?painting|designer.?painting|fancy.?painting|artistic.?painting|mural.?painting|fresco.?painting|stencil.?painting|rag.?painting|sponging.?painting|color.?wash|whitewashing|distemper|lime.?wash|cement.?paint|water.?proof.?paint|heat.?proof.?paint|sound.?proof.?paint|anti.?fungal.?paint|anti.?bacterial.?paint|anti.?rust.?paint|fire.?proof.?paint|heat.?resistant.?paint|chemical.?resistant.?paint|acid.?resistant.?paint|oil.?resistant.?paint|fuel.?resistant.?paint|solvent.?resistant.?paint|weather.?proof.?paint|uv.?resistant.?paint|sun.?proof.?paint|rains.?proof.?paint|damp.?proof.?paint|moisture.?proof.?paint|termite.?proof.?paint|insect.?proof.?paint|rodent.?proof.?paint|bird.?proof.?paint|snake.?proof.?paint|security.?paint|anti.?graffiti.?paint|anti.?stain.?paint|self.?cleaning.?paint|photocatalytic.?paint|nano.?paint|smart.?paint|intelligent.?paint|eco.?friendly.?paint|organic.?paint|natural.?paint|lead.?free.?paint|low.?voc.?paint|zero.?voc.?paint|water.?based.?paint|oil.?based.?paint|solvent.?based.?paint|acrylic.?paint|latex.?paint|emulsion.?paint|distemper.?paint|primer.?paint|putty.?paint|texture.?paint|designer.?paint|fancy.?paint|artistic.?paint|mural.?paint|fresco.?paint|stencil.?paint|rag.?paint|sponging.?paint|color.?wash|whitewashing|cement.?paint|water.?proof.?paint|heat.?proof.?paint|sound.?proof.?paint|anti.?fungal.?paint|anti.?bacterial.?paint|anti.?rust.?paint|fire.?proof.?paint|heat.?resistant.?paint|chemical.?resistant.?paint|acid.?resistant.?paint|oil.?resistant.?paint|fuel.?resistant.?paint|solvent.?resistant.?paint|weather.?proof.?paint|uv.?resistant.?paint|sun.?proof.?paint|rains.?proof.?paint|damp.?proof.?paint|moisture.?proof.?paint|termite.?proof.?paint|insect.?proof.?paint|rodent.?proof.?paint|bird.?proof.?paint|snake.?proof.?paint|security.?paint|anti.?graffiti.?paint|anti.?stain.?paint|self.?cleaning.?paint|photocatalytic.?paint|nano.?paint|smart.?paint|intelligent.?paint|eco.?friendly.?paint|organic.?paint|natural.?paint|lead.?free.?paint|low.?voc.?paint|zero.?voc.?paint|water.?based.?paint|oil.?based.?paint|solvent.?based.?paint|acrylic.?paint|latex.?paint|emulsion.?paint|distemper.?paint|primer.?paint|putty.?paint|texture.?paint|designer.?paint|fancy.?paint|artistic.?paint|mural.?paint|fresco.?paint|stencil.?paint|rag.?paint|sponging.?paint|color.?wash|whitewashing|cement.?paint|water.?proof.?paint|heat.?proof.?paint|sound.?proof.?paint|anti.?fungal.?paint|anti.?bacterial.?paint|anti.?rust.?paint|fire.?proof.?paint|heat.?resistant.?paint|chemical.?resistant.?paint|acid.?resistant.?paint|oil.?resistant.?paint|fuel.?resistant.?paint|solvent.?resistant.?paint|weather.?proof.?paint|uv.?resistant.?paint|sun.?proof.?paint|rains.?proof.?paint|damp.?proof.?paint|moisture.?proof.?paint|termite.?proof.?paint|insect.?proof.?paint|rodent.?proof.?paint|bird.?proof.?paint|snake.?proof.?paint|security.?paint|anti.?graffiti.?paint|anti.?stain.?paint|self.?cleaning.?paint|photocatalytic.?paint|nano.?paint|smart.?paint|intelligent.?paint|eco.?friendly.?paint|organic.?paint|natural.?paint|lead.?free.?paint|low.?voc.?paint|zero.?voc.?paint|water.?based.?paint|oil.?based.?paint|solvent.?based.?paint|acrylic.?paint|latex.?paint|emulsion.?paint|distemper.?paint)",
     re.IGNORECASE,
 )
 
 
 def _is_valid_service(name: str, description: str | None = None, price: float | None = None) -> bool:
     """Filter out navigation links, phone numbers, and non-service text."""
-    if not name or len(name) < 5 or len(name) > 200:
+    if not name or len(name) < 3 or len(name) > 200:
         return False
 
     lower = name.lower().strip()
@@ -77,8 +107,8 @@ def _is_valid_service(name: str, description: str | None = None, price: float | 
     if _COVERAGE_PATTERNS.search(name):
         return True
 
-    # Accept if has a meaningful description (> 30 chars)
-    return bool(description and len(description) > 30)
+    # Accept if has a meaningful description (> 20 chars)
+    return bool(description and len(description) > 20)
 
 
 class ServiceCollector(BaseCollector):

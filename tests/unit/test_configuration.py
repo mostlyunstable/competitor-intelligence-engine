@@ -24,11 +24,11 @@ from app.configuration.settings import (
 class TestDatabaseSettings:
     def test_defaults(self) -> None:
         settings = DatabaseSettings()
-        assert "postgresql" in settings.url
+        assert settings.url == ""
         assert settings.echo is False
-        assert settings.pool_size == 10
-        assert settings.max_overflow == 20
-        assert settings.pool_timeout == 30
+        assert settings.pool_size == 20
+        assert settings.max_overflow == 30
+        assert settings.pool_timeout == 60
         assert settings.pool_recycle == 1800
 
     def test_custom_values(self) -> None:
@@ -93,7 +93,7 @@ class TestSettings:
 
     def test_defaults(self) -> None:
         reset_settings()
-        settings = get_settings()
+        settings = Settings(_env_file=None)
         assert settings.environment == "development"
         assert settings.log_level == "info"
         assert settings.debug is False

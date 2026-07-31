@@ -1,5 +1,5 @@
+import asyncio
 import json
-import os
 import secrets
 import time
 from datetime import UTC, datetime
@@ -33,11 +33,12 @@ security = HTTPBasic()
 
 
 def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+    settings = get_settings()
     correct_username = secrets.compare_digest(
-        credentials.username, os.getenv("ADMIN_USER", "admin")
+        credentials.username, settings.admin_user
     )
     correct_password = secrets.compare_digest(
-        credentials.password, os.getenv("ADMIN_PASSWORD", "admin123")
+        credentials.password, settings.admin_password
     )
     if not (correct_username and correct_password):
         raise HTTPException(
@@ -134,9 +135,11 @@ async def get_dashboard_competitors(
     page_size: int = 50,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    page_size = min(page_size, 200)
     stmt = select(Competitor)
     if search:
-        stmt = stmt.where(Competitor.name.ilike(f"%{search}%"))
+        safe_search = search.replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(Competitor.name.ilike(f"%{safe_search}%", escape="\\"))
     if enabled is not None:
         stmt = stmt.where(Competitor.enabled.is_(enabled))
     if frequency:
@@ -330,9 +333,6 @@ async def delete_dashboard_competitor(
 
 # ─── Bulk Operations ────────────────────────────────────────────────────────
 
-class CompetitorBulkAction(BaseModel):
-    competitor_ids: list[int]
-
 
 @router.post("/api/dashboard/competitors/bulk/delete")
 async def bulk_delete(
@@ -430,23 +430,40 @@ async def duplicate_competitor(
 async def get_dashboard_stats(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    total_competitors = await session.scalar(select(func.count()).select_from(Competitor)) or 0
-    active_competitors = await session.scalar(
-        select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True))
-    ) or 0
-    urls_count = await session.scalar(select(func.count()).select_from(CompetitorSource)) or 0
-    services_count = await session.scalar(select(func.count()).select_from(CompetitorService)) or 0
-    pricing_count = await session.scalar(select(func.count()).select_from(CompetitorPricing)) or 0
-    content_count = await session.scalar(select(func.count()).select_from(CompetitorContent)) or 0
-    social_count = await session.scalar(select(func.count()).select_from(CompetitorSocial)) or 0
+    (
+        total_competitors,
+        active_competitors,
+        urls_count,
+        services_count,
+        pricing_count,
+        content_count,
+        social_count,
+        total_logs,
+        success_logs,
+        failed_logs,
+    ) = await asyncio.gather(
+        session.scalar(select(func.count()).select_from(Competitor)),
+        session.scalar(select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True))),
+        session.scalar(select(func.count()).select_from(CompetitorSource)),
+        session.scalar(select(func.count()).select_from(CompetitorService)),
+        session.scalar(select(func.count()).select_from(CompetitorPricing)),
+        session.scalar(select(func.count()).select_from(CompetitorContent)),
+        session.scalar(select(func.count()).select_from(CompetitorSocial)),
+        session.scalar(select(func.count()).select_from(CollectionLog)),
+        session.scalar(select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(True))),
+        session.scalar(select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(False))),
+    )
 
-    total_logs = await session.scalar(select(func.count()).select_from(CollectionLog)) or 0
-    success_logs = await session.scalar(
-        select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(True))
-    ) or 0
-    failed_logs = await session.scalar(
-        select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(False))
-    ) or 0
+    total_competitors = total_competitors or 0
+    active_competitors = active_competitors or 0
+    urls_count = urls_count or 0
+    services_count = services_count or 0
+    pricing_count = pricing_count or 0
+    content_count = content_count or 0
+    social_count = social_count or 0
+    total_logs = total_logs or 0
+    success_logs = success_logs or 0
+    failed_logs = failed_logs or 0
 
     success_rate = round((success_logs / total_logs * 100) if total_logs > 0 else 0, 1)
 
@@ -464,8 +481,9 @@ async def get_dashboard_stats(
         from app.main import message_queue as mq
         queue_stats = await mq.get_stats()  # type: ignore
         running_jobs = queue_stats.get("queue_size", 0)
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("queue_stats_failed", error=str(e))
 
     return {
         "total_competitors": total_competitors,
@@ -534,7 +552,8 @@ async def get_dashboard_summary(
 async def get_feed(
     limit: int = 20, offset: int = 0, session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
-    fetch_limit = limit + offset + 100
+    limit = min(limit, 100)
+    fetch_limit = limit + offset
 
     log_stmt = (
         select(CollectionLog, Competitor.name)
@@ -737,9 +756,11 @@ async def get_config() -> dict[str, Any]:
 async def global_search(
     q: str, session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
+    q = q[:200]
+    safe_q = q.replace("%", "\\%").replace("_", "\\_")
     stmt = select(RawStorage).where(
         RawStorage.extracted_data.isnot(None),
-        cast(RawStorage.extracted_data, String).ilike(f"%{q}%"),
+        cast(RawStorage.extracted_data, String).ilike(f"%{safe_q}%", escape="\\"),
     ).order_by(RawStorage.collected_at.desc()).limit(100)
     result = await session.execute(stmt)
     raw_storages = result.scalars().all()
@@ -1007,6 +1028,7 @@ async def get_collection_trends(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Get collection trends over time."""
+    days = min(max(days, 1), 365)
     from datetime import timedelta
 
     from sqlalchemy import Date, cast, func
@@ -1063,36 +1085,69 @@ async def compare_competitors(
     if not ids:
         return []
 
+    competitors_result = await session.execute(
+        select(Competitor).where(Competitor.id.in_(ids[:5]))
+    )
+    competitors = {c.id: c for c in competitors_result.scalars().all()}
+
+    if not competitors:
+        return []
+
+    competitor_ids = list(competitors.keys())
+
+    counts_subquery = (
+        select(
+            CompetitorService.competitor_id.label("competitor_id"),
+            func.count(CompetitorService.id).label("services_count"),
+        )
+        .where(CompetitorService.competitor_id.in_(competitor_ids))
+        .group_by(CompetitorService.competitor_id)
+    )
+
+    pricing_subquery = (
+        select(
+            CompetitorPricing.competitor_id.label("competitor_id"),
+            func.count(CompetitorPricing.id).label("pricing_count"),
+        )
+        .where(CompetitorPricing.competitor_id.in_(competitor_ids))
+        .group_by(CompetitorPricing.competitor_id)
+    )
+
+    social_subquery = (
+        select(
+            CompetitorSocial.competitor_id.label("competitor_id"),
+            func.count(CompetitorSocial.id).label("social_count"),
+        )
+        .where(CompetitorSocial.competitor_id.in_(competitor_ids))
+        .group_by(CompetitorSocial.competitor_id)
+    )
+
+    content_subquery = (
+        select(
+            CompetitorContent.competitor_id.label("competitor_id"),
+            func.count(CompetitorContent.id).label("content_count"),
+        )
+        .where(CompetitorContent.competitor_id.in_(competitor_ids))
+        .group_by(CompetitorContent.competitor_id)
+    )
+
+    services_counts = {row.competitor_id: row.services_count for row in (await session.execute(counts_subquery)).all()}
+    pricing_counts = {row.competitor_id: row.pricing_count for row in (await session.execute(pricing_subquery)).all()}
+    social_counts = {row.competitor_id: row.social_count for row in (await session.execute(social_subquery)).all()}
+    content_counts = {row.competitor_id: row.content_count for row in (await session.execute(content_subquery)).all()}
+
     results = []
-    for cid in ids[:5]:
-        comp = (await session.execute(
-            select(Competitor).where(Competitor.id == cid)
-        )).scalar_one_or_none()
-        if not comp:
-            continue
-
-        services_count = await session.scalar(
-            select(func.count()).select_from(CompetitorService).where(CompetitorService.competitor_id == cid)
-        ) or 0
-        pricing_count = await session.scalar(
-            select(func.count()).select_from(CompetitorPricing).where(CompetitorPricing.competitor_id == cid)
-        ) or 0
-        social_count = await session.scalar(
-            select(func.count()).select_from(CompetitorSocial).where(CompetitorSocial.competitor_id == cid)
-        ) or 0
-        content_count = await session.scalar(
-            select(func.count()).select_from(CompetitorContent).where(CompetitorContent.competitor_id == cid)
-        ) or 0
-
+    for cid in competitor_ids:
+        comp = competitors[cid]
         results.append({
             "id": comp.id,
             "name": comp.name,
             "website_url": comp.website_url,
             "modules": comp.modules or [],
-            "services_count": services_count,
-            "pricing_count": pricing_count,
-            "social_count": social_count,
-            "content_count": content_count,
+            "services_count": services_counts.get(cid, 0),
+            "pricing_count": pricing_counts.get(cid, 0),
+            "social_count": social_counts.get(cid, 0),
+            "content_count": content_counts.get(cid, 0),
         })
 
     return results

@@ -5,63 +5,36 @@ from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 
+from app.parsers.price_utils import CURRENCY_CODES, CURRENCY_SYMBOLS, detect_currency, parse_price
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 _HEADER_KW: dict[str, set[str]] = {
-    "name": {"service", "plan", "name", "product", "feature", "item", "package", "tier"},
+    "name": {"service", "plan", "name", "product", "feature", "item", "package", "tier", "seva", "yojana", "course", "batch"},
     "price": {
-        "price",
-        "cost",
-        "rate",
-        "fee",
-        "charge",
-        "amount",
-        "total",
-        "per",
-        "monthly",
-        "annual",
-        "starting",
+        "price", "cost", "rate", "fee", "charge", "amount", "total", "per", "monthly", "annual", "starting",
+        "keemat", "kimat", "dainik", "mahina", "varshik", "emi", "shulk",
     },
     "currency": {"currency", "cur", "symbol"},
     "duration": {
-        "duration",
-        "term",
-        "period",
-        "length",
-        "commitment",
-        "billing",
-        "cycle",
-        "frequency",
+        "duration", "term", "period", "length", "commitment", "billing", "cycle", "frequency",
+        "mahine", "saal", "hafta", "dinjaana",
     },
     "description": {"description", "details", "desc", "info", "about", "overview"},
     "category": {"category", "type", "class", "group", "section", "department"},
-    "discount": {"discount", "saving", "offer", "promo", "deal", "special"},
+    "discount": {"discount", "saving", "offer", "promo", "deal", "special", "dhamaka", "festive", "combo", "bundled"},
     "rating": {"rating", "review", "score", "stars", "rank"},
     "features": {
-        "features",
-        "includes",
-        "included",
-        "what's included",
-        "benefits",
-        "what you get",
-        "highlights",
-        "capabilities",
+        "features", "includes", "included", "what's included", "benefits", "what you get",
+        "highlights", "capabilities", "kya milta hai", "key points",
     },
 }
 
 _TABLE_KW: dict[str, set[str]] = {
     "pricing": {
-        "pricing",
-        "plan",
-        "subscription",
-        "package",
-        "tier",
-        "rate",
-        "cost",
-        "price",
-        "membership",
+        "pricing", "plan", "subscription", "package", "tier", "rate", "cost", "price", "membership",
+        "keemat", "kimat", "shulk", "emi",
     },
-    "services": {"service", "offering", "solution", "product", "catalog", "menu", "what we offer"},
+    "services": {"service", "offering", "solution", "product", "catalog", "menu", "what we offer", "seva", "yojana"},
     "membership": {"membership", "member", "club", "premium", "loyalty", "rewards", "vip"},
 }
 
@@ -70,44 +43,27 @@ _PRICE_RE = re.compile(
     r"""
     (?:[\$\€\£\₹\¥]\s*[\d,]+(?:\.\d{1,2})?)
     |
+    (?:rs\.?\s*[\d,]+(?:\.\d{1,2})?)
+    |
     (?:[\d,]+(?:\.\d{1,2})?\s*(?:USD|EUR|GBP|INR|JPY|CAD|AUD|EUR)\b)
     |
     (?:\b(?:\d+[.,]\d{1,2})\s*(?:per|month|year|hour|week|day|annually|yearly)?)
+    |
+    (?:[\d,]+(?:\.\d{1,2})?/-)
     """,
     re.I | re.X,
 )
 
 _DURATION_RE = re.compile(
-    r"(per\s*month|/month|/mo|monthly|per\s*year|/year|/yr|annually|"  # monthly/yearly
-    r"per\s*hour|/hour|hourly|per\s*week|/week|weekly|"  # hourly/weekly
-    r"per\s*day|/day|daily|"  # daily
-    r"one.time|one.off|setup\s*fee|once|flat\s*fee)",  # one-time
+    r"(per\s*month|/month|/mo|monthly|per\s*year|/year|/yr|annually|"
+    r"per\s*hour|/hour|hourly|per\s*week|/week|weekly|"
+    r"per\s*day|/day|daily|"
+    r"one.time|one.off|setup\s*fee|once|flat\s*fee|"
+    r"mahine\s*ka|saal\s*ka|hafta|dinjaana|quarterly|half-yearly|per\s*session|emi|installment|advance)",
     re.I,
 )
 
 _FEATURE_SEP_RE = re.compile(r"[•●◆◇‣-▪▸→➤⇒✓✔✗✘⊕⊖±·⋅]+")
-
-_CURRENCY_SYMBOLS: dict[str, str] = {
-    "$": "USD",
-    "€": "EUR",
-    "£": "GBP",
-    "₹": "INR",
-    "¥": "JPY",
-    "C$": "CAD",
-    "A$": "AUD",
-    "CHF": "CHF",
-}
-
-_CURRENCY_CODES: dict[str, str] = {
-    "USD": "USD",
-    "EUR": "EUR",
-    "GBP": "GBP",
-    "INR": "INR",
-    "JPY": "JPY",
-    "CAD": "CAD",
-    "AUD": "AUD",
-    "CHF": "CHF",
-}
 
 
 def _find_nearest_heading(el: Tag, *levels: str) -> str:
@@ -166,29 +122,11 @@ def _classify_column(header_text: str) -> str:
 
 
 def _parse_price(text: str | None) -> float | None:
-    if not text:
-        return None
-    clean = text.replace(",", "")
-    numbers = re.findall(r"[\d]+\.?\d*", clean)
-    if numbers:
-        try:
-            return float(numbers[0])
-        except ValueError:
-            return None
-    return None
+    return parse_price(text)
 
 
 def _detect_currency(text: str | None) -> str:
-    if not text:
-        return "USD"
-    for sym, code in _CURRENCY_SYMBOLS.items():
-        if sym in text:
-            return code
-    upper = text.upper()
-    for code in _CURRENCY_CODES:
-        if code in upper:
-            return code
-    return "USD"
+    return detect_currency(text)
 
 
 def _parse_duration(text: str | None) -> str | None:
@@ -359,7 +297,7 @@ class TableExtractionStrategy(ParsingStrategy):
 
         base_price = inferred.get("price")
         promo_price = inferred.get("promo_price")
-        currency = inferred.get("currency", "USD")
+        currency = inferred.get("currency", "INR")
         duration = inferred.get("duration")
 
         if table_type == "pricing" or (table_type == "unknown" and base_price is not None):
@@ -387,7 +325,7 @@ class TableExtractionStrategy(ParsingStrategy):
                     "category": inferred.get("category")
                     or (table_type if table_type != "unknown" else None),
                     "starting_price": base_price,
-                    "currency": currency or "USD",
+                    "currency": currency or "INR",
                     "estimated_duration": duration,
                     "features": features,
                 }
@@ -446,4 +384,6 @@ class TableExtractionStrategy(ParsingStrategy):
 
 def _price_is_promo(text: str) -> bool:
     lower = text.lower()
-    return any(kw in lower for kw in ("sale", "offer", "promo", "discount", "now", "save", "was"))
+    return any(kw in lower for kw in ("sale", "offer", "promo", "discount", "now", "save", "was",
+                                       "dhamaka", "best price", "lowest price", "special offer",
+                                       "limited time", "festive", "combo", "bundled", "free", "plus", "additional"))

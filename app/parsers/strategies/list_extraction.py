@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from app.parsers.price_utils import detect_currency, parse_price
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 if TYPE_CHECKING:
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 
 _PRICE_RE = re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{1,2})?")
 _DURATION_RE = re.compile(
-    r"(\d+[\s-]*(?:min|hr|hour|day|week|month|year|session|visit))", re.IGNORECASE
+    r"(\d+[\s-]*(?:min|hr|hour|day|week|month|year|session|visit|din|hafta|mahina|saal))", re.IGNORECASE
 )
 
 
@@ -101,7 +102,7 @@ class ListExtractionStrategy(ParsingStrategy):
                 currency = self._detect_currency(definition)
 
                 # Classify the term
-                if any(kw in lower for kw in ("price", "pricing", "cost", "$", "£", "€")):
+                if any(kw in lower for kw in ("price", "pricing", "cost", "$", "£", "€", "₹", "rs", "inr", "rupee", "rupees", "keemat", "kimat")):
                     result.pricing.append(
                         {
                             "service_name": term,
@@ -160,6 +161,15 @@ class ListExtractionStrategy(ParsingStrategy):
                     "where we operate",
                     "office",
                     "offices",
+                    "pincode",
+                    "district",
+                    "state",
+                    "taluka",
+                    "nagar",
+                    "sector",
+                    "service center",
+                    "franchise",
+                    "branch",
                 )
             ) and not any(
                 kw in context
@@ -201,7 +211,8 @@ class ListExtractionStrategy(ParsingStrategy):
                         )
             elif any(
                 kw in context
-                for kw in ("feature", "capability", "includes", "included", "what you get")
+                for kw in ("feature", "capability", "includes", "included", "what you get",
+                           "kya milta hai", "highlights", "key points")
             ):
                 for item in items:
                     price_match = _PRICE_RE.search(item)
@@ -258,17 +269,6 @@ class ListExtractionStrategy(ParsingStrategy):
                         "policy",
                         "legal",
                         "copyright",
-                        "why ahs",
-                        "real estate plans",
-                        "site map",
-                        "member testimonials",
-                        "promos & discounts",
-                        "terms of use",
-                        "warranty renewal",
-                        "frontdoor",
-                        "hsa home",
-                        "landmark",
-                        "oneguard",
                     }
                     if lower_item in nav_words:
                         continue
@@ -323,7 +323,7 @@ class ListExtractionStrategy(ParsingStrategy):
                                 "description": None,
                                 "category": None,
                                 "starting_price": None,
-                                "currency": "USD",
+                                "currency": "INR",
                                 "estimated_duration": None,
                             }
                         )
@@ -350,7 +350,7 @@ class ListExtractionStrategy(ParsingStrategy):
                             "plan_name": item,
                             "description": None,
                             "price": None,
-                            "currency": "USD",
+                            "currency": "INR",
                             "features": [],
                         }
                     )
@@ -412,26 +412,8 @@ class ListExtractionStrategy(ParsingStrategy):
 
     @staticmethod
     def _parse_price(price_text: str | None) -> float | None:
-        if not price_text:
-            return None
-        numbers = re.findall(r"[\d,]+\.?\d*", price_text.replace(",", ""))
-        if numbers:
-            try:
-                return float(numbers[0])
-            except ValueError:
-                return None
-        return None
+        return parse_price(price_text)
 
     @staticmethod
     def _detect_currency(price_text: str | None) -> str:
-        if not price_text:
-            return "USD"
-        if "$" in price_text:
-            return "USD"
-        if "€" in price_text:
-            return "EUR"
-        if "£" in price_text:
-            return "GBP"
-        if "₹" in price_text:
-            return "INR"
-        return "USD"
+        return detect_currency(price_text)

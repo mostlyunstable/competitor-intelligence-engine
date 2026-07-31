@@ -93,7 +93,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-4 text-xs text-center text-surface-500">
-            Default: admin / admin123
+            Enter your credentials to sign in
           </p>
         </div>
       </div>

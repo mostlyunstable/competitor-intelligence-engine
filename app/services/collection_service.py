@@ -272,10 +272,10 @@ class CollectionService:
                 async with db_manager.session() as session:
                     ai_data = await _gather_competitor_data(competitor_id, session)
                 ai_data["name"] = competitor_name
-                ai_data["url"] = competitor.website_url
+                ai_data["url"] = competitor_data["base_url"]
                 await trigger_ai_analysis(competitor_id, ai_data)
-            except ImportError:
-                log.warning("AI Intelligence Layer not available")
+            except Exception as e:
+                log.warning("ai_analysis_trigger_failed", error=str(e))
 
 
             return {

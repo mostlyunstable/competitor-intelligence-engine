@@ -17,7 +17,6 @@ from bs4.element import Comment, Tag
 _REMOVE_TAGS: set[str] = {
     "script",
     "style",
-    "noscript",
     "iframe",
     "canvas",
     "svg",
@@ -53,14 +52,10 @@ _TRACKING_SELECTORS: list[str] = [
     "[class*='notice']",
 ]
 
-# Hidden element detection
+# Hidden element detection — only remove truly invisible elements
+# Keep aria-hidden and display:none as they may contain SEO content
 _HIDDEN_SELECTORS: list[str] = [
     "[hidden]",
-    "[style*='display:none']",
-    "[style*='display: none']",
-    "[style*='visibility:hidden']",
-    "[style*='visibility: hidden']",
-    "[aria-hidden='true']",
     "[type='hidden']",
 ]
 

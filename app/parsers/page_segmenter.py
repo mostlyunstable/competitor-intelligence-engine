@@ -84,6 +84,10 @@ _KW: dict[str, list[str]] = {
         "book now",
         "request demo",
         "watch demo",
+        "swagat",
+        "aapka swagat",
+        "abhi shuru karein",
+        "demo lein",
     ],
     SEGMENT_NAVIGATION: [
         "menu",
@@ -107,6 +111,12 @@ _KW: dict[str, list[str]] = {
         "what you get",
         "our work",
         "we offer",
+        "seva",
+        "uplabdh",
+        "hamare kaam",
+        "prakriya",
+        "tarike",
+        "sevayein",
     ],
     SEGMENT_PRICING: [
         "price",
@@ -122,6 +132,14 @@ _KW: dict[str, list[str]] = {
         "billed annually",
         "free trial",
         "enterprise",
+        "keemat",
+        "kimat",
+        "dainik",
+        "mahina",
+        "varshik",
+        "emi",
+        "kist",
+        "shulk",
         # currency symbols covered separately by regex
     ],
     SEGMENT_PLANS: [
@@ -177,6 +195,10 @@ _KW: dict[str, list[str]] = {
         "star",
         "rated",
         "recommended",
+        "justdial",
+        "sulekha",
+        "urbanclap",
+        "google reviews",
     ],
     SEGMENT_FAQ: [
         "faq",
@@ -189,6 +211,10 @@ _KW: dict[str, list[str]] = {
         "can i",
         "is there",
         "do you",
+        "sawaal",
+        "jawaab",
+        "sawaal-jawaab",
+        "madad",
     ],
     SEGMENT_BLOG: [
         "blog",
@@ -216,6 +242,13 @@ _KW: dict[str, list[str]] = {
         "available in",
         "nationwide",
         "local",
+        "pincode",
+        "district",
+        "taluka",
+        "mandal",
+        "tehsil",
+        "nagar",
+        "sector",
     ],
     SEGMENT_COVERAGE: [
         "coverage",
@@ -278,6 +311,9 @@ _KW: dict[str, list[str]] = {
         "address",
         "location",
         "find us",
+        "sampark",
+        "call karein",
+        "sampark karein",
     ],
     SEGMENT_FOOTER: [
         "copyright",
@@ -295,10 +331,10 @@ _KW: dict[str, list[str]] = {
 _KW_SETS: dict[str, set[str]] = {k: set(v) for k, v in _KW.items()}
 
 # Regex for currency / price patterns (language-agnostic)
-_PRICE_RE = re.compile(r"[\$\€\£\₹\¥]\s*[\d,]+|[\d,]+\s*(?:USD|EUR|GBP|INR|JPY)\b", re.I)
+_PRICE_RE = re.compile(r"[\$\€\£\₹\¥]\s*[\d,]+|rs\.?\s*[\d,]+|[\d,]+\s*(?:USD|EUR|GBP|INR|JPY)\b|[\d,]+/-", re.I)
 
 # Regex for FAQ-style question patterns
-_FAQ_RE = re.compile(r"^\s*(how|what|why|when|where|who|can|do|is|are|will|does)\b", re.I)
+_FAQ_RE = re.compile(r"^\s*(how|what|why|when|where|who|can|do|is|are|will|does|kaise|kya|kyun|kab|kahan|kaun)\b", re.I)
 
 
 # ---------------------------------------------------------------------------

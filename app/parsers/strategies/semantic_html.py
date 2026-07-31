@@ -4,7 +4,9 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from app.parsers.constants import SOCIAL_PLATFORMS
 from app.parsers.page_segmenter import PageSegment
+from app.parsers.price_utils import detect_currency, parse_price
 from app.parsers.strategy import ParsedResult, ParsingStrategy
 
 
@@ -110,7 +112,9 @@ class SemanticHtmlStrategy(ParsingStrategy):
             href = str(a_tag.get("href", ""))
             text = a_tag.get_text(strip=True).lower()
             if any(
-                kw in text for kw in ["service", "services", "pricing", "about", "contact"]
+                kw in text for kw in ["service", "services", "pricing", "about", "contact",
+                                       "sevayein", "keemat", "sampark", "hamare baare mein",
+                                       "enquiry", "catalogue", "catalog"]
             ) and (href.startswith("/") or href.startswith(".")):
                 pass
 
@@ -122,7 +126,10 @@ class SemanticHtmlStrategy(ParsingStrategy):
         self._extract_pricing_from_tables(main, result)
 
     def _extract_services_from_headings(self, container: Any, result: ParsedResult) -> None:
-        service_keywords = ["service", "repair", "install", "maintenance", "plan", "cleaning"]
+        service_keywords = ["service", "repair", "install", "maintenance", "plan", "cleaning",
+                        "seva", "safai", "marammat", "coaching", "treatment", "diagnosis",
+                        "consultation", "wedding", "catering", "beauty", "salon", "interior",
+                        "painting", "carpentry", "plumbing", "electrical", "pest control"]
         headings = container.select("h2, h3, h4")
         for heading in headings:
             text = heading.get_text(strip=True)
@@ -135,7 +142,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
                         "description": desc_el.get_text(strip=True) if desc_el else None,
                         "category": None,
                         "starting_price": None,
-                        "currency": "USD",
+                        "currency": "INR",
                         "estimated_duration": None,
                         **ev,
                     }
@@ -226,14 +233,15 @@ class SemanticHtmlStrategy(ParsingStrategy):
                     "description": el.get("data-description") or el.get_text(strip=True)[:200],
                     "category": category,
                     "starting_price": self._parse_price(str(price_raw)) if price_raw else None,
-                    "currency": self._detect_currency(str(price_raw)) if price_raw else "USD",
+                    "currency": self._detect_currency(str(price_raw)) if price_raw else "INR",
                     "estimated_duration": el.get("data-duration"),
                 }
             )
 
     def _extract_from_definition_lists(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         """Extract service name/description pairs from <dl> definition lists."""
-        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plan"]
+        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plan",
+                        "seva", "safai", "marammat", "coaching", "treatment"]
         for dl in soup.select("dl"):
             terms = dl.select("dt")
             defs = dl.select("dd")
@@ -254,7 +262,8 @@ class SemanticHtmlStrategy(ParsingStrategy):
 
     def _extract_from_figures(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         """Extract service items from <figure>/<figcaption> cards."""
-        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plumb"]
+        service_keywords = ["service", "repair", "install", "clean", "maintenance", "plumb",
+                        "seva", "safai", "marammat", "coaching", "treatment"]
         for figure in soup.select("figure"):
             caption_el = figure.select_one("figcaption")
             if not caption_el:
@@ -269,7 +278,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
                         "description": alt if alt else None,
                         "category": None,
                         "starting_price": None,
-                        "currency": "USD",
+                        "currency": "INR",
                         "estimated_duration": None,
                     }
                 )
@@ -280,7 +289,9 @@ class SemanticHtmlStrategy(ParsingStrategy):
             if not heading:
                 continue
             text = heading.get_text(strip=True).lower()
-            if any(kw in text for kw in ["service", "what we do", "our services"]):
+            if any(kw in text for kw in ["service", "what we do", "our services",
+                                           "hamari sevayein", "what we offer", "hamare plans",
+                                           "prakriya", "services we offer"]):
                 desc_el = section.select_one("p")
                 if desc_el:
                     result.services.append(
@@ -289,7 +300,7 @@ class SemanticHtmlStrategy(ParsingStrategy):
                             "description": desc_el.get_text(strip=True),
                             "category": None,
                             "starting_price": None,
-                            "currency": "USD",
+                            "currency": "INR",
                             "estimated_duration": None,
                         }
                     )
@@ -301,6 +312,13 @@ class SemanticHtmlStrategy(ParsingStrategy):
         if email_link:
             result.contact_email = str(email_link["href"]).replace("mailto:", "")
             result.set_field_evidence("contact_email", email_link)
+        else:
+            # Extract plain text email
+            import re as re_mod
+            text = soup.get_text(" ", strip=True)
+            email_match = re_mod.search(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', text)
+            if email_match:
+                result.contact_email = email_match.group(0)
 
     def _extract_phones(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         if result.contact_phone:
@@ -309,43 +327,24 @@ class SemanticHtmlStrategy(ParsingStrategy):
         if phone_link:
             result.contact_phone = str(phone_link["href"]).replace("tel:", "")
             result.set_field_evidence("contact_phone", phone_link)
+        else:
+            # Extract plain text Indian phone number
+            import re as re_mod
+            text = soup.get_text(" ", strip=True)
+            phone_match = re_mod.search(r'(?:\+91[-.\s]?)?\d{5}\s?\d{5}|\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', text)
+            if phone_match:
+                result.contact_phone = phone_match.group(0).strip()
 
     def _extract_social_links(self, soup: BeautifulSoup, result: ParsedResult, url: str) -> None:
-        platforms = {
-            "linkedin.com": "linkedin",
-            "facebook.com": "facebook",
-            "instagram.com": "instagram",
-            "twitter.com": "twitter",
-            "x.com": "twitter",
-            "youtube.com": "youtube",
-        }
         for a_tag in soup.select("a[href]"):
             href = str(a_tag.get("href", ""))
-            for domain, platform in platforms.items():
+            for domain, platform in SOCIAL_PLATFORMS.items():
                 if domain in href and platform not in result.social_links:
                     result.social_links[platform] = urljoin(url, href)
                     result.set_field_evidence(f"social_{platform}", a_tag)
 
     def _parse_price(self, price_text: str | None) -> float | None:
-        if not price_text:
-            return None
-        numbers = re.findall(r"[\d,]+\.?\d*", price_text.replace(",", ""))
-        if numbers:
-            try:
-                return float(numbers[0])
-            except ValueError:
-                return None
-        return None
+        return parse_price(price_text)
 
     def _detect_currency(self, price_text: str | None) -> str:
-        if not price_text:
-            return "USD"
-        if "$" in price_text:
-            return "USD"
-        if "€" in price_text:
-            return "EUR"
-        if "£" in price_text:
-            return "GBP"
-        if "₹" in price_text:
-            return "INR"
-        return "USD"
+        return detect_currency(price_text)

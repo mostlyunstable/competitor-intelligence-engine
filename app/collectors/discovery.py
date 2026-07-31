@@ -361,12 +361,12 @@ class DiscoveryEngine:
     def _rank(self, urls: list[DiscoveredURL], domain: str) -> list[DiscoveredURL]:
         """Rank URLs by relevance for competitor intelligence collection."""
         high_value_patterns = [
-            (r"/(service|pricing|plan|product|feature)", 10),
-            (r"/(about|company|team|story|mission)", 8),
-            (r"/(blog|article|news|resource|case-study)", 7),
-            (r"/(contact|support|help|faq)", 5),
-            (r"/(privacy|terms|legal|policy)", 3),
-            (r"/(career|job|hiring)", 2),
+            (r"/(service|pricing|plan|product|feature|seva|mulya|yojana)", 10),
+            (r"/(about|company|team|story|mission|humare-bare|samuh)", 8),
+            (r"/(blog|article|news|resource|case-study|samachar|lekh)", 7),
+            (r"/(contact|support|help|faq|sampark|sahayata|prashn)", 5),
+            (r"/(privacy|terms|legal|policy|gopniyata|sharten|kanooni|niti)", 3),
+            (r"/(career|job|hiring|rozgar|naukri|bharti)", 2),
         ]
 
         def score_url(discovered: DiscoveredURL) -> int:

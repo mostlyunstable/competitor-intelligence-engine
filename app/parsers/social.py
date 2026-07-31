@@ -14,6 +14,14 @@ class SocialParser(BaseParser):
         "youtube.com": "youtube",
         "pinterest.com": "pinterest",
         "threads.net": "threads",
+        "tiktok.com": "tiktok",
+        "snapchat.com": "snapchat",
+        "reddit.com": "reddit",
+        "quora.com": "quora",
+        "medium.com": "medium",
+        "github.com": "github",
+        "behance.net": "behance",
+        "dribbble.com": "dribbble",
     }
 
     def parse(self, html: str, url: str) -> dict[str, Any]:

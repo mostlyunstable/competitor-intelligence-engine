@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import httpx
@@ -40,8 +41,6 @@ class WebhookService:
                         error=str(e),
                         next_retry_in=delay,
                     )
-                    import asyncio
-
                     await asyncio.sleep(delay)
                 else:
                     logger.error(

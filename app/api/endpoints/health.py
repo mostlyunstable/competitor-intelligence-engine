@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import verify_any_auth
 from app.api.dependencies import get_session
 from app.database.models import CollectionLog, Competitor
 
@@ -297,6 +298,7 @@ async def health(
 async def get_logs(
     limit: int = 50,
     session: AsyncSession = Depends(get_session),
+    _auth: str = Depends(verify_any_auth),
 ) -> list[CollectionLogResponse]:
     stmt = select(CollectionLog).order_by(CollectionLog.id.desc()).limit(limit)
     result = await session.execute(stmt)

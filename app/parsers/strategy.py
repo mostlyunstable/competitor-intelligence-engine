@@ -809,3 +809,36 @@ class ParsingStrategy(ABC):
             elif value is not None:
                 result.append(str(value))
         return result
+
+    def _collect_section(self, heading: Tag) -> Tag | None:
+        """Collect sibling elements after a heading until the next heading of same or higher level."""
+        heading_level = int(heading.name[1]) if heading.name and heading.name[0] == "h" else 3
+        container = heading.parent
+        if not container:
+            return None
+
+        collecting = False
+        elements: list[Tag] = []
+        for sibling in container.children:
+            if not isinstance(sibling, Tag):
+                continue
+            if sibling is heading:
+                collecting = True
+                continue
+            if collecting:
+                if sibling.name and sibling.name[0] == "h":
+                    try:
+                        sib_level = int(sibling.name[1])
+                        if sib_level <= heading_level:
+                            break
+                    except (ValueError, IndexError):
+                        pass
+                elements.append(sibling)
+
+        if not elements:
+            return None
+
+        wrapper = BeautifulSoup("", "html.parser").new_tag("div")
+        for el in elements:
+            wrapper.append(el)
+        return wrapper

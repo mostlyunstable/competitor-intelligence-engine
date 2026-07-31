@@ -17,8 +17,8 @@ from app.services.websocket_manager import ws_manager
 
 logger = structlog.get_logger(__name__)
 
-# Global message queue (initialized at module level, configured in lifespan)
-message_queue = None
+# Global message queue (initialized in lifespan)
+message_queue: Any = None
 _queue_worker_task: asyncio.Task[Any] | None = None
 
 
@@ -89,9 +89,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         with contextlib.suppress(asyncio.CancelledError):
             await _queue_worker_task
 
-    from app.schedulers.scheduler import scheduler as sched
+    from app.schedulers.scheduler import scheduler
 
-    await sched.stop()
+    await scheduler.stop()
     await db_manager.disconnect()
     logger.info("app_stopped")
 
@@ -189,7 +189,7 @@ All errors follow RFC 7807 Problem Details format:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
             response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:"
+                "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:"
             )
             return response
 
@@ -200,13 +200,13 @@ All errors follow RFC 7807 Problem Details format:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.debug else [],
-        allow_credentials=settings.debug,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    app.add_middleware(RateLimitMiddleware, requests_per_minute=300000)
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=300)
 
     app.include_router(health.router)
     app.include_router(competitors.router)
@@ -238,24 +238,23 @@ All errors follow RFC 7807 Problem Details format:
                 import json
                 data = json.loads(first_msg)
                 token = data.get("token", "")
-            except Exception:
+            except (asyncio.TimeoutError, json.JSONDecodeError, ValueError):
                 await websocket.close(code=4001, reason="Authentication required")
                 return
 
         # Validate token against API key
         from app.configuration.settings import get_settings
+        import hmac as _hmac
         settings = get_settings()
-        # Token is base64 encoded "username:password" - validate against stored API key
         valid = False
         if token:
             try:
                 import base64
                 decoded = base64.b64decode(token).decode()
-                username, password = decoded.split(":", 1)
-                # Accept if password matches API key or default admin credentials
-                if password == settings.api_key or (username == "admin" and password == "admin123"):
+                _, password = decoded.split(":", 1)
+                if settings.api_key and _hmac.compare_digest(password, settings.api_key):
                     valid = True
-            except Exception:
+            except (ValueError, UnicodeDecodeError):
                 pass
 
         if not valid:
@@ -270,7 +269,8 @@ All errors follow RFC 7807 Problem Details format:
                     await websocket.send_text('{"type":"pong"}')
         except WebSocketDisconnect:
             await ws_manager.disconnect(websocket)
-        except Exception:
+        except Exception as e:
+            logger.warning("websocket_error", error=str(e))
             await ws_manager.disconnect(websocket)
 
     _configure_logging(settings.log_level)

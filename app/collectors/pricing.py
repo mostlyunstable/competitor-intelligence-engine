@@ -23,7 +23,7 @@ _NAV_NAMES_PRICING = frozenset({
 })
 
 _PRICING_PATTERNS = re.compile(
-    r"(plan|pricing|price|cost|rate|fee|per month|per year|annually|monthly|starting at|\$)",
+    r"(plan|pricing|price|cost|rate|fee|per month|per year|annually|monthly|starting at|starts from|₹|inr|usd|eur|gbp)",
     re.IGNORECASE,
 )
 

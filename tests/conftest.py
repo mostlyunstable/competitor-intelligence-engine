@@ -11,10 +11,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.database.connection import Base
 
-TEST_DATABASE_URL = os.environ.get(
-    "CI_TEST_DATABASE_URL",
-    "postgresql+asyncpg://utservio:changeme@localhost:5434/utservio_ci_test",
-)
+TEST_DATABASE_URL = os.environ.get("CI_TEST_DATABASE_URL", "")
 
 
 @pytest_asyncio.fixture(scope="session")

@@ -266,6 +266,7 @@ class CollectionLog(Base):
     __table_args__ = (
         Index("ix_collection_log_competitor_id", "competitor_id"),
         Index("ix_collection_log_start_time", "start_time"),
+        Index("ix_collection_log_success", "success"),
         {"comment": "Audit trail of all collection runs"},
     )
 
@@ -302,6 +303,7 @@ class RawStorage(Base):
         Index("ix_raw_storage_competitor_id", "competitor_id"),
         Index("ix_raw_storage_source_url", "source_url"),
         Index("ix_raw_storage_content_hash", "content_hash"),
+        Index("ix_raw_storage_extracted_data_gin", "extracted_data", postgresql_using="gin"),
         {"comment": "Original HTML snapshots and raw data"},
     )
 
@@ -381,6 +383,11 @@ class CompetitorAIInsight(Base):
     )
 
     competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="ai_insight")
+
+    __table_args__ = (
+        Index("ix_ai_insight_llm_provider", "llm_provider"),
+        Index("ix_ai_insight_prompt_version", "prompt_version"),
+    )
 
 
 class AIInsightFeedback(Base):

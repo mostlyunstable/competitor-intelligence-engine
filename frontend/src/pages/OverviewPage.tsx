@@ -1,15 +1,17 @@
 import { useState, useCallback } from 'react'
+import { useDashboard } from '../context/DashboardContext'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate, timeAgo } from '../lib/utils'
-import { BarChart } from '../components/Charts'
 import {
   Users, Activity, CheckCircle, XCircle, TrendingUp, Clock,
-  Database, Zap, RefreshCw, BarChart3, ExternalLink
+  Database, Zap, RefreshCw, ExternalLink
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type { FeedItem } from '../types'
 
 function StatCard({ label, value, icon: Icon, color }: {
-  label: string; value: string | number; icon: any; color: string
+  label: string; value: string | number; icon: LucideIcon; color: string
 }) {
   return (
     <div className="stat-card">
@@ -33,11 +35,9 @@ function StatusDot({ status }: { status: string }) {
 }
 
 export default function OverviewPage() {
-  const { data: stats, loading: statsLoading, refresh: refetchStats } = usePolling(() => api.getStats(), 15000)
+  const { stats, health, telemetry, loading, refresh } = useDashboard()
   const { data: feedPage, refresh: refetchFeed } = usePolling(() => api.getFeed(20, 0), 20000)
-  const { data: health, refresh: refetchHealth } = usePolling(() => api.getHealth(), 30000)
-  const { data: telemetry } = usePolling(() => api.getTelemetry(), 10000)
-  const { data: trends, refresh: refetchTrends } = usePolling(() => api.getTrends(14), 60000)
+
   const [refreshing, setRefreshing] = useState(false)
 
   const feed = feedPage?.items || []
@@ -45,13 +45,14 @@ export default function OverviewPage() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      await Promise.all([refetchStats(), refetchFeed(), refetchHealth(), refetchTrends()])
-    } finally {
+      await Promise.all([refresh.stats(), refetchFeed(), refresh.health()])
+    } catch { /* usePolling handles errors */ }
+    finally {
       setRefreshing(false)
     }
-  }, [refetchStats, refetchFeed, refetchHealth, refetchTrends])
+  }, [refresh, refetchFeed])
 
-  if (statsLoading && !stats) {
+  if (loading.stats && !stats) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-surface-900">Dashboard Overview</h1>
@@ -64,7 +65,7 @@ export default function OverviewPage() {
     )
   }
 
-  const s = stats || {}
+  const s = stats as typeof stats | null
 
   return (
     <div className="space-y-6">
@@ -88,49 +89,17 @@ export default function OverviewPage() {
 
       {/* KPI Cards */}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity duration-200 ${refreshing ? 'opacity-60' : ''}`}>
-        <StatCard label="Total Competitors" value={s.total_competitors || 0} icon={Users} color="bg-brand-600" />
-        <StatCard label="Active Competitors" value={s.active_competitors || 0} icon={Users} color="bg-green-600" />
-        <StatCard label="Collections Running" value={s.collections_running || 0} icon={Activity} color="bg-blue-600" />
-        <StatCard label="Success Rate" value={`${s.success_rate || 0}%`} icon={TrendingUp} color="bg-emerald-600" />
-        <StatCard label="Successful Collections" value={s.successful_collections || 0} icon={CheckCircle} color="bg-green-500" />
-        <StatCard label="Failed Collections" value={s.failed_collections || 0} icon={XCircle} color="bg-red-500" />
-        <StatCard label="Services Extracted" value={s.services_extracted || 0} icon={Zap} color="bg-purple-600" />
-        <StatCard label="URLs Discovered" value={s.urls_discovered || 0} icon={Database} color="bg-orange-500" />
+        <StatCard label="Total Competitors" value={s?.total_competitors || 0} icon={Users} color="bg-brand-600" />
+        <StatCard label="Active Competitors" value={s?.active_competitors || 0} icon={Users} color="bg-green-600" />
+        <StatCard label="Collections Running" value={s?.collections_running || 0} icon={Activity} color="bg-blue-600" />
+        <StatCard label="Success Rate" value={`${s?.success_rate || 0}%`} icon={TrendingUp} color="bg-emerald-600" />
+        <StatCard label="Successful Collections" value={s?.successful_collections || 0} icon={CheckCircle} color="bg-green-500" />
+        <StatCard label="Failed Collections" value={s?.failed_collections || 0} icon={XCircle} color="bg-red-500" />
+        <StatCard label="Services Extracted" value={s?.services_extracted || 0} icon={Zap} color="bg-purple-600" />
+        <StatCard label="URLs Discovered" value={s?.urls_discovered || 0} icon={Database} color="bg-orange-500" />
       </div>
 
-      {/* Trends Charts */}
-      {trends && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 size={18} className="text-brand-500" />
-              <h3 className="font-semibold text-surface-900">Collections (Last 14 Days)</h3>
-            </div>
-            <BarChart
-              data={(trends.daily_collections || []).map((d: any) => ({
-                label: new Date(d.date).toLocaleDateString('en', { weekday: 'short' }),
-                value: d.total,
-                color: 'bg-brand-500',
-              }))}
-              height={120}
-            />
-          </div>
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 size={18} className="text-emerald-500" />
-              <h3 className="font-semibold text-surface-900">Records Collected (Last 14 Days)</h3>
-            </div>
-            <BarChart
-              data={(trends.daily_records || []).map((d: any) => ({
-                label: new Date(d.date).toLocaleDateString('en', { weekday: 'short' }),
-                value: d.records,
-                color: 'bg-emerald-500',
-              }))}
-              height={120}
-            />
-          </div>
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
@@ -142,7 +111,7 @@ export default function OverviewPage() {
             {!feed || feed.length === 0 ? (
               <div className="p-8 text-center text-surface-400 text-sm">No recent activity</div>
             ) : (
-              feed.map((item: any, i: number) => (
+              feed.map((item: FeedItem, i) => (
                 <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-surface-50">
                   <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
                     item.type === 'collection_success' ? 'bg-emerald-500' :
@@ -179,8 +148,8 @@ export default function OverviewPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-surface-600">Scheduler</span>
               <div className="flex items-center gap-2">
-                <StatusDot status={s.scheduler_status === 'running' ? 'healthy' : 'stopped'} />
-                <span className="text-sm font-medium text-surface-900">{s.scheduler_status || 'unknown'}</span>
+                <StatusDot status={s?.scheduler_status === 'running' ? 'healthy' : 'stopped'} />
+                <span className="text-sm font-medium text-surface-900">{s?.scheduler_status || 'unknown'}</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
@@ -194,7 +163,7 @@ export default function OverviewPage() {
               <span className="text-sm text-surface-600">Queue</span>
               <div className="flex items-center gap-2">
                 <StatusDot status="healthy" />
-                <span className="text-sm font-medium text-surface-900">{s.queue_size || 0} pending</span>
+                <span className="text-sm font-medium text-surface-900">{s?.queue_size || 0} pending</span>
               </div>
             </div>
 
@@ -226,7 +195,7 @@ export default function OverviewPage() {
 
             <div className="pt-3 border-t border-surface-100">
               <h3 className="text-sm font-medium text-surface-900 mb-2">Last Collection</h3>
-              <p className="text-sm text-surface-600">{formatDate(s.last_collection)}</p>
+              <p className="text-sm text-surface-600">{formatDate(s?.last_collection ?? null)}</p>
             </div>
 
             <div className="pt-3 border-t border-surface-100">

@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, ClassVar
 
+from app.parsers.price_utils import detect_currency, parse_price
+
 if TYPE_CHECKING:
     from bs4 import BeautifulSoup
 
@@ -23,11 +25,12 @@ class RegexPatternStrategy(ParsingStrategy):
         r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
     )
     PHONE_PATTERN: ClassVar[re.Pattern[str]] = re.compile(
-        r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
+        r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{2,5}[-.\s]?\d{2,5}"
     )
     PRICE_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
         re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{2})?"),
-        re.compile(r"[\d,]+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)"),
+        re.compile(r"[\d,]+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR|Rs\.?)"),
+        re.compile(r"(?:Rs\.?|INR)\s*[\d,]+(?:\.\d{2})?"),
     ]
     SOCIAL_PATTERNS: ClassVar[dict[str, re.Pattern[str]]] = {
         "linkedin": re.compile(r"https?://(?:www\.)?linkedin\.com/(?:company|in)/[a-zA-Z0-9\-]+"),
@@ -35,6 +38,12 @@ class RegexPatternStrategy(ParsingStrategy):
         "twitter": re.compile(r"https?://(?:www\.)?(?:twitter\.com|x\.com)/[a-zA-Z0-9_]+"),
         "instagram": re.compile(r"https?://(?:www\.)?instagram\.com/[a-zA-Z0-9_.]+"),
         "youtube": re.compile(r"https?://(?:www\.)?youtube\.com/(?:@|channel/|c/)[a-zA-Z0-9\-_]+"),
+        "tiktok": re.compile(r"https?://(?:www\.)?tiktok\.com/@[a-zA-Z0-9_.]+"),
+        "snapchat": re.compile(r"https?://(?:www\.)?snapchat\.com/add/[a-zA-Z0-9_.]+"),
+        "reddit": re.compile(r"https?://(?:www\.)?reddit\.com/(?:r|u)/[a-zA-Z0-9_.]+"),
+        "quora": re.compile(r"https?://(?:www\.)?quora\.com/profile/[a-zA-Z0-9_.\-]+"),
+        "medium": re.compile(r"https?://(?:www\.)?medium\.com/@[a-zA-Z0-9_.\-]+"),
+        "github": re.compile(r"https?://(?:www\.)?github\.com/[a-zA-Z0-9_.\-]+"),
     }
 
     def parse(self, soup: BeautifulSoup, url: str) -> ParsedResult:
@@ -106,25 +115,7 @@ class RegexPatternStrategy(ParsingStrategy):
                 result.social_links[platform] = match.group(0)
 
     def _parse_price(self, price_text: str | None) -> float | None:
-        if not price_text:
-            return None
-        numbers = re.findall(r"[\d,]+\.?\d*", price_text.replace(",", ""))
-        if numbers:
-            try:
-                return float(numbers[0])
-            except ValueError:
-                return None
-        return None
+        return parse_price(price_text)
 
     def _detect_currency(self, price_text: str | None) -> str:
-        if not price_text:
-            return "USD"
-        if "$" in price_text:
-            return "USD"
-        if "€" in price_text:
-            return "EUR"
-        if "£" in price_text:
-            return "GBP"
-        if "₹" in price_text:
-            return "INR"
-        return "USD"
+        return detect_currency(price_text)

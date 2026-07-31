@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { useDashboard } from '../context/DashboardContext'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate, timeAgo } from '../lib/utils'
 import {
-  Settings, Database, Server, Activity, Clock, Bell,
-  CheckCircle, XCircle, AlertTriangle, RefreshCw, Cpu, HardDrive, FileJson
+  Settings, Database, Server, Activity, Clock,
+  CheckCircle, XCircle, RefreshCw, Cpu, FileJson
 } from 'lucide-react'
 
 function StatusIndicator({ status, label }: { status: string; label: string }) {
@@ -30,9 +31,7 @@ function StatusIndicator({ status, label }: { status: string; label: string }) {
 }
 
 export default function AdminPage() {
-  const { data: health, loading, refresh: refreshHealth } = usePolling(() => api.getHealth(), 20000)
-  const { data: schedulerStatus, refresh: refreshScheduler } = usePolling(() => api.getSchedulerStatus(), 15000)
-  const { data: telemetry } = usePolling(() => api.getTelemetry(), 10000)
+  const { health, scheduler, telemetry, refresh, loading } = useDashboard()
   const { data: metrics } = usePolling(() => api.getMetricsJson(), 30000)
   const { data: config } = usePolling(() => api.getConfig(), 30000)
   const [resyncing, setResyncing] = useState(false)
@@ -44,9 +43,9 @@ export default function AdminPage() {
     setResyncResult(null)
     try {
       const result = await api.resyncConfig()
-      setResyncResult(`Reloaded ${result.reloaded} competitors from config file. Synced: ${result.synced?.synced || 0}`)
-    } catch (e: any) {
-      setResyncResult(`Error: ${e.message}`)
+      setResyncResult(`Synced: ${result.synced.synced} competitors, ${result.synced.skipped} skipped`)
+    } catch (e: unknown) {
+      setResyncResult(`Error: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setResyncing(false)
     }
@@ -56,7 +55,7 @@ export default function AdminPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">System Administration</h1>
-        <button onClick={async () => { setRefreshing(true); try { await Promise.all([refreshHealth(), refreshScheduler()]) } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+        <button onClick={async () => { setRefreshing(true); try { await refresh.all() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
           <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh All
         </button>
       </div>
@@ -100,21 +99,21 @@ export default function AdminPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-surface-600">Status</span>
               <div className="flex items-center gap-2">
-                <div className={`w-2.5 h-2.5 rounded-full ${schedulerStatus?.is_running ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                <span className="text-sm font-medium">{schedulerStatus?.is_running ? 'Running' : 'Stopped'}</span>
+                <div className={`w-2.5 h-2.5 rounded-full ${scheduler?.is_running ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                <span className="text-sm font-medium">{scheduler?.is_running ? 'Running' : 'Stopped'}</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-surface-600">Check Interval</span>
-              <span className="text-sm font-medium">{schedulerStatus?.interval_seconds || '-'}s</span>
+              <span className="text-sm font-medium">{scheduler?.interval_seconds || '-'}s</span>
             </div>
             <div className="flex gap-2 pt-2">
-              {schedulerStatus?.is_running ? (
-                <button onClick={async () => { await api.pauseScheduler(); refreshScheduler() }} className="btn-secondary">
+              {scheduler?.is_running ? (
+                <button onClick={async () => { try { await api.pauseScheduler(); refresh.scheduler() } catch { /* usePolling handles errors */ } }} className="btn-secondary">
                   Pause
                 </button>
               ) : (
-                <button onClick={async () => { await api.resumeScheduler(); refreshScheduler() }} className="btn-primary">
+                <button onClick={async () => { try { await api.resumeScheduler(); refresh.scheduler() } catch { /* usePolling handles errors */ } }} className="btn-primary">
                   Resume
                 </button>
               )}

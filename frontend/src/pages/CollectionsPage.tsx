@@ -1,35 +1,41 @@
 import { useState, useCallback } from 'react'
+import { useDashboard } from '../context/DashboardContext'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import { formatDate, timeAgo } from '../lib/utils'
 import {
   Play, Pause, RefreshCw, Activity, Clock, CheckCircle,
-  XCircle, Loader2, AlertTriangle
+  XCircle
 } from 'lucide-react'
+import type { CollectionLog } from '../types'
 
 export default function CollectionsPage() {
   const [competitorFilter, setCompetitorFilter] = useState<number | undefined>()
   const [refreshing, setRefreshing] = useState(false)
+
+  const { stats, scheduler, refresh } = useDashboard()
 
   const fetchData = useCallback(() => api.getLogs({
     competitor_id: competitorFilter,
     page_size: 30,
   }), [competitorFilter])
 
-  const { data: logsData, loading, refresh } = usePolling(fetchData, 10000)
-  const { data: schedulerStatus, refresh: refreshScheduler } = usePolling(() => api.getSchedulerStatus(), 10000)
-  const { data: stats } = usePolling(() => api.getStats(), 15000)
+  const { data: logsData, loading, refresh: refreshLogs } = usePolling(fetchData, 10000)
 
   const logs = logsData?.logs || []
 
   const handlePauseScheduler = async () => {
-    await api.pauseScheduler()
-    refreshScheduler()
+    try {
+      await api.pauseScheduler()
+      refresh.scheduler()
+    } catch { /* usePolling handles errors */ }
   }
 
   const handleResumeScheduler = async () => {
-    await api.resumeScheduler()
-    refreshScheduler()
+    try {
+      await api.resumeScheduler()
+      refresh.scheduler()
+    } catch { /* usePolling handles errors */ }
   }
 
   return (
@@ -37,7 +43,7 @@ export default function CollectionsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-900">Collection Monitoring</h1>
         <div className="flex items-center gap-2">
-          {schedulerStatus?.is_running ? (
+          {scheduler?.is_running ? (
             <button onClick={handlePauseScheduler} className="btn-secondary">
               <Pause size={16} /> Pause Scheduler
             </button>
@@ -46,7 +52,7 @@ export default function CollectionsPage() {
               <Play size={16} /> Resume Scheduler
             </button>
           )}
-          <button onClick={async () => { setRefreshing(true); try { await refresh() } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+          <button onClick={async () => { setRefreshing(true); try { await refresh.all() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
           </button>
         </div>
@@ -80,11 +86,11 @@ export default function CollectionsPage() {
       <div className="card p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${schedulerStatus?.is_running ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+            <div className={`w-3 h-3 rounded-full ${scheduler?.is_running ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
             <div>
               <h3 className="font-semibold text-surface-900">Scheduler</h3>
               <p className="text-sm text-surface-500">
-                {schedulerStatus?.is_running ? `Running (check every ${schedulerStatus.interval_seconds}s)` : 'Stopped'}
+                {scheduler?.is_running ? `Running (check every ${scheduler?.interval_seconds}s)` : 'Stopped'}
               </p>
             </div>
           </div>
@@ -116,7 +122,7 @@ export default function CollectionsPage() {
           ) : logs.length === 0 ? (
             <div className="p-8 text-center text-surface-400">No collection logs yet</div>
           ) : (
-            logs.map((log: any) => (
+            logs.map((log: CollectionLog) => (
               <div key={log.id} className="px-5 py-4 flex items-center gap-4 hover:bg-surface-50">
                 {log.success ? (
                   <CheckCircle size={20} className="text-emerald-500 flex-shrink-0" />
@@ -142,7 +148,7 @@ export default function CollectionsPage() {
                   )}
                 </div>
                 <button
-                  onClick={async () => { await api.triggerCollection(log.competitor_id); refresh() }}
+                  onClick={async () => { try { await api.triggerCollection(log.competitor_id); refreshLogs() } catch { /* errors shown by usePolling */ } }}
                   className="btn-secondary btn-sm"
                 >
                   <RefreshCw size={12} /> Retry

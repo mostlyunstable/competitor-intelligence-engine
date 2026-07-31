@@ -1,6 +1,5 @@
 import hmac
 import logging
-import os
 import secrets
 
 from fastapi import Depends, HTTPException, Security, status
@@ -25,12 +24,14 @@ async def verify_any_auth(
         return "api-key"
 
     # 2. Try Basic Auth (for dashboard browser clients)
-    if credentials:
+    admin_user = settings.admin_user
+    admin_password = settings.admin_password
+    if credentials and admin_user and admin_password:
         correct_username = secrets.compare_digest(
-            credentials.username, os.getenv("ADMIN_USER", "admin")
+            credentials.username, admin_user
         )
         correct_password = secrets.compare_digest(
-            credentials.password, os.getenv("ADMIN_PASSWORD", "admin123")
+            credentials.password, admin_password
         )
         if correct_username and correct_password:
             return "basic-auth"

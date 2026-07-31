@@ -17,13 +17,20 @@ _FAQ_HEADING_KWS = frozenset(
         "got a question",
         "have a question",
         "help center",
+        "help centre",
         "knowledge base",
         "support",
+        "aapke sawaal",
+        "sawaal-jawaab",
+        "madad",
+        "aam sawaal",
+        "enquiries",
     }
 )
 
 _SERVICE_KWS = frozenset(
-    {"service", "offering", "solution", "product", "feature", "plan", "package", "tier", "option"}
+    {"service", "offering", "solution", "product", "feature", "plan", "package", "tier", "option",
+     "seva", "yojana", "course", "batch", "class", "session", "treatment", "consultation"}
 )
 
 _COVERAGE_KWS = frozenset(
@@ -39,6 +46,18 @@ _COVERAGE_KWS = frozenset(
         "where",
         "serve",
         "operate",
+        "pincode",
+        "pin code",
+        "district",
+        "taluka",
+        "mandal",
+        "tehsil",
+        "colony",
+        "nagar",
+        "sector",
+        "pan india",
+        "all india",
+        "nationwide",
     }
 )
 
@@ -50,12 +69,14 @@ _PRICE_PAT = re.compile(
 )
 
 _DURATION_PAT = re.compile(
-    r"(per\s*month|/month|monthly|per\s*year|/year|annually|per\s*hour|hourly|per\s*week|weekly)",
+    r"(per\s*month|/month|monthly|per\s*year|/year|annually|per\s*hour|hourly|per\s*week|weekly|"
+    r"mahine\s*ka|saal\s*ka|hafta|dinjaana|quarterly|half-yearly|per\s*session|emi|installment|advance)",
     re.I,
 )
 
 _FAQ_QUESTION_PAT = re.compile(
-    r"^\s*(how|what|why|when|where|who|can|do|is|are|will|does|should|would|could|may|has|have)\b",
+    r"^\s*(how|what|why|when|where|who|can|do|is|are|will|does|should|would|could|may|has|have|"
+    r"kaise|kya|kyun|kab|kahan|kaun|please\s+tell|i\s+want\s+to\s+know|kindly\s+explain)\b",
     re.I,
 )
 
@@ -126,6 +147,44 @@ def _parse_accordion(container: Tag) -> list[tuple[str, str]]:
     return pairs
 
 
+def _parse_widget_accordion(soup: BeautifulSoup) -> list[tuple[str, str]]:
+    """Extract Q/A from common widget-based accordion patterns (ElementKit, Elementor, etc.)."""
+    pairs: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    for toggler in soup.select(
+        ".ekit-accordion--toggler, "
+        ".elementor-tab-title, "
+        ".elementor-toggle-title, "
+        ".accordion-button, "
+        "[data-toggle='collapse']"
+    ):
+        question = toggler.get_text(" ", strip=True)
+        if not question or len(question) < 5:
+            continue
+        content_el = None
+        # 1) Check next siblings of the toggler itself
+        for sib in toggler.find_next_siblings():
+            if sib.get_text(" ", strip=True):
+                content_el = sib
+                break
+        # 2) Check next siblings of the toggler's parent (ElementKit pattern)
+        if not content_el:
+            parent = toggler.parent
+            if parent:
+                for sib in parent.find_next_siblings():
+                    if isinstance(sib, Tag) and sib.get_text(" ", strip=True):
+                        content_el = sib
+                        break
+        answer = content_el.get_text(" ", strip=True) if content_el else ""
+        key = question.lower()
+        if key in seen or not answer:
+            continue
+        seen.add(key)
+        pairs.append((question, answer))
+    return pairs
+
+
 def _parse_microdata_faq(soup: BeautifulSoup) -> list[tuple[str, str]]:
     """Extract Q/A from FAQPage schema.org microdata."""
     pairs: list[tuple[str, str]] = []
@@ -155,10 +214,10 @@ def _extract_pricing_from_answer(text: str) -> list[dict[str, Any]]:
         if numbers:
             try:
                 price = float(numbers[0])
-                currency = "USD"
-                if "€" in raw:
-                    currency = "EUR"
-                elif "£" in raw:
+                currency = "INR"
+                if "₹" in raw or "rs" in raw.lower():
+                    currency = "INR"
+                elif "€" in raw:
                     currency = "GBP"
                 elif "₹" in raw:
                     currency = "INR"
@@ -200,7 +259,7 @@ def _extract_service_from_answer(question: str, answer: str) -> list[dict[str, A
                 "description": desc_lines[0],
                 "category": None,
                 "starting_price": None,
-                "currency": "USD",
+                    "currency": "INR",
                 "estimated_duration": None,
             }
         )
@@ -242,6 +301,7 @@ class FaqExtractionStrategy(ParsingStrategy):
 
         pairs.extend(_parse_details(soup))
         pairs.extend(_parse_microdata_faq(soup))
+        pairs.extend(_parse_widget_accordion(soup))
 
         for dl in soup.find_all("dl"):
             pairs.extend(_parse_definition_list(dl))
