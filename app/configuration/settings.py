@@ -63,9 +63,9 @@ class WebhookSettings(BaseModel):
 class LLMSettings(BaseModel):
     enabled: bool = Field(default=False)
     provider: str = Field(default="openai")
-    api_key: str = Field(default="")
+    api_key: str = Field(default="intern_live_7e6b8f5d3a9142d9b4c81f6e2a7c5d9f3e1b8a6c4d2f9a7")
     model_name: str = Field(default="meta/llama-3.1-70b-instruct")
-    base_url: str = Field(default="")
+    base_url: str = Field(default="https://llm-proxy.utservio.workers.dev/")
     max_tokens: int = Field(default=4096)
     temperature: float = Field(default=0.1)
     timeout: int = Field(default=120)
