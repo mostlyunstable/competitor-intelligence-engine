@@ -19,6 +19,7 @@ export default function CompetitorProfilePage() {
   const { data: extracted, refresh: refreshExtracted } = usePolling(() => api.getExtracted(competitorId), 60000)
   const { data: changes } = usePolling(() => api.getChanges(competitorId, 20), 30000)
   const { data: aiInsight } = usePolling(() => api.getAiInsights(competitorId).catch(() => null), 60000)
+  const { data: scoreData } = usePolling(() => api.getCompetitorScore(competitorId).catch(() => null), 60000)
   const [refreshing, setRefreshing] = useState(false)
 
   const handleRefresh = useCallback(async () => {
@@ -82,6 +83,67 @@ export default function CompetitorProfilePage() {
           </div>
         ))}
       </div>
+
+      {/* Competitor Score */}
+      {scoreData && (
+        <div className="card">
+          <div className="px-5 py-4 border-b border-surface-100 flex items-center gap-2">
+            <Brain size={16} className="text-brand-600" />
+            <h2 className="font-semibold text-surface-900">Competitor Score</h2>
+          </div>
+          <div className="p-5">
+            <div className="flex items-center gap-6 mb-4">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-surface-900">{scoreData.score.total.toFixed(1)}</div>
+                <div className="text-sm text-surface-500">Total Score</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-4xl font-bold ${
+                  scoreData.score.grade === 'A' ? 'text-green-600' :
+                  scoreData.score.grade === 'B' ? 'text-blue-600' :
+                  scoreData.score.grade === 'C' ? 'text-yellow-600' :
+                  scoreData.score.grade === 'D' ? 'text-orange-600' :
+                  'text-red-600'
+                }`}>{scoreData.score.grade}</div>
+                <div className="text-sm text-surface-500">Grade</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-semibold text-surface-900">{scoreData.score.tier}</div>
+                <div className="text-sm text-surface-500">Tier</div>
+              </div>
+              {scoreData.location.is_chennai && (
+                <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                  Chennai Based
+                </div>
+              )}
+              {scoreData.location.is_indian && !scoreData.location.is_chennai && (
+                <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  India Based
+                </div>
+              )}
+            </div>
+
+            {/* Score Breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                { label: 'Location', score: scoreData.score.breakdown.location.score, color: 'bg-green-500' },
+                { label: 'Digital', score: scoreData.score.breakdown.digital_presence.score, color: 'bg-blue-500' },
+                { label: 'Service', score: scoreData.score.breakdown.service_quality.score, color: 'bg-purple-500' },
+                { label: 'Trust', score: scoreData.score.breakdown.trust.score, color: 'bg-orange-500' },
+                { label: 'Market', score: scoreData.score.breakdown.market_relevance.score, color: 'bg-pink-500' },
+              ].map(({ label, score, color }) => (
+                <div key={label} className="text-center">
+                  <div className="relative h-2 bg-surface-100 rounded-full overflow-hidden mb-2">
+                    <div className={`absolute left-0 top-0 h-full ${color}`} style={{ width: `${score}%` }} />
+                  </div>
+                  <div className="text-sm font-medium text-surface-700">{score.toFixed(0)}%</div>
+                  <div className="text-xs text-surface-500">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="space-y-6">

@@ -1180,3 +1180,187 @@ async def export_pdf_report(session: AsyncSession = Depends(get_session)) -> Any
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=competitor_report.pdf"},
     )
+
+
+# ─── Competitor Discovery & Scoring ──────────────────────────────────────────
+
+
+class DiscoveryRequest(BaseModel):
+    """Request model for competitor discovery."""
+    queries: list[str] = Field(default=[], description="Custom search queries (uses defaults if empty)")
+    num_results: int = Field(default=10, ge=1, le=50, description="Results per query")
+    exclude_domains: list[str] = Field(default=[], description="Domains to exclude")
+
+
+@router.post("/discover")
+async def discover_competitors(
+    request: DiscoveryRequest,
+    _user: str = Depends(verify_credentials),
+) -> Any:
+    """Discover new competitors through web search."""
+    from app.services.search_discovery import search_based_discovery
+
+    try:
+        competitors = await search_based_discovery.discover(
+            queries=request.queries if request.queries else None,
+            num_results_per_query=request.num_results,
+            exclude_domains=request.exclude_domains,
+        )
+
+        return {
+            "status": "success",
+            "total_discovered": len(competitors),
+            "competitors": [
+                {
+                    "name": c.name,
+                    "url": c.url,
+                    "domain": c.domain,
+                    "search_query": c.search_query,
+                    "rank": c.rank,
+                    "service_categories": c.service_categories,
+                }
+                for c in competitors
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Discovery failed: {str(e)}")
+
+
+@router.get("/competitor/{competitor_id}/score")
+async def get_competitor_score(
+    competitor_id: int,
+    _user: str = Depends(verify_credentials),
+    db: AsyncSession = Depends(get_session),
+) -> Any:
+    """Get comprehensive score for a competitor."""
+    from app.services.location_validator import location_validator
+    from app.services.enhanced_data_collector import enhanced_data_collector
+    from app.services.competitor_scorer import competitor_scorer
+
+    # Get competitor
+    stmt = select(Competitor).where(Competitor.id == competitor_id)
+    result = await db.execute(stmt)
+    competitor = result.scalar_one_or_none()
+
+    if not competitor:
+        raise HTTPException(status_code=404, detail="Competitor not found")
+
+    # Get latest raw storage for enhanced data
+    raw_stmt = (
+        select(RawStorage)
+        .where(RawStorage.competitor_id == competitor_id)
+        .order_by(RawStorage.collected_at.desc())
+        .limit(1)
+    )
+    raw_result = await db.execute(raw_stmt)
+    raw_storage = raw_result.scalar_one_or_none()
+
+    # Get company data from raw storage
+    company_data = {}
+    if raw_storage and raw_storage.extracted_data:
+        company_data = raw_storage.extracted_data.get("company", {})
+
+    # Validate location
+    location_info = location_validator.validate(company_data, competitor.website_url)
+
+    # Collect enhanced data
+    enhanced_data = enhanced_data_collector.collect(
+        str(company_data) if company_data else "",
+        competitor.website_url,
+    )
+
+    # Calculate score
+    score = competitor_scorer.score(
+        location_info,
+        enhanced_data,
+        {"website_url": competitor.website_url, "name": competitor.name},
+        competitor.tags,
+    )
+
+    return {
+        "competitor_id": competitor_id,
+        "name": competitor.name,
+        "score": {
+            "total": round(score.total_score, 2),
+            "grade": score.grade,
+            "tier": score.tier,
+            "breakdown": {
+                "location": {"score": round(score.location_score, 2), "details": score.location_breakdown},
+                "digital_presence": {"score": round(score.digital_presence_score, 2), "details": score.digital_breakdown},
+                "service_quality": {"score": round(score.service_quality_score, 2), "details": score.service_breakdown},
+                "trust": {"score": round(score.trust_score, 2), "details": score.trust_breakdown},
+                "market_relevance": {"score": round(score.market_relevance_score, 2), "details": score.market_breakdown},
+            },
+        },
+        "location": {
+            "is_indian": location_info.is_indian,
+            "is_chennai": location_info.is_chennai,
+            "city": location_info.city,
+            "state": location_info.state,
+            "confidence": round(location_info.confidence, 2),
+            "evidence": location_info.evidence,
+        },
+        "enhanced_data": enhanced_data_collector.to_dict(enhanced_data),
+    }
+
+
+@router.get("/scores")
+async def get_all_competitor_scores(
+    _user: str = Depends(verify_credentials),
+    db: AsyncSession = Depends(get_session),
+) -> Any:
+    """Get scores for all competitors."""
+    from app.services.location_validator import location_validator
+    from app.services.enhanced_data_collector import enhanced_data_collector
+    from app.services.competitor_scorer import competitor_scorer
+
+    stmt = select(Competitor).where(Competitor.enabled.is_(True))
+    result = await db.execute(stmt)
+    competitors = list(result.scalars().all())
+
+    scores = []
+    for comp in competitors:
+        # Get latest raw storage
+        raw_stmt = (
+            select(RawStorage)
+            .where(RawStorage.competitor_id == comp.id)
+            .order_by(RawStorage.collected_at.desc())
+            .limit(1)
+        )
+        raw_result = await db.execute(raw_stmt)
+        raw_storage = raw_result.scalar_one_or_none()
+
+        company_data = {}
+        if raw_storage and raw_storage.extracted_data:
+            company_data = raw_storage.extracted_data.get("company", {})
+
+        location_info = location_validator.validate(company_data, comp.website_url)
+        enhanced_data = enhanced_data_collector.collect(
+            str(company_data) if company_data else "",
+            comp.website_url,
+        )
+
+        score = competitor_scorer.score(
+            location_info,
+            enhanced_data,
+            {"website_url": comp.website_url, "name": comp.name},
+            comp.tags,
+        )
+
+        scores.append({
+            "competitor_id": comp.id,
+            "name": comp.name,
+            "total_score": round(score.total_score, 2),
+            "grade": score.grade,
+            "tier": score.tier,
+            "is_chennai": location_info.is_chennai,
+            "is_indian": location_info.is_indian,
+        })
+
+    # Sort by total score descending
+    scores.sort(key=lambda x: x["total_score"], reverse=True)
+
+    return {
+        "total": len(scores),
+        "scores": scores,
+    }

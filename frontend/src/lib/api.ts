@@ -283,6 +283,23 @@ class ApiClient {
   async getMetricsJson() {
     return this.request<any>('/metrics/json')
   }
+
+  // Competitor Scoring
+  async getCompetitorScore(competitorId: number) {
+    return this.request<any>(`/competitor/${competitorId}/score`)
+  }
+
+  async getAllScores() {
+    return this.request<any>('/scores')
+  }
+
+  // Competitor Discovery
+  async discoverCompetitors(queries?: string[], numResults?: number) {
+    return this.request<any>('/discover', {
+      method: 'POST',
+      body: JSON.stringify({ queries: queries || [], num_results: numResults || 10 }),
+    })
+  }
 }
 
 export const api = new ApiClient()
