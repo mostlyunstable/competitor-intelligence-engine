@@ -1,11 +1,11 @@
-"""OpenAI-compatible LLM provider implementation."""
+"""Utservio LLM proxy provider using Responses API format."""
 
 import json
 import time
 from typing import Any
 
+import httpx
 import structlog
-from openai import AsyncOpenAI
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -23,19 +23,20 @@ logger = structlog.get_logger("ai.provider")
 
 class OpenAIProvider(LLMProvider):
     """
-    LLM Provider wrapping AsyncOpenAI.
-    Works with OpenAI, NVIDIA NIM, and any OpenAI-compatible endpoint.
+    LLM Provider for Utservio proxy using OpenAI Responses API format.
     """
 
     def __init__(self) -> None:
         self._settings = get_settings().llm
         if not self._settings.api_key:
             raise ProviderError("LLM API key not configured", provider="openai")
-        self._client = AsyncOpenAI(
-            api_key=self._settings.api_key,
-            base_url=self._settings.base_url if self._settings.base_url else None,
-            timeout=self._settings.timeout,
-            max_retries=0,  # We handle retries via tenacity
+        self._client = httpx.AsyncClient(
+            base_url=self._settings.base_url.rstrip("/"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._settings.api_key}",
+            },
+            timeout=httpx.Timeout(self._settings.timeout),
         )
 
     @property
@@ -56,83 +57,113 @@ class OpenAIProvider(LLMProvider):
         """Call the LLM with JSON mode and return structured output."""
         start = time.monotonic()
         try:
-            response = await self._client.chat.completions.create(
-                model=self._settings.model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a specialized business intelligence analyst. "
-                            "You MUST output your analysis as valid JSON matching the schema provided. "
-                            "No markdown, no explanation, no code fences — only raw JSON."
-                        ),
-                    },
-                    {"role": "user", "content": f"Schema:\n{json.dumps(schema, indent=2)}\n\nData:\n{prompt}"},
-                ],
-                response_format={"type": "json_object"},
-                temperature=self._settings.temperature,
-                max_tokens=self._settings.max_tokens,
+            system_prompt = (
+                "You are a specialized business intelligence analyst. "
+                "You MUST output your analysis as valid JSON matching the schema provided. "
+                "No markdown, no explanation, no code fences — only raw JSON."
+            )
+            user_message = f"Schema:\n{json.dumps(schema, indent=2)}\n\nData:\n{prompt}"
+
+            response = await self._client.post(
+                "/v1/responses",
+                json={
+                    "model": self._settings.model_name,
+                    "input": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message},
+                    ],
+                    "text": {"format": {"type": "json_object"}},
+                    "temperature": self._settings.temperature,
+                    "max_output_tokens": self._settings.max_tokens,
+                },
             )
             elapsed_ms = (time.monotonic() - start) * 1000
 
-            content = response.choices[0].message.content
+            if response.status_code != 200:
+                error_msg = f"LLM API error: {response.status_code} - {response.text[:200]}"
+                logger.error("llm_call_failed", error=error_msg, elapsed_ms=round(elapsed_ms))
+                raise ProviderError(error_msg, provider=self.provider_name)
+
+            data = response.json()
+
+            # Extract text from Responses API format
+            content = ""
+            for output_item in data.get("output", []):
+                if output_item.get("type") == "message":
+                    for content_item in output_item.get("content", []):
+                        if content_item.get("type") == "output_text":
+                            content = content_item.get("text", "")
+                            break
+
             if not content:
                 raise ProviderError("LLM returned empty response", provider=self.provider_name)
 
             result = json.loads(content)
 
             # Attach token usage for cost tracking
-            if response.usage:
+            usage = data.get("usage", {})
+            if usage:
                 result["_token_usage"] = {
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens,
+                    "prompt_tokens": usage.get("input_tokens", 0),
+                    "completion_tokens": usage.get("output_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
                 }
                 logger.info(
                     "llm_call_complete",
                     provider=self.provider_name,
                     model=self._settings.model_name,
-                    prompt_tokens=response.usage.prompt_tokens,
-                    completion_tokens=response.usage.completion_tokens,
+                    prompt_tokens=usage.get("input_tokens", 0),
+                    completion_tokens=usage.get("output_tokens", 0),
                     elapsed_ms=round(elapsed_ms),
                 )
 
             return result
 
         except json.JSONDecodeError as e:
-            raise ProviderError(
-                f"LLM returned invalid JSON: {e}",
-                provider=self.provider_name,
-            ) from e
-        except ProviderError:
-            raise
-        except Exception as e:
-            elapsed_ms = (time.monotonic() - start) * 1000
-            logger.error("llm_call_failed", provider=self.provider_name, error=str(e), elapsed_ms=round(elapsed_ms))
-            raise ProviderError(
-                f"LLM call failed: {e}",
-                provider=self.provider_name,
-                status_code=getattr(e, "status_code", 0),
-            ) from e
+            logger.error("llm_json_parse_failed", error=str(e))
+            raise ProviderError(f"Failed to parse LLM response as JSON: {e}", provider=self.provider_name)
+        except httpx.HTTPError as e:
+            logger.error("llm_http_error", error=str(e))
+            raise ProviderError(f"HTTP error calling LLM: {e}", provider=self.provider_name)
 
     async def health(self) -> ProviderHealth:
-        """Check provider connectivity with a minimal request."""
+        """Quick health check with a simple prompt."""
         start = time.monotonic()
         try:
-            response = await self._client.models.list()
-            elapsed_ms = (time.monotonic() - start) * 1000
-            return ProviderHealth(
-                healthy=True,
-                provider=self.provider_name,
-                model=self._settings.model_name,
-                latency_ms=round(elapsed_ms),
+            response = await self._client.post(
+                "/v1/responses",
+                json={
+                    "model": self._settings.model_name,
+                    "input": "Reply with exactly: OK",
+                    "max_output_tokens": 5,
+                },
             )
-        except Exception as e:
-            elapsed_ms = (time.monotonic() - start) * 1000
+            latency_ms = (time.monotonic() - start) * 1000
+
+            if response.status_code == 200:
+                return ProviderHealth(
+                    healthy=True,
+                    provider=self.provider_name,
+                    model=self._settings.model_name,
+                    latency_ms=latency_ms,
+                )
             return ProviderHealth(
                 healthy=False,
                 provider=self.provider_name,
                 model=self._settings.model_name,
-                latency_ms=round(elapsed_ms),
+                latency_ms=latency_ms,
+                error=f"HTTP {response.status_code}",
+            )
+        except Exception as e:
+            latency_ms = (time.monotonic() - start) * 1000
+            return ProviderHealth(
+                healthy=False,
+                provider=self.provider_name,
+                model=self._settings.model_name,
+                latency_ms=latency_ms,
                 error=str(e),
             )
+
+    async def close(self) -> None:
+        """Close the HTTP client."""
+        await self._client.aclose()
