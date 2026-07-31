@@ -2,11 +2,19 @@
 
 ## Overview
 
-The Competitor Intelligence Engine is a high-performance, asynchronous data collection and analysis platform. It autonomously monitors competitor web properties, extracts structured data utilizing heuristic parsing and machine learning, and stores the resulting entities in a relational database for intelligence reporting. 
+The Competitor Intelligence Engine is a high-performance, asynchronous data collection and analysis platform focused on the **Indian home services market**, with priority given to **Chennai-based companies**. It autonomously monitors competitor web properties, extracts structured data utilizing heuristic parsing and machine learning, and stores the resulting entities in a relational database for intelligence reporting.
 
-Designed for scalability and reliability, it solves the brittleness of traditional web scraping by avoiding hardcoded CSS selectors in favor of generalized DOM analysis, entity resolution, and AI-driven insight generation. 
+Designed for scalability and reliability, it solves the brittleness of traditional web scraping by avoiding hardcoded CSS selectors in favor of generalized DOM analysis, entity resolution, and AI-driven insight generation.
 
 Targeted at enterprise data teams, business analysts, and competitive intelligence units, the platform provides a complete end-to-end pipeline from HTML ingestion to a professional React-based reporting dashboard.
+
+### Market Focus
+
+- **Primary Market**: India (Chennai focus)
+- **Competitor Tiers**:
+  - **Tier 1**: Urban Company, HomeFix Smart Services, Servi (market leaders)
+  - **Tier 2**: Vijay Home Services, Sparkle Cleaning Services, Chennai Home Service, CallSevai (regional)
+  - **Tier 3**: NoBroker, Justdial, Sulekha, IndiaMART (marketplaces)
 
 ---
 

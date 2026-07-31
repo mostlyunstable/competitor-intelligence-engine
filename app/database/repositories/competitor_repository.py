@@ -27,6 +27,11 @@ class CompetitorRepository(BaseRepository[Competitor]):
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_all(self) -> list[Competitor]:
+        stmt = select(Competitor)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
     async def exists(self, competitor_id: int) -> bool:
         stmt = select(Competitor.id).where(Competitor.id == competitor_id).limit(1)
         result = await self._session.execute(stmt)

@@ -1,40 +1,103 @@
 {
   "competitors": [
     {
-      "name": "American Home Shield",
-      "website_url": "https://www.ahs.com",
+      "name": "Urban Company",
+      "website_url": "https://www.urbancompany.com",
       "enabled": true,
       "collection_frequency": "daily",
       "modules": ["discovery", "company", "services", "pricing", "content", "social"],
-      "tags": ["home-warranty", "major-player"],
-      "notes": "Largest home warranty company in the US"
+      "tags": ["india", "chennai", "market-leader", "home-services", "tier-1"],
+      "notes": "Largest home services platform in India. Offers cleaning, plumbing, electrical, appliance repair, beauty, pest control. Strong Chennai presence. IPO in 2025 valued at $3B."
     },
     {
-      "name": "First American Home Warranty",
-      "website_url": "https://homewarranty.firstam.com",
+      "name": "HomeFix Smart Services",
+      "website_url": "https://www.homefix.co.in",
       "enabled": true,
       "collection_frequency": "daily",
       "modules": ["discovery", "company", "services", "pricing", "content", "social"],
-      "tags": ["home-warranty", "first-american"],
-      "notes": "Subsidiary of First American Financial"
+      "tags": ["india", "chennai", "regional", "home-services", "tier-1"],
+      "notes": "Tamil Nadu-focused platform with verified technicians, transparent pricing. Chennai interiors brand with 4.9 rating. Modular furniture store."
     },
     {
-      "name": "Cinch Home Services",
-      "website_url": "https://www.cinchhomeservices.com",
+      "name": "Servi",
+      "website_url": "https://servi.in",
       "enabled": true,
       "collection_frequency": "daily",
       "modules": ["discovery", "company", "services", "pricing", "content", "social"],
-      "tags": ["home-warranty", "cinch"],
-      "notes": "Home warranty and home services company"
+      "tags": ["india", "chennai", "regional", "home-services", "tier-1"],
+      "notes": "Chennai-focused platform providing home cleaning, plumbing, electrical, appliance repair, and 24/7 booking."
     },
     {
-      "name": "Choice Home Warranty",
-      "website_url": "https://www.choicehomewarranty.com",
+      "name": "Vijay Home Services",
+      "website_url": "https://www.vijayhomeservices.com",
       "enabled": true,
       "collection_frequency": "daily",
       "modules": ["discovery", "company", "services", "pricing", "content", "social"],
-      "tags": ["home-warranty", "choice"],
-      "notes": "Replaced previous competitor oxhomeservices.com"
+      "tags": ["india", "chennai", "regional", "home-services", "tier-2"],
+      "notes": "Home, kitchen, bathroom, office cleaning. Pan-India with strong Chennai presence. 3000+ trained professionals, 5M+ customers."
+    },
+    {
+      "name": "Sparkle Cleaning Services",
+      "website_url": "https://sparklecleanings.in",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["india", "chennai", "local", "cleaning", "tier-2"],
+      "notes": "Chennai-based residential deep cleaning. Strong local cleaning brand."
+    },
+    {
+      "name": "NoBroker Home Services",
+      "website_url": "https://www.nobroker.in/home-services",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["india", "chennai", "marketplace", "home-services", "tier-3"],
+      "notes": "India's #1 real estate platform with home services. Painting, cleaning, electrician, plumbing, carpentry. Chennai operational."
+    },
+    {
+      "name": "Justdial",
+      "website_url": "https://www.justdial.com",
+      "enabled": true,
+      "collection_frequency": "weekly",
+      "modules": ["discovery", "company", "services", "content"],
+      "tags": ["india", "marketplace", "directory", "tier-3"],
+      "notes": "Local search engine aggregating service providers. Influences customer discovery and pricing."
+    },
+    {
+      "name": "Sulekha",
+      "website_url": "https://www.sulekha.com",
+      "enabled": true,
+      "collection_frequency": "weekly",
+      "modules": ["discovery", "company", "services", "content"],
+      "tags": ["india", "marketplace", "directory", "tier-3"],
+      "notes": "Service marketplace aggregating local providers. Strong in Chennai for home services."
+    },
+    {
+      "name": "IndiaMART",
+      "website_url": "https://www.indiamart.com",
+      "enabled": true,
+      "collection_frequency": "weekly",
+      "modules": ["discovery", "company", "services", "content"],
+      "tags": ["india", "marketplace", "commercial", "tier-3"],
+      "notes": "B2B marketplace for commercial services. Relevant for commercial cleaning and facility management."
+    },
+    {
+      "name": "Chennai Home Service",
+      "website_url": "https://www.chennaihomeservice.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["india", "chennai", "local", "home-services", "tier-2"],
+      "notes": "Chennai's No.1 service company. Multiple home service categories."
+    },
+    {
+      "name": "CallSevai",
+      "website_url": "https://callsevai.com/chennai/",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "pricing", "content"],
+      "tags": ["india", "chennai", "local", "home-services", "tier-2"],
+      "notes": "Chennai home services by verified electricians, plumbers, AC repair, carpenters, CCTV. 60+ services. WhatsApp booking."
     }
   ]
 }

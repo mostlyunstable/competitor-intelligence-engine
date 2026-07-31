@@ -29,11 +29,22 @@ class ConfigSyncService:
 
         synced = 0
         skipped = 0
+        disabled = 0
+        config_names = {c.name for c in configs}
 
         try:
             async with db_manager.session() as session:
                 comp_repo = CompetitorRepository(session)
 
+                # Disable competitors not in config
+                all_competitors = await comp_repo.get_all()
+                for comp in all_competitors:
+                    if comp.name not in config_names and comp.enabled:
+                        await comp_repo.update(comp.id, enabled=False)
+                        disabled += 1
+                        logger.info("competitor_disabled_not_in_config", name=comp.name)
+
+                # Upsert competitors from config
                 for config in configs:
                     existing = await comp_repo.get_by_name(config.name)
                     if existing:
@@ -65,6 +76,7 @@ class ConfigSyncService:
                 return {
                     "status": "success",
                     "synced": synced,
+                    "disabled": disabled,
                     "skipped": skipped,
                     "total": len(configs),
                 }
