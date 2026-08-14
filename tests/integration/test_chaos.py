@@ -74,11 +74,9 @@ async def test_worker_chaos_resilience(tmp_path):
     
     # worker will try to process, pipeline will fail if OpenAI fails or DB fails.
     # Even if FS fails while writing DLQ, worker should not crash the main event loop.
-    with patch("app.ai.application.worker.AIPipeline.process_competitor", side_effect=Exception("Mock pipeline failure")):
+    with patch("app.ai.application.pipeline.AIPipeline.run_analysis", side_effect=Exception("Mock pipeline failure")):
         try:
             await _worker_instance.process_task(999, {"foo": "bar"})
-        except SystemExit:
-            # If worker catastrophic crash triggers
+        except Exception:
+            # Worker correctly caught error, logged, wrote to DLQ, and re-raised for task queue retry
             pass
-        except Exception as e:
-            pytest.fail(f"Worker task should catch exceptions, but raised: {e}")

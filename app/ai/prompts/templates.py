@@ -5,49 +5,43 @@ PROMPT_TEMPLATES = {
         "id": "competitor_analysis",
         "version": "3.0.0",
         "purpose": "Comprehensive competitor intelligence analysis",
-        "required_variables": ["competitor_name", "competitor_url", "services", "pricing", "content", "social", "extracted_data", "data_summary"],
-        "template": """You are a senior business intelligence analyst specializing in home warranty and home services companies.
+        "required_variables": [
+            "competitor_name",
+            "competitor_url",
+            "pricing",
+        ],
+        "template": """You are a senior commercial intelligence analyst & pricing strategist evaluating competitor pricing data against Utservio's internal service catalog.
 
-Analyze the following competitor data and produce a structured intelligence report.
+Do NOT produce generic marketing boilerplate or generic website summaries. Your task is to analyze the actual database records, database price logs, and ML predictions provided below to produce a DB-grounded executive report from a commercial business POV.
 
 ## Competitor: {{competitor_name}}
 ## Website: {{competitor_url}}
-## Data Quality: {{data_summary}}
-
-## Services Offered
-{{services}}
-
-## Pricing Data
-{{pricing}}
-
-## Content & Marketing
-{{content}}
-
-## Social Media Presence
-{{social}}
-
-## Extracted Website Data
-{{extracted_data}}
+## Services: {{services}}
+## Scraped Pricing Records: {{pricing}}
+## DB Price Records Analyzed: {{db_price_observations_count}}
+## DB ML Predictions vs Utservio Catalog Baseline: {{db_ml_predictions_vs_utservio}}
+## Data Summary: {{data_summary}}
 
 ---
 
-Based on this data, produce a JSON object with these exact fields:
+Based strictly on this database evidence, produce a JSON object with these exact fields:
 
-{{
-  "summary": "A 2-3 sentence executive summary of this competitor's positioning and strategy",
-  "key_differentiators": ["List 3-5 things that make this competitor unique or strong"],
-  "market_position": "One paragraph describing where they sit in the market relative to competitors",
-  "confidence_score": 0.75,
-  "pricing_analysis": {{
-    "overview": "Summary of their pricing strategy",
-    "price_range": "Typical price range observed",
-    "positioning": "budget/mid-range/premium"
-  }},
-  "feature_gaps": ["List 2-4 areas where this competitor is weak or missing features"],
-  "strategic_moves": ["List 2-3 recent strategic initiatives or changes you can infer"],
-  "recommendations": ["List 3-5 actionable recommendations for competing against them"],
-  "latest_updates": ["List 2-3 notable recent changes on their website or offerings"]
-}}
+{
+  "summary": "A 2-3 sentence executive summary quantifying exact database observations count, price ranges, and predicted price gap percentage vs Utservio baseline from a commercial business POV.",
+  "key_differentiators": ["List 3-5 specific DB-backed pricing or operational differentiators (e.g. 'Maintains a +14.0% (+₹126) price premium over Utservio catalog baseline across 1,248 DB observations')"],
+  "market_position": "One paragraph analyzing their pricing power and competitive margin relative to Utservio's catalog pricing baseline.",
+  "confidence_score": 0.87,
+  "pricing_analysis": {
+    "db_observations_analyzed": "{{db_price_observations_count}} DB records",
+    "utservio_catalog_gap": "Quantified percentage price spread vs Utservio baseline",
+    "price_range_observed": "Exact min and max prices recorded in database",
+    "positioning_tier": "budget / value / premium relative to Utservio"
+  },
+  "feature_gaps": ["List 2-4 specific service or pricing gaps identified in database observations"],
+  "strategic_moves": ["List 2-3 inferred pricing or promotional moves based on DB price trajectory logs"],
+  "recommendations": ["List 3-5 actionable commercial recommendations for Utservio pricing strategy (e.g. 'Maintain Utservio AC General Service at ₹599 to preserve 14.0% cost advantage over Urban Company ₹649 baseline')"],
+  "latest_updates": ["List 2-3 recent DB price changes or new catalog entries recorded"]
+}
 
 CONFIDENCE SCORE CALIBRATION (CRITICAL):
 The confidence_score MUST reflect how much data you actually have. Use these guidelines:

@@ -1,3 +1,4 @@
+"""Specific Competitor-vs-Competitor Comparison Service."""
 
 from typing import Any
 
@@ -5,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import (
-"""Specific Competitor-vs-Competitor Comparison Service."""
     Competitor,
     CompetitorAIInsight,
     CompetitorPricing,
@@ -96,7 +96,7 @@ class ComparisonService:
             select(CompetitorPricing).where(CompetitorPricing.competitor_id == competitor_id)
         )
         pricing = [
-            {"name": p.service_name, "price": p.base_price} for p in pricing_res.scalars().all()
+            {"service": p.service_name, "name": p.service_name, "price": p.base_price} for p in pricing_res.scalars().all()
         ]
 
         insight_res = await session.execute(

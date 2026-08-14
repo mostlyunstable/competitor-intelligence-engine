@@ -2,8 +2,8 @@ import re
 from typing import Any
 
 
-    """Normalize string for robust matching without fuzzy false positives."""
 def normalize_string(s: str) -> str:
+    """Normalize string for robust matching without fuzzy false positives."""
     if not s:
         return ""
     # Lowercase, replace non-alphanumeric (like hyphens, underscores, extra spaces) with a single space
@@ -64,13 +64,13 @@ def compare_pricing(
     # Build lookup tables for pricing
     map_a = {}
     for p in pricing_a:
-        norm = normalize_string(p.get("service", ""))
+        norm = normalize_string(p.get("service") or p.get("name") or "")
         if norm in shared_norm:
             map_a[norm] = p
 
     map_b = {}
     for p in pricing_b:
-        norm = normalize_string(p.get("service", ""))
+        norm = normalize_string(p.get("service") or p.get("name") or "")
         if norm in shared_norm:
             map_b[norm] = p
 
@@ -81,14 +81,19 @@ def compare_pricing(
         p_b = map_b.get(norm)
 
         # Determine the original service name using one of the available
-        service_name = p_a.get("service") if p_a else (p_b.get("service") if p_b else norm)
+        service_name = (p_a.get("service") or p_a.get("name")) if p_a else ((p_b.get("service") or p_b.get("name")) if p_b else norm)
+
+        price_a = (p_a.get("price") if p_a and p_a.get("price") is not None else (p_a.get("base_price") if p_a else None))
+        price_b = (p_b.get("price") if p_b and p_b.get("price") is not None else (p_b.get("base_price") if p_b else None))
+        curr_a = (p_a.get("currency") or "INR").strip().upper() if p_a else "INR"
+        curr_b = (p_b.get("currency") or "INR").strip().upper() if p_b else "INR"
 
         comp = {
             "service": service_name,
-            "price_a": p_a.get("price") if p_a else None,
-            "price_b": p_b.get("price") if p_b else None,
-            "currency_a": p_a.get("currency") if p_a else None,
-            "currency_b": p_b.get("currency") if p_b else None,
+            "price_a": price_a,
+            "price_b": price_b,
+            "currency_a": curr_a,
+            "currency_b": curr_b,
             "absolute_difference": None,
             "percentage_difference": None,
             "comparison_status": "comparable",

@@ -31,8 +31,16 @@ interface ChartPoint {
 }
 
 const METRIC_LABELS: Record<string, string> = {
-  services: 'Service Listings',
-  pricing: 'Pricing Entries',
+  base_price: 'Base Service Price (₹)',
+  min_price: 'Minimum / Tiered Entry Price (₹)',
+  max_price: 'Maximum Service Price (₹)',
+  promotional_discount: 'Promotional Discount (%)',
+  services: 'Active Service Listings Count',
+  add_on_pricing: 'Add-On Service Pricing (₹)',
+  quote_required: 'Quote-Required Commercial Listings',
+  surging_priority: 'Emergency Surge Surcharge (%)',
+  location_premium: 'Regional Price Tiering Variance (%)',
+  pricing: 'Catalog Pricing Entries',
   content: 'Content Items',
   changes: 'Changes Detected',
 }

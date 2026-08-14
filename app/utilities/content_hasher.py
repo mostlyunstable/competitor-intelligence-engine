@@ -61,7 +61,7 @@ def compute_service_hash(
     service_category: str | None = None,
     description: str | None = None,
     starting_price: float | None = None,
-    currency: str = "USD",
+    currency: str = "INR",
 ) -> str:
     """Compute content hash for a service listing."""
     return compute_content_hash(
@@ -78,7 +78,7 @@ def compute_pricing_hash(
     category: str | None = None,
     base_price: float | None = None,
     promotional_price: float | None = None,
-    currency: str = "USD",
+    currency: str = "INR",
 ) -> str:
     """Compute content hash for a pricing entry."""
     return compute_content_hash(

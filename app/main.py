@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import os
 import random
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -10,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.endpoints import ai, collection, competitors, dashboard, health, predictions, reports
-from app.api.endpoints import predictive, ml_intelligence
+from app.api.endpoints import predictive, ml_intelligence, pricing_intelligence
 from app.api.middleware import RateLimitMiddleware
 from app.configuration.settings import Settings, get_settings
 from app.database.connection import db_manager
@@ -26,9 +27,13 @@ _queue_worker_task: asyncio.Task[Any] | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    settings = get_settings()
+    if os.environ.get("TESTING") == "1" or getattr(settings, "environment", "") == "testing":
+        yield
+        return
+
     await db_manager.connect()
 
-    settings = get_settings()
     if settings.environment == "development" or settings.debug:
         await db_manager.create_tables()
 
@@ -210,6 +215,7 @@ All errors follow RFC 7807 Problem Details format:
 
     app.add_middleware(RateLimitMiddleware, requests_per_minute=300)
 
+    from app.api.endpoints import predictive_db
     app.include_router(health.router)
     app.include_router(competitors.router)
     app.include_router(collection.router)
@@ -219,7 +225,9 @@ All errors follow RFC 7807 Problem Details format:
     app.include_router(ai.router)
     app.include_router(predictions.router)
     app.include_router(predictive.router)
+    app.include_router(predictive_db.router)
     app.include_router(ml_intelligence.router)
+    app.include_router(pricing_intelligence.router)
 
     if settings.debug:
         from app.api.endpoints.debug import router as debug_router

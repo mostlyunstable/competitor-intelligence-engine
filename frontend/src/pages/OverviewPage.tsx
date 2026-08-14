@@ -5,41 +5,16 @@ import { api } from '../lib/api'
 import { formatDate, timeAgo } from '../lib/utils'
 import {
   Users, Activity, CheckCircle, XCircle, TrendingUp, Clock,
-  Database, Zap, RefreshCw, ExternalLink
+  Database, Zap, RefreshCw, ExternalLink, LayoutDashboard
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 import type { FeedItem } from '../types'
-
-function StatCard({ label, value, icon: Icon, color }: {
-  label: string; value: string | number; icon: LucideIcon; color: string
-}) {
-  return (
-    <div className="stat-card">
-      <div className="flex items-center justify-between">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-          <Icon size={20} className="text-white" />
-        </div>
-      </div>
-      <div className="text-2xl font-bold text-surface-900">{value}</div>
-      <div className="text-sm text-surface-500">{label}</div>
-    </div>
-  )
-}
-
-function StatusDot({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    healthy: 'bg-emerald-500', running: 'bg-emerald-500', connected: 'bg-emerald-500',
-    degraded: 'bg-amber-500', stopped: 'bg-red-500', unhealthy: 'bg-red-500',
-  }
-  return <span className={`inline-block w-2 h-2 rounded-full ${colors[status] || 'bg-surface-400'}`} />
-}
+import { PageHeader, MetricCard, StatusBadge, EmptyState, LoadingState } from '../components/ui'
 
 export default function OverviewPage() {
   const { stats, health, telemetry, loading, refresh } = useDashboard()
   const { data: feedPage, refresh: refetchFeed } = usePolling(() => api.getFeed(20, 0), 20000)
 
   const [refreshing, setRefreshing] = useState(false)
-
   const feed = feedPage?.items || []
 
   const handleRefresh = useCallback(async () => {
@@ -55,12 +30,12 @@ export default function OverviewPage() {
   if (loading.stats && !stats) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-surface-900">Dashboard Overview</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="card p-5"><div className="skeleton h-20 w-full" /></div>
-          ))}
-        </div>
+        <PageHeader
+          title="Dashboard Overview"
+          description="Real-time monitoring and competitive intelligence metrics."
+          icon={LayoutDashboard}
+        />
+        <LoadingState rows={8} />
       </div>
     )
   }
@@ -69,69 +44,71 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-surface-900">Dashboard Overview</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-surface-500">
-            <Clock size={14} />
-            Updated {timeAgo(new Date().toISOString())}
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-            Refresh
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard Overview"
+        description="Real-time database records, competitor tracking status, and telemetry."
+        icon={LayoutDashboard}
+        actions={
+          <>
+            <div className="flex items-center gap-2 text-xs text-surface-500 font-medium">
+              <Clock className="w-3.5 h-3.5" />
+              Updated {timeAgo(new Date().toISOString())}
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="btn-secondary"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </>
+        }
+      />
 
-      {/* KPI Cards */}
+      {/* KPI Cards Grid */}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity duration-200 ${refreshing ? 'opacity-60' : ''}`}>
-        <StatCard label="Total Competitors" value={s?.total_competitors || 0} icon={Users} color="bg-brand-600" />
-        <StatCard label="Active Competitors" value={s?.active_competitors || 0} icon={Users} color="bg-green-600" />
-        <StatCard label="Collections Running" value={s?.collections_running || 0} icon={Activity} color="bg-blue-600" />
-        <StatCard label="Success Rate" value={`${s?.success_rate || 0}%`} icon={TrendingUp} color="bg-emerald-600" />
-        <StatCard label="Successful Collections" value={s?.successful_collections || 0} icon={CheckCircle} color="bg-green-500" />
-        <StatCard label="Failed Collections" value={s?.failed_collections || 0} icon={XCircle} color="bg-red-500" />
-        <StatCard label="Services Extracted" value={s?.services_extracted || 0} icon={Zap} color="bg-purple-600" />
-        <StatCard label="URLs Discovered" value={s?.urls_discovered || 0} icon={Database} color="bg-orange-500" />
+        <MetricCard title="Total Competitors" value={s?.total_competitors || 0} icon={Users} color="text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/30" />
+        <MetricCard title="Active Competitors" value={s?.active_competitors || 0} icon={Users} color="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30" />
+        <MetricCard title="Collections Running" value={s?.collections_running || 0} icon={Activity} color="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30" />
+        <MetricCard title="Success Rate" value={`${s?.success_rate || 0}%`} icon={TrendingUp} color="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30" />
+        <MetricCard title="Successful Collections" value={s?.successful_collections || 0} icon={CheckCircle} color="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30" />
+        <MetricCard title="Failed Collections" value={s?.failed_collections || 0} icon={XCircle} color="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30" />
+        <MetricCard title="Services Extracted" value={s?.services_extracted || 0} icon={Zap} color="text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30" />
+        <MetricCard title="URLs Discovered" value={s?.urls_discovered || 0} icon={Database} color="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30" />
       </div>
-
-
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
         <div className="card">
-          <div className="px-5 py-4 border-b border-surface-100">
-            <h2 className="font-semibold text-surface-900">Recent Activity</h2>
+          <div className="px-5 py-4 border-b border-surface-200 dark:border-surface-800">
+            <h2 className="font-bold text-surface-900 dark:text-white">Recent Activity</h2>
           </div>
-          <div className="divide-y divide-surface-50 max-h-96 overflow-auto">
+          <div className="divide-y divide-surface-100 dark:divide-surface-800 max-h-96 overflow-auto">
             {!feed || feed.length === 0 ? (
-              <div className="p-8 text-center text-surface-400 text-sm">No recent activity</div>
+              <EmptyState title="No recent activity" description="Collection events will appear here." />
             ) : (
               feed.map((item: FeedItem, i) => (
-                <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-surface-50">
-                  <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition">
+                  <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
                     item.type === 'collection_success' ? 'bg-emerald-500' :
                     item.type === 'collection_failure' ? 'bg-red-500' : 'bg-brand-500'
                   }`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-surface-900 truncate">{item.message}</p>
-                    <p className="text-xs text-surface-400">{timeAgo(item.timestamp)}</p>
+                    <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.message}</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400">{timeAgo(item.timestamp)}</p>
                   </div>
                 </div>
               ))
             )}
           </div>
           {feed && feed.length > 0 && (
-            <div className="border-t border-surface-100">
+            <div className="border-t border-surface-200 dark:border-surface-800">
               <a
                 href="/activity"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full px-5 py-3 text-sm text-brand-600 hover:bg-surface-50 flex items-center justify-center gap-2"
+                className="w-full px-5 py-3 text-sm font-semibold text-brand-600 dark:text-brand-400 hover:bg-surface-50 dark:hover:bg-surface-800 flex items-center justify-center gap-2 transition"
               >
                 View all activity <ExternalLink size={14} />
               </a>
@@ -141,51 +118,42 @@ export default function OverviewPage() {
 
         {/* System Status */}
         <div className="card">
-          <div className="px-5 py-4 border-b border-surface-100">
-            <h2 className="font-semibold text-surface-900">System Status</h2>
+          <div className="px-5 py-4 border-b border-surface-200 dark:border-surface-800">
+            <h2 className="font-bold text-surface-900 dark:text-white">System Status</h2>
           </div>
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-surface-600">Scheduler</span>
-              <div className="flex items-center gap-2">
-                <StatusDot status={s?.scheduler_status === 'running' ? 'healthy' : 'stopped'} />
-                <span className="text-sm font-medium text-surface-900">{s?.scheduler_status || 'unknown'}</span>
-              </div>
+              <span className="text-sm font-medium text-surface-600 dark:text-surface-400">Scheduler</span>
+              <StatusBadge status={s?.scheduler_status || 'unknown'} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-surface-600">Database</span>
-              <div className="flex items-center gap-2">
-                <StatusDot status={health?.checks?.database?.status || 'unknown'} />
-                <span className="text-sm font-medium text-surface-900">{health?.checks?.database?.status || 'checking...'}</span>
-              </div>
+              <span className="text-sm font-medium text-surface-600 dark:text-surface-400">Database</span>
+              <StatusBadge status={health?.checks?.database?.status || 'checking...'} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-surface-600">Queue</span>
-              <div className="flex items-center gap-2">
-                <StatusDot status="healthy" />
-                <span className="text-sm font-medium text-surface-900">{s?.queue_size || 0} pending</span>
-              </div>
+              <span className="text-sm font-medium text-surface-600 dark:text-surface-400">Queue</span>
+              <StatusBadge status={`${s?.queue_size || 0} pending`} variant="neutral" />
             </div>
 
-            <div className="pt-3 border-t border-surface-100">
-              <h3 className="text-sm font-medium text-surface-900 mb-3">Resources</h3>
+            <div className="pt-3 border-t border-surface-200 dark:border-surface-800">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-3">Resources</h3>
               <div className="space-y-3">
                 <div>
-                  <div className="flex justify-between text-xs text-surface-500 mb-1">
-                    <span>CPU</span>
+                  <div className="flex justify-between text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1">
+                    <span>CPU Usage</span>
                     <span>{telemetry?.cpu_percent || 0}%</span>
                   </div>
-                  <div className="h-1.5 bg-surface-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-brand-500 rounded-full" style={{ width: `${telemetry?.cpu_percent || 0}%` }} />
+                  <div className="h-2 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-brand-600 rounded-full transition-all duration-300" style={{ width: `${telemetry?.cpu_percent || 0}%` }} />
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between text-xs text-surface-500 mb-1">
-                    <span>Memory</span>
+                  <div className="flex justify-between text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1">
+                    <span>Memory Allocation</span>
                     <span>{telemetry?.memory_mb || 0} MB</span>
                   </div>
-                  <div className="h-1.5 bg-surface-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{
+                  <div className="h-2 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-600 rounded-full transition-all duration-300" style={{
                       width: `${telemetry?.memory_total_gb ? (telemetry.memory_mb / (telemetry.memory_total_gb * 1024)) * 100 : 0}%`
                     }} />
                   </div>
@@ -193,19 +161,19 @@ export default function OverviewPage() {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-surface-100">
-              <h3 className="text-sm font-medium text-surface-900 mb-2">Last Collection</h3>
-              <p className="text-sm text-surface-600">{formatDate(s?.last_collection ?? null)}</p>
+            <div className="pt-3 border-t border-surface-200 dark:border-surface-800">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-1">Last Collection</h3>
+              <p className="text-sm font-medium text-surface-900 dark:text-surface-200">{formatDate(s?.last_collection ?? null)}</p>
             </div>
 
-            <div className="pt-3 border-t border-surface-100">
+            <div className="pt-3 border-t border-surface-200 dark:border-surface-800">
               <a
                 href="/logs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full px-4 py-2.5 text-sm text-brand-600 hover:bg-surface-50 border border-surface-200 rounded-lg flex items-center justify-center gap-2"
+                className="w-full btn-secondary py-2 text-xs font-semibold justify-center"
               >
-                View all logs <ExternalLink size={14} />
+                View system logs <ExternalLink size={14} />
               </a>
             </div>
           </div>

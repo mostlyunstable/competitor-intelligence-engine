@@ -175,6 +175,8 @@ function renderMarkdown(text: string) {
   return elements
 }
 
+import { PageHeader } from '../components/ui'
+
 export default function CopilotPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -214,10 +216,11 @@ export default function CopilotPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-surface-900 dark:text-white">AI Copilot</h1>
-        <p className="text-surface-600 dark:text-surface-400 mt-1">Ask business questions about your competitive landscape</p>
-      </div>
+      <PageHeader
+        title="AI Copilot & Conversational Intelligence"
+        description="Query database records, competitor pricing strategies, and strategic predictions using natural language."
+        icon={Bot}
+      />
 
       <div className="flex-1 overflow-y-auto bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700 p-4 space-y-4">
         {messages.length === 0 && (

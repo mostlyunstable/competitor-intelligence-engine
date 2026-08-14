@@ -16,7 +16,6 @@ from app.services.predictions.scoring import AdvancedScorer
 from app.services.predictions.simulation import ScenarioSimulator
 from app.services.predictions.data_quality import DataQualityEvaluator
 from app.services.predictions.learning import ContinuousLearningFramework
-from app.services.predictions.industry_benchmarking import IndustryBenchmarker
 
 
 # ─── Analytics Tests ────────────────────────────────────────────────────────
@@ -345,12 +344,6 @@ class TestContinuousLearning:
 
 
 # ─── Industry Benchmarker Tests ─────────────────────────────────────────────
-
-
-class TestIndustryBenchmarker:
-    def test_instance(self):
-        benchmarker = IndustryBenchmarker()
-        assert benchmarker is not None
 
 
 # ─── Advanced Scorer Tests ──────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
   AlertTriangle, XCircle, RefreshCw
 } from 'lucide-react'
 import type { Competitor } from '../types'
+import { PageHeader, StatusBadge, SelectField, FilterBar } from '../components/ui'
 
 export default function CompetitorsPage() {
   const navigate = useNavigate()
@@ -75,17 +76,21 @@ export default function CompetitorsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-surface-900">Competitors</h1>
-        <div className="flex items-center gap-2">
-          <button onClick={async () => { setRefreshing(true); try { await refresh() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
-            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
-          </button>
-          <button onClick={() => setShowAdd(true)} className="btn-primary">
-            <Plus size={16} /> Add Competitor
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Competitor Catalog Registry"
+        description="Manage tracked competitor targets, extraction schedules, and platform status."
+        icon={Globe}
+        actions={
+          <>
+            <button onClick={async () => { setRefreshing(true); try { await refresh() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <button onClick={() => setShowAdd(true)} className="btn-primary">
+              <Plus size={16} /> Add Competitor
+            </button>
+          </>
+        }
+      />
 
       {/* Filters */}
       <div className="card p-4">

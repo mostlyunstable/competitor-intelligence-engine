@@ -278,37 +278,6 @@ async def generate_and_save_predictions(
 # ─── Sprint 7.1: Enhanced Endpoints ─────────────────────────────────────────
 
 
-# ─── Industry Benchmarking ──────────────────────────────────────────────────
-
-
-@router.get("/api/predictions/industry-benchmarks")
-async def get_industry_benchmarks(
-    session: AsyncSession = Depends(get_session),
-) -> list[dict[str, Any]]:
-    from app.services.predictions.industry_benchmarking import industry_benchmarker
-    return await industry_benchmarker.benchmark_all(session)
-
-
-@router.get("/api/predictions/industry-benchmarks/categories")
-async def get_category_benchmarks(
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
-    from app.services.predictions.industry_benchmarking import industry_benchmarker
-    return await industry_benchmarker.get_category_benchmarks(session)
-
-
-@router.get("/api/predictions/industry-benchmarks/{competitor_id}")
-async def get_industry_benchmark_competitor(
-    competitor_id: int,
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
-    from app.services.predictions.industry_benchmarking import industry_benchmarker
-    result = await industry_benchmarker.benchmark_competitor(competitor_id, session)
-    if not result:
-        raise HTTPException(status_code=404, detail="Competitor not found")
-    return result
-
-
 # ─── Advanced Scoring ──────────────────────────────────────────────────────
 
 
@@ -500,3 +469,28 @@ async def get_enhanced_report(
     }
 
     return report
+
+
+# ─── Competitor Service & Pricing Predictions Module ────────────────────────
+
+
+@router.get("/api/predictions/competitors")
+async def get_competitor_service_pricing_predictions(
+    service: str | None = None,
+    competitor: str | None = None,
+    prediction_horizon: int = 90,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    """Predict competitor service adoption, price trajectories, uncertainty ranges, and gap vs Utservio."""
+    from app.services.ml.predictive_pricing_service import predictive_pricing_engine
+    from dataclasses import asdict
+
+    prediction_horizon = min(max(prediction_horizon, 7), 365)
+    raw_preds = await predictive_pricing_engine.predict_all_competitor_services(
+        session=session,
+        horizon_days=prediction_horizon,
+        target_service=service,
+        target_competitor=competitor,
+    )
+
+    return [asdict(p) for p in raw_preds]

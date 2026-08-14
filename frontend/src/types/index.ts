@@ -531,6 +531,8 @@ export interface MLModel {
   name: string
   available: boolean
   type: string
+  display_name?: string
+  description?: string
 }
 
 export interface MLForecastResult {
@@ -586,4 +588,70 @@ export interface GeoHeatmapPoint {
 export interface GeoMapData {
   cities: { name: string; lat: number; lon: number; tier: number; population: number; competitors: number; state: string }[]
   states: { name: string; capital: string; population: number; gdp_per_capita: number }[]
+}
+
+export interface ContributingFactor {
+  factor: string
+  impact: string
+  direction: string
+  description: string
+}
+
+export interface CompetitorServicePricingPrediction {
+  service: string
+  utservio_price: number
+  competitor: string
+  current_competitor_price: number
+  predicted_service: string
+  service_probability: number
+  likelihood_category: string
+  predicted_price: number
+  price_range: { lower: number; upper: number }
+  price_difference: number
+  price_gap_percentage: number
+  confidence: number
+  confidence_level: string
+  horizon_days: number
+  training_observations: number
+  data_quality_score: number
+  model: string
+  strategic_insight: string
+  insight_category: string
+  contributing_factors: ContributingFactor[]
+}
+
+export interface DBPredictionResult {
+  competitor_id: number
+  competitor: string
+  service: string
+  canonical_service_id?: number
+  utservio_current_price: number
+  current_competitor_price: number
+  predicted_price: number
+  lower_bound: number
+  upper_bound: number
+  service_probability: number
+  predicted_service_available: string
+  price_gap_percentage: number
+  confidence_score: number
+  confidence_level: string
+  prediction_horizon_days: number
+  training_data_size: number
+  historical_period: string
+  data_quality_score: number
+  comparability_status: 'comparable' | 'insufficient_comparability' | 'insufficient_data'
+  model_name: string
+  model_version: string
+  strategic_insight: string
+  contributing_factors: ContributingFactor[]
+  recommendation_note?: string
+}
+
+export interface DBPredictionFeedback {
+  total_predictions_evaluated: number
+  mean_absolute_error: number
+  mean_absolute_percentage_error: number
+  feedback_records_added: number
+  accuracy_score: number
+  status: string
 }

@@ -124,16 +124,6 @@ class PredictiveBenchmarker:
         except Exception as exc:
             logger.warning("scoring_integration_failed", error=str(exc))
 
-        try:
-            from app.services.predictions.industry_benchmarking import industry_benchmarker
-            benchmarks = await industry_benchmarker.benchmark_all(session)
-            bench_map = {b["competitor_id"]: b for b in benchmarks}
-            for m in metrics:
-                if m["competitor_id"] in bench_map:
-                    m["industry_benchmark"] = bench_map[m["competitor_id"]]
-        except Exception as exc:
-            logger.warning("industry_benchmark_integration_failed", error=str(exc))
-
         return metrics
 
     async def _batch_count(

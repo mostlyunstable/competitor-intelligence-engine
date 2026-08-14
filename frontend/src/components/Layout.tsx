@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Activity, FileText, BarChart3,
   Settings, LogOut, Search, ChevronDown, GitCompare,
   Brain, Menu, X, TrendingUp, Globe, Bot, Cpu,
-  Play, Sparkles, Loader2,
+  Play, Sparkles, Loader2, DollarSign,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
@@ -17,10 +17,8 @@ const navItems = [
   { to: '/logs', icon: FileText, label: 'Logs' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/ai', icon: Brain, label: 'AI Insights' },
-  { to: '/predictions', icon: TrendingUp, label: 'Predictions' },
-  { to: '/industry-benchmarks', icon: Globe, label: 'Industry Benchmarks' },
+  { to: '/predictive-intelligence', icon: Sparkles, label: 'Predictions' },
   { to: '/copilot', icon: Bot, label: 'AI Copilot' },
-  { to: '/ml-performance', icon: Cpu, label: 'ML Performance' },
   { to: '/admin', icon: Settings, label: 'Administration' },
 ]
 
@@ -158,7 +156,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-        <header className="h-14 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800 flex items-center justify-between px-6">
+        <header className="h-14 bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-200 dark:border-surface-800 flex items-center justify-between px-6 sticky top-0 z-30">
           <div className="flex items-center gap-4 flex-1">
             <div ref={searchRef} className="relative max-w-md w-full">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />

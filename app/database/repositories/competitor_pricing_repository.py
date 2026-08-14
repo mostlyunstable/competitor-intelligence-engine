@@ -41,7 +41,7 @@ class CompetitorPricingRepository(BaseRepository[CompetitorPricing]):
         category: str | None = None,
         base_price: float | None = None,
         promotional_price: float | None = None,
-        currency: str = "USD",
+        currency: str = "INR",
         discount: float | None = None,
         membership_pricing: dict[str, object] | None = None,
         subscription_plans: list[str] | None = None,

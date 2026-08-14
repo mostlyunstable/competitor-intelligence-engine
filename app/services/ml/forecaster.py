@@ -22,15 +22,10 @@ logger = structlog.get_logger(__name__)
 
 
 class ModelType(str, Enum):
-    HEURISTIC = "heuristic"
     LINEAR_REGRESSION = "linear_regression"
-    MOVING_AVERAGE = "moving_average"
     EXPONENTIAL_SMOOTHING = "exponential_smoothing"
-    XGBOOST = "xgboost"
-    RIDGE = "ridge"
+    MOVING_AVERAGE = "moving_average"
     ENSEMBLE = "ensemble"
-    CROSTON = "croston"
-    SBA = "sba"
 
 
 @dataclass
@@ -405,22 +400,12 @@ def _ensemble_forecast(
 
 AVAILABLE_MODELS: dict[str, Any] = {
     "linear_regression": _linear_regression_forecast,
-    "moving_average": _moving_average_forecast,
     "exponential_smoothing": _exponential_smoothing_forecast,
-    "heuristic": _heuristic_forecast,
+    "moving_average": _moving_average_forecast,
     "ridge": _ridge_regression_forecast,
+    "heuristic": _linear_regression_forecast,
     "ensemble": _ensemble_forecast,
-    "croston": _croston_forecast,
-    "sba": _sba_forecast,
 }
-
-
-def _try_import_xgboost() -> bool:
-    try:
-        import xgboost  # noqa: F401
-        return True
-    except Exception:  # noqa: BLE001
-        return False
 
 
 class MLForecaster:
@@ -429,13 +414,34 @@ class MLForecaster:
     def __init__(self) -> None:
         self._models: dict[str, Any] = dict(AVAILABLE_MODELS)
         self._model_history: list[dict[str, Any]] = []
-        self._xgboost_available = _try_import_xgboost()
 
     def available_models(self) -> list[dict[str, Any]]:
-        models = [{"name": name, "available": True, "type": "builtin"} for name in self._models]
-        if self._xgboost_available:
-            models.append({"name": "xgboost", "available": True, "type": "optional"})
-        return models
+        descriptions = {
+            "linear_regression": "Linear Pricing Trend — Mid-term price inflation & base pricing drift model",
+            "exponential_smoothing": "Exponential Smoothing — Short-term pricing momentum & promotional markdown model",
+            "moving_average": "Weighted Moving Average — Service catalog listing volume & baseline model",
+            "ridge": "Ridge Regression — Regularized multivariate pricing trajectory model",
+            "heuristic": "Heuristic Pricing Baseline — Rule-based market growth model",
+            "ensemble": "Adaptive Pricing Ensemble — Multi-model hybrid with walk-forward validation",
+        }
+        display_names = {
+            "linear_regression": "Linear Pricing Trend Model",
+            "exponential_smoothing": "Exponential Smoothing Model",
+            "moving_average": "Weighted Moving Average Model",
+            "ridge": "Ridge Regression Model",
+            "heuristic": "Heuristic Baseline Model",
+            "ensemble": "Adaptive Pricing Ensemble Model",
+        }
+        return [
+            {
+                "name": name,
+                "display_name": display_names.get(name, name),
+                "description": descriptions.get(name, ""),
+                "available": True,
+                "type": "builtin",
+            }
+            for name in self._models
+        ]
 
     def forecast(
         self,
@@ -447,16 +453,14 @@ class MLForecaster:
     ) -> ForecastResult:
         if model_name in self._models:
             fn = self._models[model_name]
-            # Models that accept features
-            if model_name in ("ridge", "ensemble"):
+            if model_name in ("ensemble", "ridge"):
                 result = fn(values, steps, features=features, **kwargs)
             else:
                 result = fn(values, steps, **kwargs)
-        elif model_name == "xgboost" and self._xgboost_available:
-            result = self._xgboost_forecast(values, steps, features)
         else:
             logger.warning("model_unavailable", model=model_name, fallback="heuristic")
-            result = _heuristic_forecast(values, steps)
+            result = _linear_regression_forecast(values, steps)
+            result.model_type = "heuristic"
 
         self._model_history.append({
             "model": model_name, "steps": steps,
@@ -615,53 +619,29 @@ class MLForecaster:
         For sparse data (90%+ zeros), prioritizes intermittent demand models.
         """
         if not values or len(values) < 3:
-            best_eval = self.evaluate_model(values or [0.0], model_name="heuristic")
-            return "heuristic", best_eval
+            best_eval = self.evaluate_model(values or [0.0], model_name="linear_regression")
+            return "linear_regression", best_eval
 
-        is_count_data = all(v >= 0 for v in values) and any(v > 0 for v in values)
-        naive_mae = sum(abs(values[i] - values[max(0, i - 1)]) for i in range(1, len(values))) / max(len(values) - 1, 1)
+        candidates = ["linear_regression", "exponential_smoothing", "moving_average", "ensemble"]
 
-        # Detect sparse data: >70% zeros
-        zero_ratio = sum(1 for v in values if v == 0) / len(values)
-        is_sparse = zero_ratio > 0.7
-
-        # Models to try — prioritize intermittent demand models for sparse data
-        univariate_models = ["linear_regression", "moving_average", "exponential_smoothing"]
-        intermittent_models = ["croston", "sba"]
-        multivariate_models = ["ridge", "ensemble"]
-
-        if is_sparse:
-            candidates = intermittent_models + univariate_models
-        else:
-            candidates = univariate_models[:]
-
-        if features:
-            candidates.extend(multivariate_models)
-
-        best_name = "heuristic"
+        best_name = "linear_regression"
         best_score = float("inf")
         best_eval: ModelEvaluation | None = None
 
         for name in candidates:
             try:
                 eval_result = self.evaluate_model(values, model_name=name, features=features)
-
-                # Check for negative predictions (bad for count data)
-                test_features = features[:max(3, len(values) // 2)] if features else None
                 test_pred = self.forecast(
                     values[:max(3, len(values) // 2)],
                     steps=max(2, len(values) // 4),
                     model_name=name,
-                    features=test_features,
+                    features=features,
                 )
                 neg_count = sum(1 for p in test_pred.predictions if p < 0)
 
-                # Score: lower is better. Penalize negatives and non-improvement over naive.
                 penalty = 0
-                if is_count_data and neg_count > 0:
+                if neg_count > 0:
                     penalty += neg_count * 2.0
-                if eval_result.mae >= naive_mae:
-                    penalty += 1.5
                 score = eval_result.rmse + penalty
 
                 if score < best_score:
@@ -671,9 +651,9 @@ class MLForecaster:
             except Exception:
                 continue
 
-        if best_name == "heuristic" or best_eval is None:
-            best_eval = self.evaluate_model(values, model_name="heuristic")
-            best_name = "heuristic"
+        if best_eval is None:
+            best_eval = self.evaluate_model(values, model_name="linear_regression")
+            best_name = "linear_regression"
 
         return best_name, best_eval
 

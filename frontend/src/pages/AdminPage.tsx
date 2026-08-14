@@ -29,6 +29,8 @@ function StatusIndicator({ status, label }: { status: string; label: string }) {
   )
 }
 
+import { PageHeader, MetricCard, StatusBadge } from '../components/ui'
+
 export default function AdminPage() {
   const { health, scheduler, telemetry, refresh, loading } = useDashboard()
   const { data: metrics } = usePolling(() => api.getMetricsJson(), 30000)
@@ -52,12 +54,20 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-surface-900">System Administration</h1>
-        <button onClick={async () => { setRefreshing(true); try { await refresh.all() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }} disabled={refreshing} className="btn-secondary disabled:opacity-50">
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh All
-        </button>
-      </div>
+      <PageHeader
+        title="System Administration & Diagnostics"
+        description="Monitor system health checks, telemetry, database metrics, and competitor target synchronization."
+        icon={Settings}
+        actions={
+          <button
+            onClick={async () => { setRefreshing(true); try { await refresh.all() } catch { /* usePolling handles errors */ } finally { setRefreshing(false) } }}
+            disabled={refreshing}
+            className="btn-secondary disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh All
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* System Health */}

@@ -187,9 +187,9 @@ class PricingCollector(BaseCollector):
                     except (ValueError, TypeError):
                         promotional_price = None
 
-                currency = (item.get("currency") or "USD").strip().upper()
+                currency = (item.get("currency") or "INR").strip().upper()
                 if len(currency) != 3:
-                    currency = "USD"
+                    currency = "INR"
 
                 content_hash = compute_pricing_hash(
                     service_name, category, base_price, promotional_price, currency

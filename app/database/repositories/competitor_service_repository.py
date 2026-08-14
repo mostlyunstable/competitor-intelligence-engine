@@ -42,7 +42,7 @@ class CompetitorServiceRepository(BaseRepository[CompetitorService]):
         description: str | None = None,
         estimated_duration: str | None = None,
         starting_price: float | None = None,
-        currency: str = "USD",
+        currency: str = "INR",
         available_add_ons: list[object] | None = None,
         membership_available: bool = False,
         offers: list[object] | None = None,

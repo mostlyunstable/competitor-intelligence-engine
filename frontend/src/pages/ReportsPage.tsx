@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
-import { formatDate } from '../lib/utils'
 import { BarChart3, Download, FileText, TrendingUp, FileDown, RefreshCw } from 'lucide-react'
+import { PageHeader, MetricCard, StatusBadge, EmptyState, LoadingState } from '../components/ui'
 
 export default function ReportsPage() {
   const { data: summary, loading, refresh } = usePolling(() => api.getSummary(), 30000)
@@ -19,109 +19,81 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-surface-900">Reports</h1>
-        <div className="flex items-center gap-2">
-          <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary disabled:opacity-50">
-            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
-          </button>
-          <a href={api.getCompareCsvUrl()} className="btn-secondary" download>
-            <Download size={16} /> CSV
-          </a>
-          <a href={api.getPdfExportUrl()} className="btn-secondary" download>
-            <FileDown size={16} /> PDF
-          </a>
-          <a href={api.getExportZipUrl()} className="btn-primary" download>
-            <Download size={16} /> Full ZIP
-          </a>
-        </div>
-      </div>
+      <PageHeader
+        title="Intelligence Reports & Exports"
+        description="Comprehensive summary metrics, cross-competitor benchmarks, and data exports."
+        icon={BarChart3}
+        actions={
+          <>
+            <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary disabled:opacity-50">
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <a href={api.getCompareCsvUrl()} className="btn-secondary" download>
+              <Download size={16} /> Export CSV
+            </a>
+            <a href={api.getPdfExportUrl()} className="btn-secondary" download>
+              <FileDown size={16} /> Export PDF
+            </a>
+            <a href={api.getExportZipUrl()} className="btn-primary" download>
+              <Download size={16} /> Full ZIP Bundle
+            </a>
+          </>
+        }
+      />
 
-      {/* Summary Cards */}
+      {/* Summary KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="stat-card">
-          <BarChart3 size={18} className="text-brand-600" />
-          <div className="text-xl font-bold">{summary?.length || 0}</div>
-          <div className="text-xs text-surface-500">Competitors Tracked</div>
-        </div>
-        <div className="stat-card">
-          <FileText size={18} className="text-purple-600" />
-          <div className="text-xl font-bold">
-            {summary?.reduce((sum: number, s: any) => sum + (s.services_count || 0), 0) || 0}
-          </div>
-          <div className="text-xs text-surface-500">Total Services</div>
-        </div>
-        <div className="stat-card">
-          <TrendingUp size={18} className="text-emerald-600" />
-          <div className="text-xl font-bold">
-            {summary?.reduce((sum: number, s: any) => sum + (s.pricing_count || 0), 0) || 0}
-          </div>
-          <div className="text-xs text-surface-500">Total Pricing Records</div>
-        </div>
+        <MetricCard title="Competitors Tracked" value={summary?.length || 0} icon={BarChart3} color="text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/30" />
+        <MetricCard title="Total Services Extracted" value={summary?.reduce((sum: number, s: any) => sum + (s.services_count || 0), 0) || 0} icon={FileText} color="text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30" />
+        <MetricCard title="Total Pricing Records" value={summary?.reduce((sum: number, s: any) => sum + (s.pricing_count || 0), 0) || 0} icon={TrendingUp} color="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30" />
       </div>
 
-      {/* Competitor Comparison Table */}
+      {/* Competitor Summary Table */}
       <div className="card overflow-hidden">
-        <div className="px-5 py-4 border-b border-surface-100">
-          <h2 className="font-semibold text-surface-900">Competitor Comparison</h2>
+        <div className="px-5 py-4 border-b border-surface-200 dark:border-surface-800">
+          <h2 className="font-bold text-surface-900 dark:text-white">Competitor Extraction Metrics Summary</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-surface-50 border-b border-surface-200">
-              <tr>
-                <th className="table-header">Competitor</th>
-                <th className="table-header">Status</th>
-                <th className="table-header">Frequency</th>
-                <th className="table-header text-right">Services</th>
-                <th className="table-header text-right">Pricing</th>
-                <th className="table-header text-right">Content</th>
-                <th className="table-header text-right">Social</th>
-                <th className="table-header text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-50">
-              {loading ? (
-                [...Array(5)].map((_, i) => (
-                  <tr key={i}><td colSpan={8} className="p-4"><div className="skeleton h-10 w-full" /></td></tr>
-                ))
-              ) : !summary || summary.length === 0 ? (
-                <tr><td colSpan={8} className="p-8 text-center text-surface-400">No data available</td></tr>
-              ) : (
-                summary.map((s: any) => {
+        {loading && !summary ? (
+          <LoadingState type="table" rows={5} />
+        ) : !summary || summary.length === 0 ? (
+          <EmptyState title="No summary records available" description="Run collection pipelines to populate competitor records." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-surface-50 dark:bg-surface-800/80 border-b border-surface-200 dark:border-surface-700">
+                <tr>
+                  <th className="table-header">Competitor Target</th>
+                  <th className="table-header">Status</th>
+                  <th className="table-header">Frequency</th>
+                  <th className="table-header text-right">Services</th>
+                  <th className="table-header text-right">Pricing</th>
+                  <th className="table-header text-right">Content</th>
+                  <th className="table-header text-right">Social</th>
+                  <th className="table-header text-right">Total Extracted</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
+                {summary.map((s: any) => {
                   const total = (s.services_count || 0) + (s.pricing_count || 0) + (s.content_count || 0) + (s.socials_count || 0)
                   return (
-                    <tr key={s.id} className="hover:bg-surface-50">
-                      <td className="table-cell font-medium">{s.name}</td>
+                    <tr key={s.id} className="hover:bg-surface-50 dark:hover:bg-surface-800/50 transition">
+                      <td className="table-cell font-bold text-surface-900 dark:text-white">{s.name}</td>
                       <td className="table-cell">
-                        {s.enabled ? <span className="badge-success">Active</span> : <span className="badge-danger">Disabled</span>}
+                        <StatusBadge status={s.enabled ? 'Active' : 'Disabled'} />
                       </td>
-                      <td className="table-cell"><span className="badge-neutral">{s.collection_frequency}</span></td>
-                      <td className="table-cell text-right">{s.services_count}</td>
-                      <td className="table-cell text-right">{s.pricing_count}</td>
-                      <td className="table-cell text-right">{s.content_count}</td>
-                      <td className="table-cell text-right">{s.socials_count}</td>
-                      <td className="table-cell text-right font-semibold">{total}</td>
+                      <td className="table-cell font-mono text-xs text-surface-500 uppercase">{s.collection_frequency}</td>
+                      <td className="table-cell text-right font-mono font-medium text-surface-700 dark:text-surface-300">{s.services_count}</td>
+                      <td className="table-cell text-right font-mono font-medium text-surface-700 dark:text-surface-300">{s.pricing_count}</td>
+                      <td className="table-cell text-right font-mono text-surface-500">{s.content_count}</td>
+                      <td className="table-cell text-right font-mono text-surface-500">{s.socials_count}</td>
+                      <td className="table-cell text-right font-mono font-bold text-brand-600 dark:text-brand-400">{total}</td>
                     </tr>
                   )
-                })
-              )}
-            </tbody>
-            {summary && summary.length > 0 && (
-              <tfoot className="bg-surface-50 border-t border-surface-200">
-                <tr>
-                  <td className="table-cell font-semibold">Totals</td>
-                  <td className="table-cell"></td>
-                  <td className="table-cell"></td>
-                  <td className="table-cell text-right font-semibold">{summary.reduce((s: number, r: any) => s + (r.services_count || 0), 0)}</td>
-                  <td className="table-cell text-right font-semibold">{summary.reduce((s: number, r: any) => s + (r.pricing_count || 0), 0)}</td>
-                  <td className="table-cell text-right font-semibold">{summary.reduce((s: number, r: any) => s + (r.content_count || 0), 0)}</td>
-                  <td className="table-cell text-right font-semibold">{summary.reduce((s: number, r: any) => s + (r.socials_count || 0), 0)}</td>
-                  <td className="table-cell text-right font-bold">{summary.reduce((s: number, r: any) => s + (r.services_count || 0) + (r.pricing_count || 0) + (r.content_count || 0) + (r.socials_count || 0), 0)}</td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

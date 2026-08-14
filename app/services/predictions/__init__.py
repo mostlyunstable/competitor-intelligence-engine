@@ -21,7 +21,6 @@ from app.services.predictions.scoring import advanced_scorer
 from app.services.predictions.simulation import scenario_simulator
 from app.services.predictions.data_quality import data_quality_evaluator
 from app.services.predictions.learning import continuous_learner
-from app.services.predictions.industry_benchmarking import industry_benchmarker
 
 __all__ = [
     "prediction_engine",
@@ -39,5 +38,4 @@ __all__ = [
     "scenario_simulator",
     "data_quality_evaluator",
     "continuous_learner",
-    "industry_benchmarker",
 ]

@@ -134,7 +134,7 @@ class CompetitorService(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     estimated_duration: Mapped[str | None] = mapped_column(String(100), nullable=True)
     starting_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
     available_add_ons: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     membership_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     offers: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
@@ -167,7 +167,7 @@ class CompetitorPricing(Base):
     category: Mapped[str | None] = mapped_column(String(255), nullable=True)
     base_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     promotional_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
     discount: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     membership_pricing: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     subscription_plans: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
@@ -696,3 +696,171 @@ class PredictionEvaluation(Base):
     evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
     competitor = relationship("Competitor")
+
+
+class CanonicalService(Base):
+    __tablename__ = "canonical_services"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    subcategory: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(500), nullable=False, unique=True, index=True)
+    pricing_unit: Mapped[str] = mapped_column(String(50), nullable=False, default="per_service")
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    mappings: Mapped[list["ServiceMapping"]] = relationship("ServiceMapping", back_populates="canonical_service")
+    observations: Mapped[list["PriceObservation"]] = relationship("PriceObservation", back_populates="canonical_service")
+
+    __table_args__ = (
+        {"comment": "Standardized canonical service taxonomy"},
+    )
+
+
+class ServiceMapping(Base):
+    __tablename__ = "service_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    original_service_name: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    canonical_service_id: Mapped[int] = mapped_column(Integer, ForeignKey("canonical_services.id", ondelete="CASCADE"), nullable=False, index=True)
+    competitor_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("competitors.id", ondelete="SET NULL"), nullable=True, index=True)
+    similarity_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    matching_methodology: Mapped[str] = mapped_column(String(100), nullable=False, default="exact_match")
+    human_validation_status: Mapped[str] = mapped_column(String(50), nullable=False, default="validated")
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    canonical_service: Mapped["CanonicalService"] = relationship("CanonicalService", back_populates="mappings")
+
+    __table_args__ = (
+        Index("ix_service_mapping_comp_canonical", "competitor_id", "canonical_service_id"),
+        {"comment": "Mappings from raw service names to canonical services"},
+    )
+
+
+class PriceObservation(Base):
+    __tablename__ = "price_observations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    service_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("competitor_services.id", ondelete="SET NULL"), nullable=True, index=True)
+    competitor_id: Mapped[int] = mapped_column(Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True)
+    canonical_service_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("canonical_services.id", ondelete="SET NULL"), nullable=True, index=True)
+    original_service_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    location: Mapped[str] = mapped_column(String(255), nullable=False, default="Pan India")
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
+    pricing_unit: Mapped[str] = mapped_column(String(50), nullable=False, default="per_service")
+    price_type: Mapped[str] = mapped_column(String(50), nullable=False, default="standard")
+    discount: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="website")
+    collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    effective_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    data_quality_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    validation_status: Mapped[str] = mapped_column(String(50), nullable=False, default="validated")
+    change_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    canonical_service: Mapped["CanonicalService"] = relationship("CanonicalService", back_populates="observations")
+    quality_breakdown: Mapped["DataQualityScoreRecord | None"] = relationship("DataQualityScoreRecord", back_populates="observation", uselist=False)
+
+    __table_args__ = (
+        Index("ix_price_obs_comp_canonical_date", "competitor_id", "canonical_service_id", "collected_at"),
+        {"comment": "Immutable time-series pricing observations"},
+    )
+
+
+class PricingResolutionRecord(Base):
+    __tablename__ = "pricing_resolution_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    canonical_service_id: Mapped[int] = mapped_column(Integer, ForeignKey("canonical_services.id", ondelete="CASCADE"), nullable=False, index=True)
+    conflicting_observations: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    resolved_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    promotional_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    price_type: Mapped[str] = mapped_column(String(50), nullable=False, default="standard")
+    resolution_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.9)
+    resolved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        {"comment": "Audit trail of conflicting pricing discrepancy resolutions"},
+    )
+
+
+class DataQualityScoreRecord(Base):
+    __tablename__ = "data_quality_score_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    observation_id: Mapped[int] = mapped_column(Integer, ForeignKey("price_observations.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    completeness: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    accuracy: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    consistency: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    timeliness: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    validity: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    uniqueness: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    comparability: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    overall_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    observation: Mapped["PriceObservation"] = relationship("PriceObservation", back_populates="quality_breakdown")
+
+    __table_args__ = (
+        {"comment": "Detailed 7-dimension data quality scores"},
+    )
+
+
+class MLPredictionRecord(Base):
+    __tablename__ = "ml_predictions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competitor_id: Mapped[int] = mapped_column(Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True)
+    service_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("competitor_services.id", ondelete="SET NULL"), nullable=True, index=True)
+    canonical_service_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("canonical_services.id", ondelete="SET NULL"), nullable=True, index=True)
+    service_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    prediction_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    prediction_horizon_days: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
+    utservio_base_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    current_competitor_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    predicted_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    lower_bound: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    upper_bound: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    predicted_service_available: Mapped[str] = mapped_column(String(50), nullable=False, default="Likely")
+    service_probability: Mapped[float] = mapped_column(Float, nullable=False, default=0.85)
+    price_gap_percentage: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="XGBoost & Ridge Ensemble")
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="v2.0-db")
+    training_data_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    data_quality_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.85)
+    comparability_status: Mapped[str] = mapped_column(String(50), nullable=False, default="comparable")  # "comparable", "insufficient_comparability", "insufficient_data"
+    contributing_factors: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    feedbacks: Mapped[list["MLPredictionFeedbackRecord"]] = relationship("MLPredictionFeedbackRecord", back_populates="prediction", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_ml_predictions_comp_canon_date", "competitor_id", "canonical_service_id", "prediction_timestamp"),
+        {"comment": "Database-persisted ML predictions for competitor service adoption & pricing"},
+    )
+
+
+class MLPredictionFeedbackRecord(Base):
+    __tablename__ = "ml_prediction_feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    prediction_id: Mapped[int] = mapped_column(Integer, ForeignKey("ml_predictions.id", ondelete="CASCADE"), nullable=False, index=True)
+    actual_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    prediction_error: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    absolute_error: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    percentage_error: Mapped[float] = mapped_column(Float, nullable=False)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    prediction: Mapped["MLPredictionRecord"] = relationship("MLPredictionRecord", back_populates="feedbacks")
+
+    __table_args__ = (
+        {"comment": "Continuous feedback loop tracking actual vs predicted pricing error"},
+    )

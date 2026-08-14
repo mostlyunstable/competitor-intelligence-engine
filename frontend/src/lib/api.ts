@@ -48,6 +48,9 @@ import type {
   GeoCity,
   GeoHeatmapPoint,
   GeoMapData,
+  CompetitorServicePricingPrediction,
+  DBPredictionResult,
+  DBPredictionFeedback,
 } from '../types'
 
 const API_BASE = ''
@@ -125,7 +128,7 @@ class ApiClient {
     return !!this.credentials
   }
 
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -468,18 +471,6 @@ class ApiClient {
 
   // ─── Sprint 7.1: Enhanced Endpoints ─────────────────────────────────────
 
-  async getIndustryBenchmarks(): Promise<IndustryBenchmark[]> {
-    return this.request('/api/predictions/industry-benchmarks')
-  }
-
-  async getIndustryBenchmarkCompetitor(competitorId: number): Promise<IndustryBenchmark> {
-    return this.request(`/api/predictions/industry-benchmarks/${competitorId}`)
-  }
-
-  async getCategoryBenchmarks(): Promise<Record<string, unknown>> {
-    return this.request('/api/predictions/industry-benchmarks/categories')
-  }
-
   async getAdvancedScores(): Promise<AdvancedScore[]> {
     return this.request('/api/predictions/scores')
   }
@@ -499,6 +490,29 @@ class ApiClient {
   async runScenario(scenarioType: string, competitorId?: number, params?: Record<string, unknown>): Promise<ScenarioSimulation> {
     const url = `/api/predictions/scenarios/${scenarioType}` + (competitorId ? `?competitor_id=${competitorId}` : '')
     return this.request(url, { method: 'POST', body: params ? JSON.stringify(params) : undefined, headers: params ? { 'Content-Type': 'application/json' } : undefined })
+  }
+
+  async getCompetitorServicePredictions(horizonDays: number = 90, service?: string, competitor?: string): Promise<CompetitorServicePricingPrediction[]> {
+    let url = `/api/predictions/competitors?prediction_horizon=${horizonDays}`
+    if (service) url += `&service=${encodeURIComponent(service)}`
+    if (competitor) url += `&competitor=${encodeURIComponent(competitor)}`
+    return this.request(url)
+  }
+
+  async getDBPredictions(horizonDays: number = 90, competitorId?: number, canonicalServiceId?: number): Promise<DBPredictionResult[]> {
+    let url = `/api/ml/db-predictions?prediction_horizon=${horizonDays}`
+    if (competitorId) url += `&competitor_id=${competitorId}`
+    if (canonicalServiceId) url += `&canonical_service_id=${canonicalServiceId}`
+    const res = await this.request<{ predictions: DBPredictionResult[] }>(url)
+    return res.predictions || []
+  }
+
+  async generateDBPredictions(horizonDays: number = 90): Promise<{ total_persisted: number; message: string }> {
+    return this.request(`/api/ml/db-predictions/generate?prediction_horizon=${horizonDays}`, { method: 'POST' })
+  }
+
+  async getPredictionFeedback(): Promise<DBPredictionFeedback> {
+    return this.request('/api/ml/db-predictions/feedback')
   }
 
   async getLearningAccuracy(): Promise<LearningAccuracyReport> {

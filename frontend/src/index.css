@@ -32,73 +32,76 @@ input:focus, textarea:focus, select:focus {
 
 @layer components {
   .card {
-    @apply bg-white rounded-xl border border-surface-200 shadow-sm;
+    @apply bg-white rounded-xl border border-surface-200 shadow-sm transition-all duration-200;
   }
   .dark .card {
     @apply bg-surface-900 border-surface-800;
   }
   .card-hover {
-    @apply card transition-all duration-200 hover:shadow-md hover:border-surface-300;
+    @apply card transition-all duration-200 hover:shadow-md hover:border-brand-300 hover:-translate-y-0.5;
   }
   .dark .card-hover {
-    @apply hover:border-surface-700;
+    @apply hover:border-brand-700;
+  }
+  .glass-card {
+    @apply bg-white/90 dark:bg-surface-900/90 backdrop-blur-md rounded-xl border border-surface-200/80 dark:border-surface-800/80 shadow-sm transition-all duration-200 hover:shadow-md;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 transition-colors disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 shadow-sm;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-surface-700 text-sm font-medium rounded-lg border border-surface-300 hover:bg-surface-50 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 transition-colors;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-surface-700 text-sm font-medium rounded-lg border border-surface-300 hover:bg-surface-50 hover:border-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 transition-all duration-200 active:scale-[0.98];
   }
   .dark .btn-secondary {
-    @apply bg-surface-800 text-surface-200 border-surface-700 hover:bg-surface-700;
+    @apply bg-surface-800 text-surface-200 border-surface-700 hover:bg-surface-700 hover:border-surface-600;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200 active:scale-[0.98];
   }
   .btn-sm {
     @apply px-3 py-1.5 text-xs;
   }
   .input {
-    @apply w-full px-3 py-2.5 bg-white border border-surface-300 rounded-lg text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-brand-400 transition-colors;
+    @apply w-full px-3 py-2.5 bg-white border border-surface-300 rounded-lg text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-brand-400 transition-all duration-200;
   }
   .dark .input {
     @apply bg-surface-800 border-surface-700 text-surface-100 placeholder-surface-500;
   }
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-tight transition-colors;
   }
   .badge-success {
     @apply badge bg-emerald-100 text-emerald-800;
   }
   .dark .badge-success {
-    @apply bg-emerald-900/30 text-emerald-400;
+    @apply bg-emerald-900/40 text-emerald-300 border border-emerald-800/50;
   }
   .badge-danger {
     @apply badge bg-red-100 text-red-800;
   }
   .dark .badge-danger {
-    @apply bg-red-900/30 text-red-400;
+    @apply bg-red-900/40 text-red-300 border border-red-800/50;
   }
   .badge-warning {
     @apply badge bg-amber-100 text-amber-800;
   }
   .dark .badge-warning {
-    @apply bg-amber-900/30 text-amber-400;
+    @apply bg-amber-900/40 text-amber-300 border border-amber-800/50;
   }
   .badge-info {
     @apply badge bg-brand-100 text-brand-800;
   }
   .dark .badge-info {
-    @apply bg-brand-900/30 text-brand-400;
+    @apply bg-brand-900/40 text-brand-300 border border-brand-800/50;
   }
   .badge-neutral {
     @apply badge bg-surface-100 text-surface-600;
   }
   .dark .badge-neutral {
-    @apply bg-surface-800 text-surface-400;
+    @apply bg-surface-800 text-surface-400 border border-surface-700;
   }
   .table-header {
-    @apply px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider;
+    @apply px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider bg-surface-50/80 dark:bg-surface-800/80;
   }
   .dark .table-header {
     @apply text-surface-400;
@@ -110,19 +113,19 @@ input:focus, textarea:focus, select:focus {
     @apply text-surface-200;
   }
   .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-surface-500 rounded-lg hover:bg-surface-100 hover:text-surface-900 transition-colors;
+    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-surface-500 rounded-lg hover:bg-surface-100 hover:text-surface-900 transition-all duration-200 hover:translate-x-0.5;
   }
   .dark .sidebar-link {
     @apply text-surface-400 hover:bg-surface-800 hover:text-white;
   }
   .sidebar-link-active {
-    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-brand-700 bg-brand-50 rounded-lg;
+    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-brand-700 bg-brand-50 rounded-lg shadow-sm;
   }
   .dark .sidebar-link-active {
-    @apply text-brand-400 bg-brand-900/20;
+    @apply text-brand-400 bg-brand-900/30 border border-brand-800/40;
   }
   .stat-card {
-    @apply card p-5 flex flex-col gap-2;
+    @apply card p-5 flex flex-col gap-2 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-surface-300 dark:hover:border-surface-700;
   }
   .skeleton {
     @apply animate-pulse bg-surface-200 rounded;

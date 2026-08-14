@@ -11,7 +11,27 @@ from sqlalchemy.ext.asyncio import (
 
 from app.database.connection import Base
 
-TEST_DATABASE_URL = os.environ.get("CI_TEST_DATABASE_URL", "")
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.types import JSON
+
+TEST_DATABASE_URL = os.environ.get("CI_TEST_DATABASE_URL") or "sqlite+aiosqlite:///:memory:"
+
+
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+
+@compiles(JSONB, "sqlite")
+def compile_jsonb_sqlite(type_, compiler, **kw):
+    return "JSON"
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 @pytest_asyncio.fixture(scope="session")

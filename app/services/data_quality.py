@@ -1,18 +1,23 @@
+"""Evaluate the quality of extracted competitor data.
+
+Never treats a scraper failure as "NO_DATA".
+"""
+
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 
-        """
-        Evaluate the quality of extracted competitor data.
-        Never treats a scraper failure as "NO_DATA".
-        """
 class DataState(StrEnum):
-    VALID_DATA = "valid_data"
-    STALE_DATA = "stale_data"
-    EXTRACTION_FAILED = "extraction_failed"
-    NO_DATA = "no_data"
+    VALID = "VALID"
+    STALE = "STALE"
+    EXTRACTION_FAILED = "EXTRACTION_FAILED"
+    NO_DATA = "NO_DATA"
+
+    # Aliases for compatibility
+    VALID_DATA = "VALID"
+    STALE_DATA = "STALE"
 
 
 @dataclass
@@ -55,7 +60,7 @@ class DataQualityValidator:
             days_since = (datetime.now(UTC) - last_scrape_time).days
             if days_since > self.stale_threshold_days:
                 return QualityMetrics(
-                    state=DataState.STALE_DATA,
+                    state=DataState.STALE,
                     last_successful_scrape=last_scrape_time,
                     failure_reason=f"Data is {days_since} days old (threshold: {self.stale_threshold_days})",
                 )
@@ -67,11 +72,10 @@ class DataQualityValidator:
             if not extracted_data.get(field_name):
                 missing.append(field_name)
 
-        # Approximate overall confidence if tracking provenance
-        confidence = 0.0
-        methods: list[str] = []
-        # Fallback to VALID_DATA if not stale or failed, even with missing fields
-        state = DataState.VALID_DATA
+        # Compute overall confidence based on present fields
+        confidence = round((len(required_fields) - len(missing)) / len(required_fields), 2)
+        methods: list[str] = extracted_data.get("extraction_methods", [])
+        state = DataState.VALID
 
         return QualityMetrics(
             state=state,
@@ -80,3 +84,4 @@ class DataQualityValidator:
             last_successful_scrape=datetime.now(UTC),
             extraction_methods=methods,
         )
+

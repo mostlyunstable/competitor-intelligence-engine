@@ -239,9 +239,9 @@ class ServiceCollector(BaseCollector):
                     except (ValueError, TypeError):
                         starting_price = None
 
-                currency = (svc.get("currency") or "USD").strip().upper()
+                currency = (svc.get("currency") or "INR").strip().upper()
                 if len(currency) != 3:
-                    currency = "USD"
+                    currency = "INR"
 
                 content_hash = compute_service_hash(
                     service_name, service_category, description, starting_price, currency

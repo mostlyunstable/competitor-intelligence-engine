@@ -9,6 +9,8 @@ from app.api.dependencies import get_session
 
 @pytest.fixture
 def client():
+    import os
+    os.environ["TESTING"] = "1"
     from app.main import create_app
     app = create_app()
     with TestClient(app, raise_server_exceptions=False) as c:
@@ -42,6 +44,12 @@ def _empty_execute_result():
     return result
 
 
+def _set_override(client, session):
+    async def _gen():
+        yield session
+    client.app.dependency_overrides[get_session] = _gen
+
+
 # ─── Pricing Forecast Endpoint ────────────────────────────────────────────
 
 
@@ -49,7 +57,7 @@ class TestPredictivePricing:
     def test_pricing_404_unknown_competitor(self, client):
         from app.database.models import Competitor
         session = _mock_session(get=None)
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/pricing/99999", headers=_auth_headers())
         assert resp.status_code == 404
         client.app.dependency_overrides.clear()
@@ -58,7 +66,7 @@ class TestPredictivePricing:
         from app.database.models import Competitor
         comp = Competitor(id=1, name="Test", website_url="http://test.com")
         session = _mock_session(get=comp, scalar=5, execute=_empty_execute_result())
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/pricing/1?steps=3", headers=_auth_headers())
         assert resp.status_code == 200
         data = resp.json()
@@ -72,7 +80,7 @@ class TestPredictivePricing:
         from app.database.models import Competitor
         comp = Competitor(id=1, name="Test", website_url="http://test.com")
         session = _mock_session(get=comp, scalar=3, execute=_empty_execute_result())
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/pricing/1?model=exp_smoothing", headers=_auth_headers())
         assert resp.status_code == 200
         assert resp.json()["model"] == "exp_smoothing"
@@ -85,7 +93,7 @@ class TestPredictivePricing:
 class TestPredictiveGrowth:
     def test_growth_404(self, client):
         session = _mock_session(get=None)
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/growth/99999", headers=_auth_headers())
         assert resp.status_code == 404
         client.app.dependency_overrides.clear()
@@ -94,7 +102,7 @@ class TestPredictiveGrowth:
         from app.database.models import Competitor
         comp = Competitor(id=1, name="Test", website_url="http://test.com")
         session = _mock_session(get=comp, scalar=2, execute=_empty_execute_result())
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/growth/1", headers=_auth_headers())
         assert resp.status_code == 200
         data = resp.json()
@@ -110,7 +118,7 @@ class TestPredictiveGrowth:
 class TestRegionalOpportunities:
     def test_regional_returns_list(self, client):
         session = _mock_session(execute=_empty_execute_result())
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/regional/opportunities", headers=_auth_headers())
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
@@ -123,7 +131,7 @@ class TestRegionalOpportunities:
 class TestStrategicRisks:
     def test_risks_returns_list(self, client):
         session = _mock_session(execute=_empty_execute_result(), scalar=0)
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/strategic-risks", headers=_auth_headers())
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
@@ -136,7 +144,7 @@ class TestStrategicRisks:
 class TestPredictiveRecommendations:
     def test_recommendations_returns_list(self, client):
         session = _mock_session(execute=_empty_execute_result(), scalar=0)
-        client.app.dependency_overrides[get_session] = lambda: session
+        _set_override(client, session)
         resp = client.get("/api/predictive/recommendations", headers=_auth_headers())
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
