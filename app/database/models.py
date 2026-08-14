@@ -1,5 +1,6 @@
 import enum
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
@@ -88,6 +89,9 @@ class Competitor(Base):
     collection_logs: Mapped[list["CollectionLog"]] = relationship(
         "CollectionLog", back_populates="competitor", cascade="all, delete-orphan"
     )
+    change_events: Mapped[list["CompetitorChangeEvent"]] = relationship(
+        "CompetitorChangeEvent", back_populates="competitor", cascade="all, delete-orphan"
+    )
 
     __table_args__ = ({"comment": "Registered competitor websites"},)
 
@@ -147,6 +151,7 @@ class CompetitorService(Base):
     __table_args__ = (
         Index("ix_competitor_service_competitor_id", "competitor_id"),
         UniqueConstraint("competitor_id", "content_hash", name="uq_competitor_service_hash"),
+        Index("ix_services_comp_date", "competitor_id", "collected_at"),
         {"comment": "Service listings collected from competitors"},
     )
 
@@ -178,6 +183,7 @@ class CompetitorPricing(Base):
     __table_args__ = (
         Index("ix_competitor_pricing_competitor_id", "competitor_id"),
         UniqueConstraint("competitor_id", "content_hash", name="uq_competitor_pricing_hash"),
+        Index("ix_pricing_comp_date", "competitor_id", "collected_at"),
         {"comment": "Pricing data collected from competitors"},
     )
 
@@ -332,6 +338,30 @@ class ChangeLog(Base):
     )
 
 
+class CompetitorChangeEvent(Base):
+    __tablename__ = "competitor_change_events"
+    __table_args__ = (
+        Index("ix_change_event_competitor_id", "competitor_id"),
+        Index("ix_change_event_event_type", "event_type"),
+        Index("ix_change_event_detected_at", "detected_at"),
+        Index("ix_change_event_comp_date", "competitor_id", "detected_at"),
+        {"comment": "Tracks granular change deltas for predictive analysis"},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competitor_id: Mapped[int] = mapped_column(Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    category: Mapped[str | None] = mapped_column(String(100))
+    old_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    new_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    magnitude: Mapped[float | None] = mapped_column(Float)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB)
+
+    competitor = relationship("Competitor", back_populates="change_events")
+
+
 class CompetitorAIInsight(Base):
     """
     Stores AI-generated intelligence and insights about a competitor.
@@ -402,3 +432,267 @@ class AIInsightFeedback(Base):
     rating: Mapped[int] = mapped_column(Integer, nullable=False)  # 1=thumbs down, 2=thumbs up
     comment: Mapped[str] = mapped_column(Text, nullable=True, default="")
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Sprint 7: Predictive Intelligence Models ────────────────────────────────
+
+
+class PredictionType(enum.StrEnum):
+    GROWTH = "growth"
+    PRICING = "pricing"
+    SERVICE_LAUNCH = "service_launch"
+    MARKET_MOVEMENT = "market_movement"
+    EXPANSION = "expansion"
+
+
+class TrendDirection(enum.StrEnum):
+    INCREASING = "increasing"
+    DECREASING = "decreasing"
+    STABLE = "stable"
+    EMERGING = "emerging"
+
+
+class RiskLevel(enum.StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class GrowthLevel(enum.StrEnum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class ChangeEventType(StrEnum):
+    PRICE_CHANGE = "PRICE_CHANGE"
+    SERVICE_LAUNCH = "SERVICE_LAUNCH"
+    SERVICE_DISCONTINUATION = "SERVICE_DISCONTINUATION"
+    REGIONAL_EXPANSION = "REGIONAL_EXPANSION"
+    CONTENT_UPDATE = "CONTENT_UPDATE"
+    STRATEGIC_SHIFT = "STRATEGIC_SHIFT"
+
+
+class CompetitorPrediction(Base):
+    """Stores predictive intelligence for a competitor."""
+    __tablename__ = "competitor_predictions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    competitor_id: Mapped[int] = mapped_column(
+        ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    prediction_type: Mapped[PredictionType] = mapped_column(
+        Enum(PredictionType, name="prediction_type_enum", create_constraint=True),
+        nullable=False, index=True
+    )
+    prediction_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    predicted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="heuristic_v1")
+
+    __table_args__ = (
+        Index("ix_prediction_competitor_type", "competitor_id", "prediction_type"),
+        {"comment": "Predictive intelligence per competitor"},
+    )
+
+
+class MarketTrend(Base):
+    """Stores detected market trends."""
+    __tablename__ = "market_trends"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    category: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    direction: Mapped[TrendDirection] = mapped_column(
+        Enum(TrendDirection, name="trend_direction_enum", create_constraint=True),
+        nullable=False
+    )
+    strength: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    evidence: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    affected_competitors: Mapped[list[int]] = mapped_column(JSONB, nullable=False, default=list)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_trend_category_direction", "category", "direction"),
+        {"comment": "Detected market trends"},
+    )
+
+
+class RegionalExpansion(Base):
+    """Stores regional expansion forecasts."""
+    __tablename__ = "regional_expansions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    competitor_id: Mapped[int] = mapped_column(
+        ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    region: Mapped[str] = mapped_column(String(255), nullable=False)
+    expansion_probability: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    expansion_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    expected_timeline: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    factors: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    predicted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_expansion_competitor_region", "competitor_id", "region"),
+        {"comment": "Regional expansion forecasts"},
+    )
+
+
+class CompetitorRisk(Base):
+    """Stores risk analysis for competitors."""
+    __tablename__ = "competitor_risks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    competitor_id: Mapped[int] = mapped_column(
+        ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    risk_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    risk_level: Mapped[RiskLevel] = mapped_column(
+        Enum(RiskLevel, name="risk_level_enum", create_constraint=True),
+        nullable=False
+    )
+    risk_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    likelihood: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    business_impact: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    mitigation: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_risk_competitor_type", "competitor_id", "risk_type"),
+        {"comment": "Competitor risk analysis"},
+    )
+
+
+class BusinessOpportunity(Base):
+    """Stores detected business opportunities."""
+    __tablename__ = "business_opportunities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    opportunity_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    opportunity_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    roi_estimate: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    recommended_action: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    affected_regions: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    affected_competitors: Mapped[list[int]] = mapped_column(JSONB, nullable=False, default=list)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        {"comment": "Detected business opportunities"},
+    )
+
+
+class StrategicRecommendation(Base):
+    """Stores AI-generated strategic recommendations."""
+    __tablename__ = "strategic_recommendations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    recommendation: Mapped[str] = mapped_column(Text, nullable=False)
+    why: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    expected_benefit: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    risk_level: Mapped[RiskLevel] = mapped_column(
+        Enum(RiskLevel, name="recommendation_risk_level_enum", create_constraint=True),
+        nullable=False, default=RiskLevel.LOW
+    )
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    applied: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    __table_args__ = (
+        {"comment": "Strategic recommendations"},
+    )
+
+
+class PredictiveBenchmark(Base):
+    """Stores predictive benchmarking data."""
+    __tablename__ = "predictive_benchmarks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    competitor_id: Mapped[int] = mapped_column(
+        ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    current_rank: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    predicted_rank: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    growth_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    innovation_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    expansion_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    risk_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    overall_prediction: Mapped[str] = mapped_column(String(20), nullable=False, default="stable")
+    benchmark_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("competitor_id", name="uq_benchmark_competitor"),
+        {"comment": "Predictive benchmarking data"},
+    )
+
+
+class ForecastReport(Base):
+    """Stores generated forecast reports."""
+    __tablename__ = "forecast_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    executive_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    predictions: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    risks: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    opportunities: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    recommendations: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    benchmark_data: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    regional_insights: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    business_actions: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    report_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        {"comment": "Generated forecast reports"},
+    )
+
+
+class PredictionEvaluation(Base):
+    __tablename__ = "prediction_evaluations"
+    __table_args__ = (
+        Index("ix_pred_eval_competitor_id", "competitor_id"),
+        Index("ix_pred_eval_prediction_type", "prediction_type"),
+        Index("ix_pred_eval_evaluated_at", "evaluated_at"),
+        {"comment": "Historical backtesting and actual vs. forecast validation"},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competitor_id: Mapped[int] = mapped_column(Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True)
+    prediction_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    predicted_value: Mapped[float] = mapped_column(Float, nullable=False)
+    actual_value: Mapped[float | None] = mapped_column(Float)
+    error_margin: Mapped[float | None] = mapped_column(Float)
+    confidence_score: Mapped[float] = mapped_column(Float, default=0.5)
+    model_used: Mapped[str | None] = mapped_column(String(100))
+    evaluation_notes: Mapped[str | None] = mapped_column(Text)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    competitor = relationship("Competitor")

@@ -1,4 +1,5 @@
 import time
+import structlog
 from typing import Any
 
 from fastapi import APIRouter, Depends, Response
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import verify_any_auth
 from app.api.dependencies import get_session
 from app.database.models import CollectionLog, Competitor
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["Health"])
 
@@ -255,7 +258,8 @@ async def health(
             "status": "healthy",
             "rss_mb": rss_mb,
         }
-    except Exception:
+    except Exception as e:
+        logger.warning("operation_failed", error=str(e))
         checks["memory"] = {"status": "unknown"}
 
     http_status = 200 if overall_healthy else 503

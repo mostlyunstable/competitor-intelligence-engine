@@ -106,6 +106,8 @@ class PageAnalyzer:
         r"window\.__INITIAL_DATA__",
         r"window\.__SERVER_DATA__",
         r"window\.__CLIENT_DATA__",
+        r"<div id=[\"']root[\"']></div>",
+        r"<div id=[\"']app[\"']></div>",
     ]
 
     CONTENT_QUALITY_INDICATORS: ClassVar[list[str]] = [
@@ -253,11 +255,12 @@ class PlaywrightRenderer:
         timeout: int = 30000,
         primary_selector: str = "body",
         competitor_id: int | None = None,
+        spa_base_url: str | None = None,
     ) -> str:
         """Render a page and return the HTML.
 
-        Uses domcontentloaded for faster initial load, then waits for
-        a primary content selector before extracting HTML.
+        Handles both traditional sites and SPAs with client-side routing.
+        For SPAs, uses a shared browser context and navigates via router.
         """
         context = await self._ensure_browser()
         page = await context.new_page()
@@ -268,10 +271,46 @@ class PlaywrightRenderer:
             await Stealth().apply_stealth_async(page)
 
         try:
-            await page.goto(url, wait_until="networkidle", timeout=timeout)
+            # For SPA: navigate to base URL first if this is a routed page
+            is_spa_route = spa_base_url is not None and spa_base_url != url
+            
+            if is_spa_route:
+                # Load the SPA base first
+                await page.goto(spa_base_url, wait_until="domcontentloaded", timeout=min(timeout, 30000))
+                await page.wait_for_selector(primary_selector, timeout=min(timeout, 30000))
+                
+                # Now navigate to the target route (client-side navigation)
+                await page.goto(url, wait_until="domcontentloaded", timeout=min(timeout, 30000))
+                # Wait for router to update content - wait for URL change and content
+                await page.wait_for_url(url, timeout=min(timeout, 15000))
+            else:
+                # Standard navigation
+                await page.goto(url, wait_until="domcontentloaded", timeout=min(timeout, 30000))
+
+            # Site-specific waits for SPA content loading
+            if is_spa_route:
+                if "servi.in" in url:
+                    # servi.in loads pricing via GraphQL after navigation
+                    with contextlib.suppress(Exception):
+                        await page.wait_for_response("**/graphql**", timeout=15000)
+                    # Also wait for pricing content to appear
+                    with contextlib.suppress(Exception):
+                        await page.wait_for_selector("[class*='price'], [class*='plan'], [class*='pricing']", timeout=10000)
+                elif "callsevai.com" in url:
+                    # callsevai.com loads service details via API
+                    with contextlib.suppress(Exception):
+                        await page.wait_for_response("**/api/**", timeout=15000)
+                    with contextlib.suppress(Exception):
+                        await page.wait_for_selector("[class*='service'], [class*='pricing'], [class*='price']", timeout=10000)
 
             with contextlib.suppress(Exception):
-                await page.wait_for_selector(primary_selector, timeout=min(timeout, 10000))
+                await page.wait_for_selector(primary_selector, timeout=min(timeout, 30000))
+
+            # If we have extra timeout budget, wait for network to settle
+            remaining = timeout - 30000
+            if remaining > 0:
+                with contextlib.suppress(Exception):
+                    await page.wait_for_load_state("networkidle", timeout=remaining)
 
             if competitor_id is not None:
                 from app.services.visual_diff_service import VisualDiffService
@@ -521,8 +560,8 @@ class HybridFetcher:
             self._domain_limiters[domain] = RateLimiter(self._settings.rate_limit_per_second)
         return self._domain_limiters[domain]
 
-    async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create httpx client."""
+    async def _get_client(self, url: str | None = None) -> httpx.AsyncClient:
+        """Get or create httpx client with domain-specific headers."""
         import random
 
         proxy = None
@@ -538,11 +577,36 @@ class HybridFetcher:
                 proxy = proxy_str
                 proxy_key = proxy_str
 
+        # Add domain-specific proxy key for custom headers
+        if url:
+            if "nobroker.in" in url:
+                proxy_key = "nobroker"
+            elif "justdial.com" in url:
+                proxy_key = "justdial"
+
         client = self._clients.get(proxy_key)
         if client is None or client.is_closed:
+            headers = {"User-Agent": self._settings.user_agent}
+            # Domain-specific headers
+            if url and "nobroker.in" in url:
+                headers.update({
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                    "Accept-Language": "en-IN,en;q=0.9",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Referer": "https://www.google.com/",
+                    "Cache-Control": "no-cache",
+                    "Pragma": "no-cache",
+                })
+            elif url and "justdial.com" in url:
+                headers.update({
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-IN,en;q=0.9",
+                    "Referer": "https://www.google.com/",
+                })
+
             client = httpx.AsyncClient(
                 timeout=httpx.Timeout(self._settings.collection_timeout),
-                headers={"User-Agent": self._settings.user_agent},
+                headers=headers,
                 follow_redirects=True,
                 verify=True,
                 proxy=proxy,
@@ -582,7 +646,18 @@ class HybridFetcher:
             from app.utilities.metrics import metrics
 
             metrics.inc_counter("playwright_fallback_total")
-            dynamic_result = await self._fetch_dynamic(url, competitor_id)
+
+            # For forced render, also detect SPA
+            static_result = await self._fetch_static({})
+            analysis = self._analyzer.analyze(static_result.html) if static_result.html else {"has_indicators": False}
+            is_spa = analysis.get("has_indicators", False)
+            spa_base_url = None
+            if is_spa:
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                spa_base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+            dynamic_result = await self._fetch_dynamic(url, competitor_id, spa_base_url=spa_base_url)
             if dynamic_result.html:
                 lang_detector = LanguageDetector()
                 lang_result = lang_detector.detect(dynamic_result.html)
@@ -686,8 +761,16 @@ class HybridFetcher:
 
         metrics.inc_counter("playwright_fallback_total")
 
+        # Detect SPA: if has SPA indicators (root/app div), treat as SPA
+        is_spa = analysis.get("has_indicators", False)
+        spa_base_url = None
+        if is_spa:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            spa_base_url = f"{parsed.scheme}://{parsed.netloc}"
+
         try:
-            dynamic_result = await self._fetch_dynamic(url, competitor_id)
+            dynamic_result = await self._fetch_dynamic(url, competitor_id, spa_base_url=spa_base_url)
             if dynamic_result.html:
                 lang_detector = LanguageDetector()
                 lang_result = lang_detector.detect(dynamic_result.html)
@@ -764,7 +847,7 @@ class HybridFetcher:
 
         for attempt in range(self._settings.retry_attempts):
             try:
-                client = await self._get_client()
+                client = await self._get_client(url)
                 headers = dict(conditional_headers) if conditional_headers else {}
                 from app.chaos import ChaosMonkey
                 await ChaosMonkey.maybe_fail_network()
@@ -879,7 +962,7 @@ class HybridFetcher:
 
         raise last_error or RuntimeError(f"Failed to fetch {url}")
 
-    async def _fetch_dynamic(self, url: str, competitor_id: int | None = None) -> FetchResult:
+    async def _fetch_dynamic(self, url: str, competitor_id: int | None = None, spa_base_url: str | None = None) -> FetchResult:
         """Fetch page using Playwright."""
         await self._get_domain_limiter(url).acquire()
 
@@ -889,6 +972,7 @@ class HybridFetcher:
             timeout=self._settings.playwright_timeout,
             primary_selector=self._settings.primary_selector,
             competitor_id=competitor_id,
+            spa_base_url=spa_base_url,
         )
 
         return FetchResult(

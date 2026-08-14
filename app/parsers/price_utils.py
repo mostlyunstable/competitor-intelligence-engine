@@ -15,7 +15,7 @@ CURRENCY_SYMBOLS: dict[str, str] = {
 # Currency codes for detection
 CURRENCY_CODES = {"USD", "EUR", "GBP", "INR", "JPY", "CAD", "AUD"}
 
-# Compiled regex for price extraction (matches Rs. prefix, amounts, symbols, codes)
+# Compiled regex for price extraction — covers Indian formats (Rs., ₹, /-, ranges)
 _PRICE_RE = re.compile(
     r"""
     (?:
@@ -31,11 +31,43 @@ _PRICE_RE = re.compile(
     re.VERBOSE | re.IGNORECASE,
 )
 
+# Indian price patterns: "Rs. 499", "₹499/-", "₹ 499", "from ₹499", "starting at Rs.499"
+_INDIAN_PRICE_RE = re.compile(
+    r'(?:rs\.?\s*|₹\s*|from\s+₹?\s*|starting\s+(?:at|from)\s+₹?\s*|price[:\s]*₹?\s*)'
+    r'([\d,]+(?:\.\d{1,2})?)'
+    r'(?:\s*/-|\s*onwards|\s*per\s+\w+|\s*/\s*\w+)?',
+    re.IGNORECASE,
+)
+
+# Range pattern: "₹499 - ₹999", "Rs. 499-999", "499-999"
+_PRICE_RANGE_RE = re.compile(
+    r'(?:₹|rs\.?\s*)?\s*([\d,]+(?:\.\d{1,2})?)'
+    r'\s*[-–to]+\s*'
+    r'(?:₹|rs\.?\s*)?\s*([\d,]+(?:\.\d{1,2})?)',
+    re.IGNORECASE,
+)
+
 
 def parse_price(text: str | None) -> float | None:
-    """Extract numeric price from text, handling Indian notation (Rs., /-)."""
+    """Extract numeric price from text, handling Indian notation (Rs., /-, ranges)."""
     if not text:
         return None
+
+    # Check for Indian price patterns first (most common for our market)
+    indian_match = _INDIAN_PRICE_RE.search(text)
+    if indian_match:
+        try:
+            return float(indian_match.group(1).replace(",", ""))
+        except ValueError:
+            pass
+
+    # Check for price range — return the lower bound
+    range_match = _PRICE_RANGE_RE.search(text)
+    if range_match:
+        try:
+            return float(range_match.group(1).replace(",", ""))
+        except ValueError:
+            pass
 
     # Check for Rs. prefix (Indian notation)
     rs_match = re.search(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', text.lower())

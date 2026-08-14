@@ -13,8 +13,8 @@ Targeted at enterprise data teams, business analysts, and competitive intelligen
 - **Primary Market**: India (Chennai focus)
 - **Competitor Tiers**:
   - **Tier 1**: Urban Company, HomeFix Smart Services, Servi (market leaders)
-  - **Tier 2**: Vijay Home Services, Sparkle Cleaning Services, Chennai Home Service, CallSevai (regional)
-  - **Tier 3**: NoBroker, Justdial, Sulekha, IndiaMART (marketplaces)
+  - **Tier 2**: Vijay Home Services, Sparkle Cleaning Services, Chennai Home Service (regional)
+  - **Tier 3**: IndiaMART (marketplace)
 
 ---
 

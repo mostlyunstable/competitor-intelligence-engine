@@ -30,7 +30,7 @@ _PRICING_PATTERNS = re.compile(
 
 def _is_valid_pricing(service_name: str, base_price: float | None, category: str | None) -> bool:
     """Filter out navigation items from pricing results."""
-    if not service_name or len(service_name) < 5 or len(service_name) > 200:
+    if not service_name or len(service_name) < 3 or len(service_name) > 200:
         return False
 
     lower = service_name.lower().strip()
@@ -42,6 +42,29 @@ def _is_valid_pricing(service_name: str, base_price: float | None, category: str
     if "@" in service_name:
         return False
     if service_name.startswith(("http://", "https://", "www.", "/")):
+        return False
+
+    # Reject names that are just price ranges ("Rs.450 – Rs.650")
+    if re.match(r"^(rs\.?|inr|₹|\$|usd|eur|gbp)\s*[\d,]+", lower):
+        return False
+    if re.match(r"^[\d,]+\s*[-–]\s*[\d,]+$", service_name.strip()):
+        return False
+
+    # Reject junk categories
+    _JUNK_CATS = frozenset({
+        "blog", "location", "select category", "enter product / service to search",
+        "press releases", "media", "home", "interiors", "home services",
+        "services", "uncategorized",
+    })
+    if category and category.lower().strip() in _JUNK_CATS:
+        return False
+
+    # Reject prices below ₹10 — too low for any real service
+    if base_price is not None and base_price < 10:
+        return False
+
+    # Reject prices above ₹1,00,000 — likely extraction error
+    if base_price is not None and base_price > 100000:
         return False
 
     # Accept if it has a real price
@@ -56,9 +79,13 @@ def _is_valid_pricing(service_name: str, base_price: float | None, category: str
     if _PRICING_PATTERNS.search(service_name):
         return True
 
-    # Reject if it looks like navigation
-    if re.match(r"^(get |buy |call |email |find |request |schedule |start |compare |view |see |read |learn |explore )", service_name, re.IGNORECASE):
-        return False
+    # Accept if name mentions a service with any number (likely a plan/price)
+    if re.search(r'\d', service_name) and len(lower) >= 5:
+        return True
+
+    # Accept if name looks like a service package
+    if re.search(r'(basic|premium|standard|plus|pro|starter| deluxe| economy| family| individual| couple)', lower):
+        return True
 
     return False
 
@@ -109,6 +136,28 @@ class PricingCollector(BaseCollector):
             for item in pricing_items:
                 service_name = (item.get("service_name") or "").strip()
                 if not service_name or len(service_name) > 500:
+                    skipped_count += 1
+                    continue
+
+                # Clean trailing suffixes from extraction artifacts
+                service_name = re.sub(r"\s*(From|Starting at|Starts from|Starting from|Prices?\s+from)\s*$", "", service_name, flags=re.IGNORECASE).strip()
+                # Remove "Most Booked" / "Best Seller" prefixes
+                service_name = re.sub(r"^(Most Booked|Best Seller|Top Rated|Featured|Popular)\s*", "", service_name, flags=re.IGNORECASE).strip()
+                # Deduplicate repeated text
+                if len(service_name) >= 6:
+                    half = len(service_name) // 2
+                    if service_name[:half] == service_name[half:half * 2]:
+                        service_name = service_name[:half].strip()
+                    # Triple repeat
+                    else:
+                        third = len(service_name) // 3
+                        if third >= 3 and service_name[:third] == service_name[third:third * 2] == service_name[third * 2:third * 3]:
+                            service_name = service_name[:third].strip()
+                # Reject price ranges as service names
+                if re.match(r"^(rs\.?|inr|₹|\$|usd|eur|gbp)\s*[\d,]+", service_name.lower()):
+                    skipped_count += 1
+                    continue
+                if re.match(r"^[\d,]+\s*[-–]\s*[\d,]+$", service_name.strip()):
                     skipped_count += 1
                     continue
 

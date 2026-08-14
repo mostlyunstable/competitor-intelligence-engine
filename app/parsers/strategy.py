@@ -619,9 +619,17 @@ class ParsedResult:
             if key.startswith("__") and key not in self.strategy_results:
                 self.strategy_results[key] = other.strategy_results[key]
 
-        # Overall page confidence — unchanged behaviour
+        # Overall page confidence — only increase if strategy extracted meaningful content
+        # Check if this strategy contributed any new entities
+        entities_before = self.count_entities()
+        # Count entities in the incoming result (only the new ones that would be added)
+        incoming_entities = other.count_entities()
+        
+        # Only add weight if the strategy extracted meaningful content
+        if incoming_entities > 0:
+            self.confidence = min(1.0, self.confidence + weight)
+        
         self.strategy_results[strategy_name] = weight
-        self.confidence = min(1.0, self.confidence + weight)
 
     # ------------------------------------------------------------------
     # New opt-in field-level metadata access

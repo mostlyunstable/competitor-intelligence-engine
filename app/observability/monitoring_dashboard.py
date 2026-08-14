@@ -6,6 +6,7 @@ Provides a comprehensive view of system health, performance, and alerts.
 from __future__ import annotations
 
 import time
+import structlog
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends
@@ -15,6 +16,8 @@ from app.api.dependencies import get_session
 from app.database.models import CollectionLog, Competitor
 from app.observability.alerting import alert_manager
 from app.observability.parser_metrics import registry
+
+logger = structlog.get_logger(__name__)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -157,7 +160,8 @@ async def _get_system_health(session: AsyncSession) -> dict[str, Any]:
             "status": "healthy" if rss_mb < 512 else "warning",
             "rss_mb": rss_mb,
         }
-    except Exception:
+    except Exception as e:
+        logger.warning("operation_failed", error=str(e))
         checks["memory"] = {"status": "unknown"}
 
     return {

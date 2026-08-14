@@ -107,10 +107,6 @@ class CollectionService:
 
             log.info("collection_started", modules=modules, base_url=base_url)
 
-            # Broadcast collection started via WebSocket
-            from app.services.websocket_manager import ws_manager
-            await ws_manager.broadcast_collection_started(competitor_id, competitor_name)
-
             # Phase 2: Discover URLs (no DB session needed)
             discovery_engine = DiscoveryEngine()
             discovered = await discovery_engine.discover(base_url)
@@ -236,8 +232,6 @@ class CollectionService:
                     removed=sum(1 for c in all_changes if c["change_type"] == "removed"),
                     modified=sum(1 for c in all_changes if c["change_type"] == "modified"),
                 )
-                # Broadcast changes via WebSocket
-                await ws_manager.broadcast_changes_detected(competitor_id, all_changes)
 
             log.info(
                 "collection_completed",
@@ -245,15 +239,6 @@ class CollectionService:
                 modules=modules,
                 records_collected=records_collected,
                 errors=len(errors),
-            )
-
-            # Broadcast collection completed via WebSocket
-            await ws_manager.broadcast_collection_completed(
-                competitor_id=competitor_id,
-                competitor_name=competitor_name,
-                records_collected=records_collected,
-                elapsed=elapsed,
-                changes=len(all_changes),
             )
 
             if records_collected > 0:
@@ -289,13 +274,6 @@ class CollectionService:
         except Exception as e:
             elapsed = round(time.time() - start_time, 2)
             log.error("collection_failed", error=str(e), elapsed=elapsed)
-            # Broadcast collection failed via WebSocket
-            from app.services.websocket_manager import ws_manager
-            await ws_manager.broadcast_collection_failed(
-                competitor_id=competitor_id,
-                competitor_name=competitor_data.get("name", f"ID {competitor_id}"),
-                error=str(e),
-            )
             return {
                 "status": "failed",
                 "competitor_id": competitor_id,
@@ -387,8 +365,19 @@ class CollectionService:
         base = base_url.rstrip("/")
         patterns = {
             "company": [r"/about", r"/company", r"/team", r"/story", r"/mission", r"/contact"],
-            "services": [r"/plan", r"/coverage", r"/warranty", r"/protect"],
-            "pricing": [r"/pric", r"/cost", r"/rate", r"/subscription"],
+            "services": [
+                r"/service", r"/solution", r"/plan", r"/coverage", r"/warranty",
+                r"/protect", r"/booking", r"/book", r"/category", r"/categories",
+                r"/cleaning", r"/plumbing", r"/electrical", r"/repair", r"/pest",
+                r"/painting", r"/ac", r"/appliance", r"/interior", r"/renovation",
+                r"/salon", r"/beauty", r"/fitness", r"/tutor", r"/coaching",
+            ],
+            "pricing": [
+                r"/pric", r"/cost", r"/rate", r"/fee", r"/charge",
+                r"/subscription", r"/plan", r"/package", r"/quote", r"/estimate",
+                r"/tariff", r"/membership", r"/tier", r"/offer",
+                r"/book", r"/booking", r"/enquir", r"/get-a-quote",
+            ],
             "content": [r"/blog", r"/article", r"/news", r"/resource", r"/case-study", r"/post"],
             "social": [r"/social", r"/follow", r"/community"],
         }
@@ -417,7 +406,7 @@ class CollectionService:
         url_lower = url.lower()
         if any(p in url_lower for p in ("service", "product", "feature", "solution")):
             return "services"
-        if any(p in url_lower for p in ("pric", "cost", "rate", "plan")):
+        if any(p in url_lower for p in ("pric", "cost", "rate", "plan", "quote", "estimate", "fee", "tariff", "charge", "package")):
             return "pricing"
         if any(p in url_lower for p in ("blog", "article", "news", "post", "resource")):
             return "content"

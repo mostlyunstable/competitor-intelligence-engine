@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import structlog
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, func
@@ -11,6 +13,8 @@ from app.api.auth import verify_any_auth
 from app.api.dependencies import get_session
 from app.configuration.settings import get_settings
 from app.database.models import Competitor, CompetitorAIInsight, RawStorage
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(
     prefix="/api/ai",
@@ -270,7 +274,8 @@ async def get_ai_status(db: AsyncSession = Depends(get_session)) -> Any:
                 provider = OpenAIProvider()
                 health = await provider.health()
                 get_ai_status._health_cache = {"healthy": health.healthy, "latency": health.latency_ms, "ts": now}
-            except Exception:
+            except Exception as e:
+                logger.warning("operation_failed", error=str(e))
                 get_ai_status._health_cache = {"healthy": False, "latency": 0.0, "ts": now}
         cache = get_ai_status._health_cache
         provider_healthy = cache["healthy"]

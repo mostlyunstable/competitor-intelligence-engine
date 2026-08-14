@@ -14,6 +14,10 @@ import ReportsPage from './pages/ReportsPage'
 import AdminPage from './pages/AdminPage'
 import ActivityPage from './pages/ActivityPage'
 import AiInsightsPage from './pages/AiInsightsPage'
+import PredictionsPage from './pages/PredictionsPage'
+import IndustryBenchmarksPage from './pages/IndustryBenchmarksPage'
+import CopilotPage from './pages/CopilotPage'
+import MLPerformancePage from './pages/MLPerformancePage'
 import { DashboardProvider } from './context/DashboardContext'
 
 const AuthContext = createContext<{
@@ -59,7 +63,7 @@ export default function App() {
               <ProtectedRoute>
                 <DashboardProvider>
                   <Layout>
-                    <ErrorBoundary>
+                    <ErrorBoundary key={window.location.pathname}>
                       <Routes>
                         <Route path="/" element={<OverviewPage />} />
                         <Route path="/competitors" element={<CompetitorsPage />} />
@@ -70,6 +74,10 @@ export default function App() {
                         <Route path="/reports" element={<ReportsPage />} />
                         <Route path="/activity" element={<ActivityPage />} />
                         <Route path="/ai" element={<AiInsightsPage />} />
+                        <Route path="/predictions" element={<PredictionsPage />} />
+                        <Route path="/industry-benchmarks" element={<IndustryBenchmarksPage />} />
+                        <Route path="/copilot" element={<CopilotPage />} />
+                        <Route path="/ml-performance" element={<MLPerformancePage />} />
                         <Route path="/admin" element={<AdminPage />} />
                       </Routes>
                     </ErrorBoundary>

@@ -66,7 +66,7 @@ _COVERAGE_PATTERNS = re.compile(
 
 def _is_valid_service(name: str, description: str | None = None, price: float | None = None) -> bool:
     """Filter out navigation links, phone numbers, and non-service text."""
-    if not name or len(name) < 3 or len(name) > 200:
+    if not name or len(name) < 2 or len(name) > 200:
         return False
 
     lower = name.lower().strip()
@@ -95,20 +95,45 @@ def _is_valid_service(name: str, description: str | None = None, price: float | 
     if "?" in name:
         return False
 
-    # Reject items with exclamation marks (marketing)
-    if "!" in name:
+    # Reject names that are just price ranges ("Rs.450 – Rs.650", "₹499-999")
+    if re.match(r"^(rs\.?|inr|₹|\$|usd|eur|gbp)\s*[\d,]+", lower):
+        return False
+    if re.match(r"^[\d,]+\s*[-–]\s*[\d,]+$", name.strip()):
+        return False
+
+    # Reject duplicated text ("Termite ControlTermite Control")
+    _check_dup = name.strip()
+    half = len(_check_dup) // 2
+    if half >= 5 and _check_dup[:half] == _check_dup[half:half * 2]:
+        return False
+    # Reject triple repeat ("AXAXA")
+    third = len(_check_dup) // 3
+    if third >= 3 and _check_dup[:third] == _check_dup[third:third * 2] == _check_dup[third * 2:third * 3]:
+        return False
+
+    # Reject junk/non-service categories as names
+    _JUNK_NAMES = frozenset({
+        "blog", "location", "select category", "enter product / service to search",
+        "press releases", "media", "home", "interiors", "home services",
+        "services", "uncategorized", "sparkle cleaning service",
+    })
+    if lower in _JUNK_NAMES:
         return False
 
     # Accept if has a real price attached
-    if price is not None and price > 1.0:
+    if price is not None and price > 0:
         return True
 
     # Accept if matches specific coverage patterns (actual systems/appliances)
     if _COVERAGE_PATTERNS.search(name):
         return True
 
-    # Accept if has a meaningful description (> 20 chars)
-    return bool(description and len(description) > 20)
+    # Accept if name has at least 5 chars and looks like a service (contains action words)
+    if len(lower) >= 5 and re.search(r'(clean|repair|install|service|wash|paint|fix|maintain|check|inspect|treat|pest|ac |plumb|electric|carpent|beauty|salon|tutor|gym|fit)', lower):
+        return True
+
+    # Accept if has a meaningful description (> 15 chars, relaxed from 20)
+    return bool(description and len(description) > 15)
 
 
 class ServiceCollector(BaseCollector):
@@ -158,6 +183,28 @@ class ServiceCollector(BaseCollector):
             for svc in services:
                 service_name = (svc.get("name") or "").strip()
                 if not service_name or len(service_name) > 500:
+                    skipped_count += 1
+                    continue
+
+                # Clean trailing suffixes from extraction artifacts
+                service_name = re.sub(r"\s*(From|Starting at|Starts from|Starting from|Prices?\s+from)\s*$", "", service_name, flags=re.IGNORECASE).strip()
+                # Remove "Most Booked" / "Best Seller" / "Top Rated" prefixes
+                service_name = re.sub(r"^(Most Booked|Best Seller|Top Rated|Featured|Popular)\s*", "", service_name, flags=re.IGNORECASE).strip()
+                # Deduplicate repeated text ("Termite ControlTermite Control" → "Termite Control")
+                if len(service_name) >= 6:
+                    half = len(service_name) // 2
+                    if service_name[:half] == service_name[half:half * 2]:
+                        service_name = service_name[:half].strip()
+                    # Triple repeat ("AXAXA" → "AX")
+                    else:
+                        third = len(service_name) // 3
+                        if third >= 3 and service_name[:third] == service_name[third:third * 2] == service_name[third * 2:third * 3]:
+                            service_name = service_name[:third].strip()
+                # Reject price ranges as service names
+                if re.match(r"^(rs\.?|inr|₹|\$|usd|eur|gbp)\s*[\d,]+", service_name.lower()):
+                    skipped_count += 1
+                    continue
+                if re.match(r"^[\d,]+\s*[-–]\s*[\d,]+$", service_name.strip()):
                     skipped_count += 1
                     continue
 

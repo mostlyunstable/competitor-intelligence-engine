@@ -52,7 +52,7 @@ class GenericDomHeuristicStrategy(ParsingStrategy):
     def _analyze_price_elements(self, soup: BeautifulSoup, result: ParsedResult) -> None:
         if result.pricing:
             return
-        price_pattern = re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{2})?|rs\.?\s*[\d,]+(?:\.\d{2})?|\d+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)|\d+[\d,]*(?:\.\d{2})?/-")
+        price_pattern = re.compile(r"[\$€£₹]\s*[\d,]+(?:\.\d{2})?|rs\.?\s*[\d,]+(?:\.\d{2})?|\d+(?:\.\d{2})?\s*(?:USD|EUR|GBP|INR)|\d+[\d,]*(?:\.\d{2})?/-|from\s+₹?\s*[\d,]+|starting\s+(?:at|from)\s+₹?\s*[\d,]+")
         for element in soup.select("th, td, li, span, strong, em"):
             text = element.get_text(strip=True)
             if not text or len(text) > 60:

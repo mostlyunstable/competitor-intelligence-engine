@@ -53,7 +53,7 @@ class DiscoveryEngine:
         needs_client = self._client is None or self._client.is_closed
         if needs_client:
             self._client = httpx.AsyncClient(
-                timeout=httpx.Timeout(30),
+                timeout=httpx.Timeout(get_settings().collector.collection_timeout),
                 headers={"User-Agent": get_settings().collector.user_agent},
                 follow_redirects=True,
                 verify=True,
@@ -78,6 +78,47 @@ class DiscoveryEngine:
                 all_urls = [u for u in all_urls if self._is_same_domain(u.url, domain)]
 
             all_urls = self._deduplicate(all_urls)
+
+            # SPA fallback: if no URLs discovered (likely SPA with no static links),
+            # try common paths that typically exist on service websites
+            if not all_urls:
+                common_paths = [
+                    "/services", "/service", "/solutions", "/products",
+                    "/pricing", "/plans", "/packages", "/quote", "/estimate",
+                    "/about", "/about-us", "/company", "/team",
+                    "/contact", "/contact-us", "/get-quote",
+                    "/blog", "/news", "/resources", "/case-studies",
+                    "/faq", "/faqs", "/help", "/support",
+                    "/login", "/signup", "/register",
+                    "/dashboard", "/portal", "/app",
+                ]
+                for path in common_paths:
+                    test_url = normalize_url(base_url.rstrip("/") + path)
+                    if self._is_same_domain(test_url, domain):
+                        all_urls.append(DiscoveredURL(
+                            url=test_url,
+                            source="spa_fallback",
+                            depth=1,
+                            context=f"SPA fallback path: {path}"
+                        ))
+
+            # Domain-specific URL filtering
+            if "callsevai.com" in base_url:
+                # Filter out known 404 service paths from sitemap
+                bad_patterns = [
+                    "/service/electrician",
+                    "/service/plumber",
+                    "/service/ac-repair",
+                    "/service/ac-installation",
+                    "/service/refrigerator-repair",
+                    "/service/washing-machine-repair",
+                    "/service/water-purifier-service",
+                    "/service/geyser-repair",
+                ]
+                before = len(all_urls)
+                all_urls = [u for u in all_urls if not any(p in u.url for p in bad_patterns)]
+                logger.info("callsevai_filtered_bad_paths", removed=before - len(all_urls), url=base_url)
+
             all_urls = self._rank(all_urls, domain)
 
             max_pages = self._settings.max_pages_per_competitor
@@ -163,7 +204,8 @@ class DiscoveryEngine:
 
             try:
                 soup = BeautifulSoup(response.text, "xml")
-            except Exception:
+            except Exception as e:
+                logger.warning("operation_failed", error=str(e))
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
                     soup = BeautifulSoup(response.text, "html.parser")

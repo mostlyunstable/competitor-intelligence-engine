@@ -41,7 +41,8 @@ class ConnectionManager:
             for ws in self._connections:
                 try:
                     await ws.send_text(message)
-                except Exception:
+                except Exception as e:
+                    logger.warning("operation_failed", error=str(e))
                     dead.append(ws)
             for ws in dead:
                 self._connections.remove(ws)

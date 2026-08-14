@@ -13,6 +13,41 @@ import type {
   AiInsight,
   CompetitorScoreResponse,
   SchedulerStatus,
+  TrendAnalysis,
+  GrowthForecast,
+  ExpansionForecast,
+  CompetitorRisk,
+  BusinessOpportunity,
+  StrategicRecommendation,
+  PredictiveBenchmark,
+  ForecastReport,
+  MarketTrend,
+  IndustryBenchmark,
+  AdvancedScore,
+  DataQualityReport,
+  ScenarioSimulation,
+  ScenarioDefinition,
+  LearningAccuracyReport,
+  ConfidenceDriftReport,
+  FeatureEffectiveness,
+  ModelVersion,
+  ConfidenceScore,
+  Explainability,
+  GraphData,
+  GraphStats,
+  GraphNeighbor,
+  MarketCluster,
+  HiddenCompetitor,
+  SearchResult as RAGSearchResult,
+  CopilotResponse,
+  CoordinatedResult,
+  MLModel,
+  MLForecastResult,
+  MLEvaluation,
+  StreamingStats,
+  GeoCity,
+  GeoHeatmapPoint,
+  GeoMapData,
 } from '../types'
 
 const API_BASE = ''
@@ -367,6 +402,325 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ queries: queries || [], num_results: numResults || 10 }),
     })
+  }
+
+  // ─── Sprint 7: Predictions ───────────────────────────────────────────────
+
+  async getMarketTrends(days = 90): Promise<TrendAnalysis> {
+    return this.request(`/api/predictions/trends?days=${days}`)
+  }
+
+  async getEmergingTrends(): Promise<MarketTrend[]> {
+    return this.request('/api/predictions/trends/emerging')
+  }
+
+  async getGrowthForecasts(): Promise<GrowthForecast[]> {
+    return this.request('/api/predictions/growth')
+  }
+
+  async getCompetitorGrowth(competitorId: number): Promise<GrowthForecast> {
+    return this.request(`/api/predictions/growth/${competitorId}`)
+  }
+
+  async getExpansionForecast(competitorId: number): Promise<ExpansionForecast[]> {
+    return this.request(`/api/predictions/expansion/${competitorId}`)
+  }
+
+  async getAllRisks(): Promise<CompetitorRisk[]> {
+    return this.request('/api/predictions/risks')
+  }
+
+  async getCompetitorRisks(competitorId: number): Promise<CompetitorRisk[]> {
+    return this.request(`/api/predictions/risks/${competitorId}`)
+  }
+
+  async getOpportunities(): Promise<BusinessOpportunity[]> {
+    return this.request('/api/predictions/opportunities')
+  }
+
+  async getAllRecommendations(): Promise<StrategicRecommendation[]> {
+    return this.request('/api/predictions/recommendations')
+  }
+
+  async getCompetitorRecommendations(competitorId: number): Promise<StrategicRecommendation[]> {
+    return this.request(`/api/predictions/recommendations/${competitorId}`)
+  }
+
+  async getPredictiveBenchmarks(): Promise<PredictiveBenchmark[]> {
+    return this.request('/api/predictions/benchmarks')
+  }
+
+  async getCompetitorBenchmark(competitorId: number): Promise<PredictiveBenchmark> {
+    return this.request(`/api/predictions/benchmarks/${competitorId}`)
+  }
+
+  async getForecastReport(): Promise<ForecastReport> {
+    return this.request('/api/predictions/report')
+  }
+
+  async getFullPredictions(competitorId: number): Promise<Record<string, unknown>> {
+    return this.request(`/api/predictions/full/${competitorId}`)
+  }
+
+  async generatePredictions(): Promise<{ status: string; saved_predictions: number; saved_trends: number; saved_benchmarks: number }> {
+    return this.request('/api/predictions/generate', { method: 'POST' })
+  }
+
+  // ─── Sprint 7.1: Enhanced Endpoints ─────────────────────────────────────
+
+  async getIndustryBenchmarks(): Promise<IndustryBenchmark[]> {
+    return this.request('/api/predictions/industry-benchmarks')
+  }
+
+  async getIndustryBenchmarkCompetitor(competitorId: number): Promise<IndustryBenchmark> {
+    return this.request(`/api/predictions/industry-benchmarks/${competitorId}`)
+  }
+
+  async getCategoryBenchmarks(): Promise<Record<string, unknown>> {
+    return this.request('/api/predictions/industry-benchmarks/categories')
+  }
+
+  async getAdvancedScores(): Promise<AdvancedScore[]> {
+    return this.request('/api/predictions/scores')
+  }
+
+  async getDataQualityAll(): Promise<DataQualityReport[]> {
+    return this.request('/api/predictions/data-quality')
+  }
+
+  async getDataQuality(competitorId: number): Promise<DataQualityReport> {
+    return this.request(`/api/predictions/data-quality/${competitorId}`)
+  }
+
+  async listScenarios(): Promise<ScenarioDefinition[]> {
+    return this.request('/api/predictions/scenarios')
+  }
+
+  async runScenario(scenarioType: string, competitorId?: number, params?: Record<string, unknown>): Promise<ScenarioSimulation> {
+    const url = `/api/predictions/scenarios/${scenarioType}` + (competitorId ? `?competitor_id=${competitorId}` : '')
+    return this.request(url, { method: 'POST', body: params ? JSON.stringify(params) : undefined, headers: params ? { 'Content-Type': 'application/json' } : undefined })
+  }
+
+  async getLearningAccuracy(): Promise<LearningAccuracyReport> {
+    return this.request('/api/predictions/learning/accuracy')
+  }
+
+  async getConfidenceDrift(): Promise<ConfidenceDriftReport> {
+    return this.request('/api/predictions/learning/drift')
+  }
+
+  async getFeatureEffectiveness(): Promise<FeatureEffectiveness> {
+    return this.request('/api/predictions/learning/features')
+  }
+
+  async getModelVersions(): Promise<ModelVersion[]> {
+    return this.request('/api/predictions/learning/models')
+  }
+
+  async getGrowthWithConfidence(competitorId: number): Promise<GrowthForecast & { confidence: ConfidenceScore; explanation: Explainability }> {
+    return this.request(`/api/predictions/growth/${competitorId}/confidence`)
+  }
+
+  async getRisksExplained(competitorId: number): Promise<(CompetitorRisk & { explanation: Explainability })[]> {
+    return this.request(`/api/predictions/risks/${competitorId}/explained`)
+  }
+
+  async getOpportunitiesExplained(): Promise<(BusinessOpportunity & { explanation: Explainability })[]> {
+    return this.request('/api/predictions/opportunities/explained')
+  }
+
+  async getRecommendationsExplained(): Promise<(StrategicRecommendation & { explanation: Explainability })[]> {
+    return this.request('/api/predictions/recommendations/explained')
+  }
+
+  async getBenchmarksExplained(): Promise<(PredictiveBenchmark & { explanation: Explainability })[]> {
+    return this.request('/api/predictions/benchmarks/explained')
+  }
+
+  async getEnhancedReport(): Promise<ForecastReport & { data_quality: DataQualityReport[]; learning: { accuracy_report: LearningAccuracyReport; confidence_drift: ConfidenceDriftReport } }> {
+    return this.request('/api/predictions/report/enhanced')
+  }
+
+  // ─── Sprint 7.2: Knowledge Graph ───────────────────────────────────────
+
+  async buildGraph(): Promise<{ nodes: number; edges: number }> {
+    return this.request('/api/graph/build')
+  }
+
+  async getGraph(): Promise<GraphData> {
+    return this.request('/api/graph')
+  }
+
+  async getGraphStats(): Promise<GraphStats> {
+    return this.request('/api/graph/stats')
+  }
+
+  async searchGraph(q: string, limit = 10): Promise<{ id: string; type: string; name: string }[]> {
+    return this.request(`/api/graph/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+  }
+
+  async getGraphNeighbors(competitorId: number, relationship?: string): Promise<GraphNeighbor[]> {
+    const rel = relationship ? `&relationship=${relationship}` : ''
+    return this.request(`/api/graph/competitor/${competitorId}/neighbors${rel}`)
+  }
+
+  async getGraphPath(source: string, target: string): Promise<{ nodes: string[]; edges: { source: string; target: string; relationship: string; weight: number }[]; total_weight: number } | null> {
+    return this.request(`/api/graph/path?source=${encodeURIComponent(source)}&target=${encodeURIComponent(target)}`)
+  }
+
+  async getGraphClusters(): Promise<MarketCluster[]> {
+    return this.request('/api/graph/clusters')
+  }
+
+  async getHiddenCompetitors(): Promise<HiddenCompetitor[]> {
+    return this.request('/api/graph/hidden-competitors')
+  }
+
+  async getGraphInfluence(): Promise<Record<string, number>> {
+    return this.request('/api/graph/influence')
+  }
+
+  async getCompetitorsInCity(city: string): Promise<{ id: string; name: string }[]> {
+    return this.request(`/api/graph/city/${encodeURIComponent(city)}`)
+  }
+
+  async getCompetitorsInCategory(category: string): Promise<{ id: string; name: string }[]> {
+    return this.request(`/api/graph/category/${encodeURIComponent(category)}`)
+  }
+
+  // ─── Sprint 7.2: RAG ──────────────────────────────────────────────────
+
+  async buildRagIndex(): Promise<Record<string, number>> {
+    return this.request('/api/rag/index')
+  }
+
+  async getRagStats(): Promise<Record<string, unknown>> {
+    return this.request('/api/rag/stats')
+  }
+
+  async searchRag(q: string, limit = 10, sourceType?: string): Promise<RAGSearchResult[]> {
+    let url = `/api/rag/search?q=${encodeURIComponent(q)}&limit=${limit}`
+    if (sourceType) url += `&source_type=${sourceType}`
+    return this.request(url)
+  }
+
+  async getRagContext(q: string, limit = 5): Promise<RAGSearchResult[]> {
+    return this.request(`/api/rag/context?q=${encodeURIComponent(q)}&limit=${limit}`)
+  }
+
+  // ─── Sprint 7.2: Copilot ──────────────────────────────────────────────
+
+  async askCopilot(question: string, conversationId?: string): Promise<CopilotResponse> {
+    return this.request('/api/copilot/ask', {
+      method: 'POST',
+      body: JSON.stringify({ question, conversation_id: conversationId }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  async getCopilotConversations(): Promise<{ id: string; turns: number; last_message: string }[]> {
+    return this.request('/api/copilot/conversations')
+  }
+
+  async getCopilotHistory(conversationId: string): Promise<{ role: string; content: string; timestamp: string }[]> {
+    return this.request(`/api/copilot/conversations/${conversationId}`)
+  }
+
+  // ─── Sprint 7.2: Multi-Agent ──────────────────────────────────────────
+
+  async coordinateAgents(): Promise<CoordinatedResult> {
+    return this.request('/api/agents/coordinate')
+  }
+
+  async getAgentTypes(): Promise<{ value: string; label: string }[]> {
+    return this.request('/api/agents/types')
+  }
+
+  // ─── Sprint 7.2: ML Forecasting ────────────────────────────────────────
+
+  async getMLModels(): Promise<MLModel[]> {
+    return this.request('/api/ml/models')
+  }
+
+  async mlForecast(values: number[], steps = 30, model = 'linear_regression'): Promise<MLForecastResult> {
+    return this.request('/api/ml/forecast', {
+      method: 'POST',
+      body: JSON.stringify({ values, steps, model }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  async mlEvaluate(values: number[], model = 'linear_regression'): Promise<MLEvaluation> {
+    return this.request('/api/ml/evaluate', {
+      method: 'POST',
+      body: JSON.stringify({ values, steps: 1, model }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  async mlCompetitorTimeSeries(competitorId: number, metric: string): Promise<{ competitor_id: number; metric: string; values: number[]; labels: string[]; total: number }> {
+    return this.request(`/api/ml/competitor-timeseries/${competitorId}?metric=${metric}`)
+  }
+
+  async mlSelectBest(values: number[]): Promise<{ best_model: string; metrics: Record<string, number> }> {
+    return this.request('/api/ml/select-best', {
+      method: 'POST',
+      body: JSON.stringify({ values, steps: 1 }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  async mlForecastCompetitor(competitorId: number, metric: string, steps: number = 7, model?: string): Promise<{
+    historical: { labels: string[]; values: number[] }
+    forecast: { labels: string[]; values: number[]; ci: [number, number][] }
+    model: { name: string; mae: number; rmse: number; r2: number }
+    trend: { direction: string; momentum: number; long_term_trend: number; change_pct: number; recent_avg: number; prev_avg: number }
+  }> {
+    let url = `/api/ml/forecast/${competitorId}?metric=${metric}&steps=${steps}`
+    if (model) url += `&model=${model}`
+    return this.request(url)
+  }
+
+  async mlForecastAll(metric: string, steps: number = 7) {
+    return this.request(`/api/ml/forecast-all?metric=${metric}&steps=${steps}`)
+  }
+
+  async getMLHistory(): Promise<Record<string, unknown>[]> {
+    return this.request('/api/ml/history')
+  }
+
+  // ─── Sprint 7.2: Streaming ────────────────────────────────────────────
+
+  async getStreamingStats(): Promise<StreamingStats> {
+    return this.request('/api/streaming/stats')
+  }
+
+  async getStreamingEvents(eventType?: string, limit = 50): Promise<Record<string, unknown>[]> {
+    let url = `/api/streaming/events?limit=${limit}`
+    if (eventType) url += `&event_type=${eventType}`
+    return this.request(url)
+  }
+
+  // ─── Sprint 7.2: Geographic Intelligence ──────────────────────────────
+
+  async getGeoAnalysis(): Promise<Record<string, unknown>> {
+    return this.request('/api/geo/analyze')
+  }
+
+  async getGeoMapData(): Promise<GeoMapData> {
+    return this.request('/api/geo/map-data')
+  }
+
+  async getGeoHeatmap(): Promise<GeoHeatmapPoint[]> {
+    return this.request('/api/geo/heatmap')
+  }
+
+  async getGeoCities(): Promise<GeoCity[]> {
+    return this.request('/api/geo/cities')
+  }
+
+  async compareGeoCities(cities: string[]): Promise<Record<string, unknown>[]> {
+    return this.request(`/api/geo/compare?cities=${cities.join(',')}`)
   }
 }
 

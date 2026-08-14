@@ -36,7 +36,7 @@ class OpenAIProvider(LLMProvider):
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self._settings.api_key}",
             },
-            timeout=httpx.Timeout(self._settings.timeout),
+            timeout=httpx.Timeout(60.0),
         )
 
     @property

@@ -27,7 +27,7 @@ async def get_metrics() -> dict[str, Any]:
             checkedout = pool.checkedout()  # type: ignore
     except Exception as e:
         import logging
-        logging.getLogger(__name__).warning("db_pool_stats_failed", error=str(e))
+        logging.getLogger(__name__).warning("db_pool_stats_failed", extra={"error": str(e)})
 
     # Worker Queue Depth
     queue_depth = len(_bg_tasks)

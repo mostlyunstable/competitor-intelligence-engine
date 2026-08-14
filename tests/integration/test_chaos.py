@@ -1,7 +1,7 @@
 import asyncio
 import os
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from sqlalchemy.exc import OperationalError
 
 from app.chaos import ChaosMonkey
@@ -49,21 +49,20 @@ async def test_openai_chaos_resilience():
     
     provider = OpenAIProvider()
     
-    # Since chaos is random, we expect tenacity to retry.
-    # Note: If it fails all 3 attempts, we might get RateLimitError. We just want to ensure it retries.
-    # We will mock the actual API call to return a valid response if it doesn't fail.
-    class MockChoices:
-        class MockMessage:
-            content = '{"status": "ok"}'
-        choices = [MockMessage()]
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "output": [{"type": "message", "content": [{"type": "output_text", "text": '{"status": "ok"}'}]}],
+        "usage": {"input_tokens": 10, "output_tokens": 10, "total_tokens": 20},
+    }
+    mock_response.text = ""
+    mock_response.headers = {}
 
-    with patch.object(provider.client.chat.completions, 'create', return_value=MockChoices()) as mock_create:
+    with patch.object(provider._client, 'post', return_value=mock_response) as mock_create:
         try:
             res = await provider.generate_structured_insight("Test", {"type": "object"})
             assert res == {"status": "ok"}
         except (RateLimitError, APIStatusError, ValueError, Exception):
-            # If tenacity exhausts retries, it raises. That's fine for extreme chaos, 
-            # but we want to assert it tried at least.
             pass
 
 

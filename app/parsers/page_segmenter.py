@@ -18,10 +18,13 @@ Design rules
 from __future__ import annotations
 
 import re
+import structlog
 from dataclasses import dataclass, field
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
+
+logger = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Segment type catalogue
@@ -697,8 +700,9 @@ class PageSegmenter:
         """
         try:
             return self._segment(html, url)
-        except Exception:
+        except Exception as e:
             # Never crash the caller — return a single UNKNOWN segment
+            logger.warning("operation_failed", error=str(e))
             soup = BeautifulSoup(html, "html.parser")
             body = soup.body or soup
             return [

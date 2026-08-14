@@ -2,12 +2,12 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import {
   LayoutDashboard, Users, Activity, FileText, BarChart3,
-  Settings, LogOut, Search, Bell, ChevronDown, GitCompare,
-  Brain, Menu, X
+  Settings, LogOut, Search, ChevronDown, GitCompare,
+  Brain, Menu, X, TrendingUp, Globe, Bot, Cpu,
+  Play, Sparkles, Loader2,
 } from 'lucide-react'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
-import { useWebSocket } from '../hooks/useWebSocket'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Overview' },
@@ -17,6 +17,10 @@ const navItems = [
   { to: '/logs', icon: FileText, label: 'Logs' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/ai', icon: Brain, label: 'AI Insights' },
+  { to: '/predictions', icon: TrendingUp, label: 'Predictions' },
+  { to: '/industry-benchmarks', icon: Globe, label: 'Industry Benchmarks' },
+  { to: '/copilot', icon: Bot, label: 'AI Copilot' },
+  { to: '/ml-performance', icon: Cpu, label: 'ML Performance' },
   { to: '/admin', icon: Settings, label: 'Administration' },
 ]
 
@@ -26,51 +30,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ competitor_id: number; name: string; context: string }[] | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [notifications, setNotifications] = useState<{ type: string; message: string; time: string }[]>([])
-  const [showNotifications, setShowNotifications] = useState(false)
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
   const searchRef = useRef<HTMLDivElement>(null)
-  const notifRef = useRef<HTMLDivElement>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [collecting, setCollecting] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [actionStatus, setActionStatus] = useState<string | null>(null)
 
-  // Dark mode toggle
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // WebSocket for real-time notifications
-  const { connected } = useWebSocket({
-    onCollectionCompleted: useCallback((data: { competitor_name: string; records_collected: number }) => {
-      setNotifications(prev => [{
-        type: 'success',
-        message: `Collection completed: ${data.competitor_name} (${data.records_collected} records)`,
-        time: new Date().toISOString(),
-      }, ...prev].slice(0, 20))
-    }, []),
-    onCollectionFailed: useCallback((data: { competitor_name: string; error: string }) => {
-      setNotifications(prev => [{
-        type: 'error',
-        message: `Collection failed: ${data.competitor_name} — ${data.error}`,
-        time: new Date().toISOString(),
-      }, ...prev].slice(0, 20))
-    }, []),
-    onChangesDetected: useCallback((data: { competitor_id: number }) => {
-      setNotifications(prev => [{
-        type: 'info',
-        message: `Changes detected for competitor #${data.competitor_id}`,
-        time: new Date().toISOString(),
-      }, ...prev].slice(0, 20))
-    }, []),
-  })
-
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setSearchResults(null); setShowNotifications(false) }
+      if (e.key === 'Escape') setSearchResults(null)
     }
     const handleClickOutside = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchResults(null)
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotifications(false)
     }
     document.addEventListener('keydown', handleEscape)
     document.addEventListener('mousedown', handleClickOutside)
@@ -90,6 +67,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const handleCollectAll = async () => {
+    setCollecting(true)
+    setActionStatus('Collecting data...')
+    try {
+      const result = await api.getCompetitors({ enabled: true, page_size: 50 })
+      const items = result.competitors || []
+      const results = await Promise.allSettled(
+        items.map(c => api.triggerCollection(c.id))
+      )
+      const ok = results.filter(r => r.status === 'fulfilled').length
+      setActionStatus(`Collected ${ok}/${items.length}`)
+    } catch {
+      setActionStatus('Collection failed')
+    }
+    setCollecting(false)
+    setTimeout(() => setActionStatus(null), 4000)
+  }
+
+  const handleGeneratePredictions = async () => {
+    setGenerating(true)
+    setActionStatus('Generating predictions...')
+    try {
+      await api.generatePredictions()
+      setActionStatus('Predictions generated')
+    } catch {
+      setActionStatus('Generation failed')
+    }
+    setGenerating(false)
+    setTimeout(() => setActionStatus(null), 4000)
+  }
+
   const handleLogout = () => {
     logout()
     navigate('/login')
@@ -97,7 +105,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Mobile hamburger */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="fixed top-3 left-3 z-50 p-2 bg-surface-900 text-white rounded-lg lg:hidden"
@@ -106,12 +113,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Sidebar overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       <aside className={`
@@ -130,7 +133,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
@@ -154,9 +157,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-        {/* Top bar */}
         <header className="h-14 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800 flex items-center justify-between px-6">
           <div className="flex items-center gap-4 flex-1">
             <div ref={searchRef} className="relative max-w-md w-full">
@@ -189,10 +190,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       </button>
                     ))
                   )}
-                  <button
-                    onClick={() => setSearchResults(null)}
-                    className="w-full px-4 py-2 text-xs text-surface-500 hover:bg-surface-50"
-                  >
+                  <button onClick={() => setSearchResults(null)} className="w-full px-4 py-2 text-xs text-surface-500 hover:bg-surface-50">
                     Close
                   </button>
                 </div>
@@ -200,8 +198,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} title={connected ? 'Connected' : 'Disconnected'} />
+          <div className="flex items-center gap-2">
+            {actionStatus && (
+              <span className="text-xs text-surface-500 dark:text-surface-400 mr-2">{actionStatus}</span>
+            )}
+
+            <button
+              onClick={handleCollectAll}
+              disabled={collecting || generating}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300 rounded-lg disabled:opacity-50 transition-colors"
+              title="Collect data from all enabled competitors"
+            >
+              {collecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              Collect All
+            </button>
+
+            <button
+              onClick={handleGeneratePredictions}
+              disabled={collecting || generating}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+              title="Generate AI predictions from collected data"
+            >
+              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              Predict
+            </button>
+
+            <div className="w-px h-6 bg-surface-200 dark:bg-surface-700 mx-1" />
 
             <button
               onClick={() => setDarkMode(!darkMode)}
@@ -210,43 +232,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               {darkMode ? '☀️' : '🌙'}
             </button>
-
-            <div ref={notifRef} className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 text-surface-400 hover:text-surface-700 dark:hover:text-surface-200"
-              >
-                <Bell size={18} />
-                {notifications.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                    {notifications.length > 9 ? '9+' : notifications.length}
-                  </span>
-                )}
-              </button>
-              {showNotifications && (
-                <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg shadow-lg z-50 max-h-96 overflow-auto">
-                  <div className="p-3 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between">
-                    <span className="text-sm font-medium text-surface-900 dark:text-white">Notifications</span>
-                    {notifications.length > 0 && (
-                      <button onClick={() => setNotifications([])} className="text-xs text-surface-400 hover:text-surface-600">Clear all</button>
-                    )}
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div className="p-4 text-sm text-surface-500 text-center">No notifications</div>
-                  ) : (
-                    notifications.map((n, i) => (
-                      <div key={i} className="px-3 py-2.5 border-b border-surface-100 dark:border-surface-800 last:border-0">
-                        <div className={`text-xs font-medium ${n.type === 'error' ? 'text-red-600' : n.type === 'success' ? 'text-green-600' : 'text-blue-600'}`}>
-                          {n.type === 'error' ? 'Error' : n.type === 'success' ? 'Success' : 'Info'}
-                        </div>
-                        <div className="text-sm text-surface-700 dark:text-surface-300 mt-0.5">{n.message}</div>
-                        <div className="text-[10px] text-surface-400 mt-1">{new Date(n.time).toLocaleTimeString()}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
 
             <div className="relative">
               <button
@@ -272,7 +257,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 overflow-auto p-6">
           {children}
         </main>

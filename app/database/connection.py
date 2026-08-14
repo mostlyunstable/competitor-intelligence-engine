@@ -49,16 +49,19 @@ class DatabaseManager:
         if not self._session_factory:
             raise RuntimeError("Database not connected. Call connect() first.")
 
+        import structlog
         import tenacity
         from sqlalchemy.exc import DBAPIError, OperationalError
 
         from app.chaos import ChaosMonkey
 
+        logger = structlog.get_logger(__name__)
+
         # Retry connection acquisition or commit errors on transient DB failures
         @tenacity.retry(
-            retry=tenacity.retry_if_exception_type((OperationalError, DBAPIError, ConnectionError)),
+            retry=tenacity.retry_if_exception_type((OperationalError, DBAPIError, ConnectionError, TimeoutError)),
             wait=tenacity.wait_exponential(multiplier=1, min=1, max=10),
-            stop=tenacity.stop_after_attempt(5),
+            stop=tenacity.stop_after_attempt(3),
             reraise=True
         )
         async def _execute_with_retry() -> AsyncGenerator[AsyncSession, None]:
@@ -68,7 +71,8 @@ class DatabaseManager:
                     yield session
                     await ChaosMonkey.maybe_fail_db()
                     await session.commit()
-                except Exception:
+                except Exception as e:
+                    logger.warning("operation_failed", error=str(e))
                     await session.rollback()
                     raise
 

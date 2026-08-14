@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { api } from '../lib/api'
 import type { DashboardStats, SystemHealth, Telemetry, SchedulerStatus } from '../types'
 
@@ -87,7 +87,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     ])
   }, [statsPoll.refresh, healthPoll.refresh, telemetryPoll.refresh, schedulerPoll.refresh])
 
-  const value: DashboardContextValue = {
+  const value = useMemo<DashboardContextValue>(() => ({
     stats: statsPoll.data,
     health: healthPoll.data,
     telemetry: telemetryPoll.data,
@@ -111,7 +111,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       scheduler: schedulerPoll.refresh,
       all: refreshAll,
     },
-  }
+  }), [
+    statsPoll.data, statsPoll.loading, statsPoll.error, statsPoll.refresh,
+    healthPoll.data, healthPoll.loading, healthPoll.error, healthPoll.refresh,
+    telemetryPoll.data, telemetryPoll.loading, telemetryPoll.error, telemetryPoll.refresh,
+    schedulerPoll.data, schedulerPoll.loading, schedulerPoll.error, schedulerPoll.refresh,
+    refreshAll,
+  ])
 
   return (
     <DashboardContext.Provider value={value}>

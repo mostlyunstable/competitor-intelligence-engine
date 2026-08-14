@@ -32,7 +32,7 @@
       "website_url": "https://www.vijayhomeservices.com",
       "enabled": true,
       "collection_frequency": "daily",
-      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "modules": ["discovery", "company", "services", "content", "social"],
       "tags": ["india", "chennai", "regional", "home-services", "tier-2"],
       "notes": "Home, kitchen, bathroom, office cleaning. Pan-India with strong Chennai presence. 3000+ trained professionals, 5M+ customers."
     },
@@ -44,33 +44,6 @@
       "modules": ["discovery", "company", "services", "pricing", "content", "social"],
       "tags": ["india", "chennai", "local", "cleaning", "tier-2"],
       "notes": "Chennai-based residential deep cleaning. Strong local cleaning brand."
-    },
-    {
-      "name": "NoBroker Home Services",
-      "website_url": "https://www.nobroker.in/home-services",
-      "enabled": true,
-      "collection_frequency": "daily",
-      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
-      "tags": ["india", "chennai", "marketplace", "home-services", "tier-3"],
-      "notes": "India's #1 real estate platform with home services. Painting, cleaning, electrician, plumbing, carpentry. Chennai operational."
-    },
-    {
-      "name": "Justdial",
-      "website_url": "https://www.justdial.com",
-      "enabled": true,
-      "collection_frequency": "weekly",
-      "modules": ["discovery", "company", "services", "content"],
-      "tags": ["india", "marketplace", "directory", "tier-3"],
-      "notes": "Local search engine aggregating service providers. Influences customer discovery and pricing."
-    },
-    {
-      "name": "Sulekha",
-      "website_url": "https://www.sulekha.com",
-      "enabled": true,
-      "collection_frequency": "weekly",
-      "modules": ["discovery", "company", "services", "content"],
-      "tags": ["india", "marketplace", "directory", "tier-3"],
-      "notes": "Service marketplace aggregating local providers. Strong in Chennai for home services."
     },
     {
       "name": "IndiaMART",
@@ -91,13 +64,40 @@
       "notes": "Chennai's No.1 service company. Multiple home service categories."
     },
     {
-      "name": "CallSevai",
-      "website_url": "https://callsevai.com/chennai/",
+      "name": "NoBroker",
+      "website_url": "https://www.nobroker.in",
       "enabled": true,
       "collection_frequency": "daily",
-      "modules": ["discovery", "company", "services", "pricing", "content"],
+      "modules": ["discovery", "company", "services", "pricing", "content", "social"],
+      "tags": ["india", "chennai", "marketplace", "home-services", "tier-1"],
+      "notes": "Home services marketplace."
+    },
+    {
+      "name": "Justdial",
+      "website_url": "https://www.justdial.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "content"],
+      "tags": ["india", "chennai", "marketplace", "local-search", "tier-1"],
+      "notes": "Local search and discovery platform."
+    },
+    {
+      "name": "Sulekha",
+      "website_url": "https://www.sulekha.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "content"],
+      "tags": ["india", "chennai", "marketplace", "home-services", "tier-1"],
+      "notes": "Service marketplace."
+    },
+    {
+      "name": "CallSevai",
+      "website_url": "https://www.callsevai.com",
+      "enabled": true,
+      "collection_frequency": "daily",
+      "modules": ["discovery", "company", "services", "content"],
       "tags": ["india", "chennai", "local", "home-services", "tier-2"],
-      "notes": "Chennai home services by verified electricians, plumbers, AC repair, carpenters, CCTV. 60+ services. WhatsApp booking."
+      "notes": "Local home services."
     }
   ]
 }

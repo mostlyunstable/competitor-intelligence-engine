@@ -1,19 +1,20 @@
 import asyncio
 import contextlib
+import random
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.endpoints import ai, collection, competitors, dashboard, health, reports
+from app.api.endpoints import ai, collection, competitors, dashboard, health, predictions, reports
+from app.api.endpoints import predictive, ml_intelligence
 from app.api.middleware import RateLimitMiddleware
 from app.configuration.settings import Settings, get_settings
 from app.database.connection import db_manager
 from app.observability.monitoring_dashboard import router as monitoring_router
-from app.services.websocket_manager import ws_manager
 
 logger = structlog.get_logger(__name__)
 
@@ -55,12 +56,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             try:
                 processed = await message_queue.process_all(max_messages=10)
                 if processed == 0:
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(2 + random.uniform(0, 0.2))
             except asyncio.CancelledError:
                 break
             except Exception:
                 logger.exception("queue_worker_error")
-                await asyncio.sleep(5)
+                await asyncio.sleep(5 + random.uniform(0, 0.5))
 
     global _queue_worker_task
     _queue_worker_task = asyncio.create_task(_queue_worker())
@@ -103,6 +104,7 @@ OPENAPI_TAGS = [
     {"name": "Metrics", "description": "Runtime metrics and performance monitoring"},
     {"name": "Dashboard", "description": "Dashboard data and analytics"},
     {"name": "Reports", "description": "Extraction reports and analytics"},
+    {"name": "Predictions", "description": "Predictive intelligence, forecasting, and strategic recommendations"},
 ]
 
 
@@ -215,6 +217,9 @@ All errors follow RFC 7807 Problem Details format:
     app.include_router(reports.router)
     app.include_router(monitoring_router)
     app.include_router(ai.router)
+    app.include_router(predictions.router)
+    app.include_router(predictive.router)
+    app.include_router(ml_intelligence.router)
 
     if settings.debug:
         from app.api.endpoints.debug import router as debug_router
@@ -225,53 +230,6 @@ All errors follow RFC 7807 Problem Details format:
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:
         return RedirectResponse(url="/dashboard")
-
-    @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket) -> None:
-        # Authenticate via query param token or first message
-        token = websocket.query_params.get("token")
-        if not token:
-            # Accept connection but require auth in first message
-            await websocket.accept()
-            try:
-                first_msg = await asyncio.wait_for(websocket.receive_text(), timeout=5)
-                import json
-                data = json.loads(first_msg)
-                token = data.get("token", "")
-            except (asyncio.TimeoutError, json.JSONDecodeError, ValueError):
-                await websocket.close(code=4001, reason="Authentication required")
-                return
-
-        # Validate token against API key
-        from app.configuration.settings import get_settings
-        import hmac as _hmac
-        settings = get_settings()
-        valid = False
-        if token:
-            try:
-                import base64
-                decoded = base64.b64decode(token).decode()
-                _, password = decoded.split(":", 1)
-                if settings.api_key and _hmac.compare_digest(password, settings.api_key):
-                    valid = True
-            except (ValueError, UnicodeDecodeError):
-                pass
-
-        if not valid:
-            await websocket.close(code=4003, reason="Invalid token")
-            return
-
-        await ws_manager.connect(websocket)
-        try:
-            while True:
-                data = await websocket.receive_text()
-                if data == "ping":
-                    await websocket.send_text('{"type":"pong"}')
-        except WebSocketDisconnect:
-            await ws_manager.disconnect(websocket)
-        except Exception as e:
-            logger.warning("websocket_error", error=str(e))
-            await ws_manager.disconnect(websocket)
 
     _configure_logging(settings.log_level)
 

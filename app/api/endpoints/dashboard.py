@@ -2,10 +2,11 @@ import asyncio
 import json
 import secrets
 import time
+import structlog
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field, field_validator
@@ -16,6 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.api.dependencies import get_session
 from app.configuration.settings import get_settings
 from app.database.models import (
+    CollectionFrequency,
     CollectionLog,
     Competitor,
     CompetitorContent,
@@ -25,8 +27,11 @@ from app.database.models import (
     CompetitorSource,
     RawStorage,
 )
+from app.messagequeue.queue import MessageQueue
 from app.schedulers.scheduler import scheduler
 from app.services.collection_service import collection_service
+
+logger = structlog.get_logger(__name__)
 
 # [SECURITY FIX] Apply Basic Auth globally to all endpoints in this router
 security = HTTPBasic()
@@ -392,7 +397,7 @@ async def bulk_update_frequency(
         result = await session.execute(stmt)
         comp = result.scalar_one_or_none()
         if comp:
-            comp.collection_frequency = payload.frequency  # type: ignore
+            comp.collection_frequency = CollectionFrequency(payload.frequency)
             updated += 1
     await session.commit()
     return {"updated": updated}
@@ -428,42 +433,20 @@ async def duplicate_competitor(
 
 @router.get("/api/dashboard/stats")
 async def get_dashboard_stats(
+    request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    (
-        total_competitors,
-        active_competitors,
-        urls_count,
-        services_count,
-        pricing_count,
-        content_count,
-        social_count,
-        total_logs,
-        success_logs,
-        failed_logs,
-    ) = await asyncio.gather(
-        session.scalar(select(func.count()).select_from(Competitor)),
-        session.scalar(select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True))),
-        session.scalar(select(func.count()).select_from(CompetitorSource)),
-        session.scalar(select(func.count()).select_from(CompetitorService)),
-        session.scalar(select(func.count()).select_from(CompetitorPricing)),
-        session.scalar(select(func.count()).select_from(CompetitorContent)),
-        session.scalar(select(func.count()).select_from(CompetitorSocial)),
-        session.scalar(select(func.count()).select_from(CollectionLog)),
-        session.scalar(select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(True))),
-        session.scalar(select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(False))),
-    )
-
-    total_competitors = total_competitors or 0
-    active_competitors = active_competitors or 0
-    urls_count = urls_count or 0
-    services_count = services_count or 0
-    pricing_count = pricing_count or 0
-    content_count = content_count or 0
-    social_count = social_count or 0
-    total_logs = total_logs or 0
-    success_logs = success_logs or 0
-    failed_logs = failed_logs or 0
+    # Run queries sequentially to avoid SQLAlchemy concurrent session error
+    total_competitors = await session.scalar(select(func.count()).select_from(Competitor)) or 0
+    active_competitors = await session.scalar(select(func.count()).select_from(Competitor).where(Competitor.enabled.is_(True))) or 0
+    urls_count = await session.scalar(select(func.count()).select_from(CompetitorSource)) or 0
+    services_count = await session.scalar(select(func.count()).select_from(CompetitorService)) or 0
+    pricing_count = await session.scalar(select(func.count()).select_from(CompetitorPricing)) or 0
+    content_count = await session.scalar(select(func.count()).select_from(CompetitorContent)) or 0
+    social_count = await session.scalar(select(func.count()).select_from(CompetitorSocial)) or 0
+    total_logs = await session.scalar(select(func.count()).select_from(CollectionLog)) or 0
+    success_logs = await session.scalar(select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(True))) or 0
+    failed_logs = await session.scalar(select(func.count()).select_from(CollectionLog).where(CollectionLog.success.is_(False))) or 0
 
     success_rate = round((success_logs / total_logs * 100) if total_logs > 0 else 0, 1)
 
@@ -478,12 +461,12 @@ async def get_dashboard_stats(
 
     running_jobs = 0
     try:
-        from app.main import message_queue as mq
-        queue_stats = await mq.get_stats()  # type: ignore
-        running_jobs = queue_stats.get("queue_size", 0)
+        mq: MessageQueue | None = request.app.state.message_queue
+        if mq is not None:
+            queue_stats = await mq.get_stats()
+            running_jobs = queue_stats.get("queue_size", 0)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("queue_stats_failed", error=str(e))
+        logger.warning("operation_failed", error=str(e))
 
     return {
         "total_competitors": total_competitors,
@@ -911,7 +894,7 @@ async def get_raw_html(competitor_id: int, session: AsyncSession = Depends(get_s
 
 
 @router.get("/api/dashboard/export/zip")
-async def export_zip(session: AsyncSession = Depends(get_session)):  # type: ignore
+async def export_zip(session: AsyncSession = Depends(get_session)) -> StreamingResponse:
     import io
     import zipfile
 
@@ -963,7 +946,10 @@ async def export_zip(session: AsyncSession = Depends(get_session)):  # type: ign
 
 
 @router.get("/api/dashboard/health")
-async def get_system_health(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+async def get_system_health(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
     checks: dict[str, Any] = {}
 
     try:
@@ -980,16 +966,19 @@ async def get_system_health(session: AsyncSession = Depends(get_session)) -> dic
     }
 
     try:
-        from app.main import message_queue as mq
-
-        q_stats = await mq.get_stats()  # type: ignore
-        checks["queue"] = {
-            "status": "healthy",
-            "queue_size": q_stats.get("queue_size", 0),
-            "published": q_stats.get("stats", {}).get("published", 0),
-            "consumed": q_stats.get("stats", {}).get("consumed", 0),
-        }
-    except Exception:
+        mq: MessageQueue | None = request.app.state.message_queue
+        if mq is not None:
+            q_stats = await mq.get_stats()
+            checks["queue"] = {
+                "status": "healthy",
+                "queue_size": q_stats.get("queue_size", 0),
+                "published": q_stats.get("stats", {}).get("published", 0),
+                "consumed": q_stats.get("stats", {}).get("consumed", 0),
+            }
+        else:
+            checks["queue"] = {"status": "unknown"}
+    except Exception as e:
+        logger.warning("operation_failed", error=str(e))
         checks["queue"] = {"status": "unknown"}
 
     active = len(collection_service._active_crawls)
@@ -1001,7 +990,8 @@ async def get_system_health(session: AsyncSession = Depends(get_session)) -> dic
         usage = resource.getrusage(resource.RUSAGE_SELF)
         rss_mb = round(usage.ru_maxrss / 1024, 1)
         checks["memory"] = {"status": "healthy", "rss_mb": rss_mb}
-    except Exception:
+    except Exception as e:
+        logger.warning("operation_failed", error=str(e))
         checks["memory"] = {"status": "unknown"}
 
     overall = all(c.get("status") == "healthy" for c in checks.values())

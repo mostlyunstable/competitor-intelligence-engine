@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
 import {
@@ -69,11 +69,21 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
   const [insight, setInsight] = useState<AiInsight | null>(existing)
   const [analyzeError, setAnalyzeError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Sync insight from polling whenever it updates
   useEffect(() => {
     if (existing) setInsight(existing)
   }, [existing])
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
+    }
+  }, [])
 
   // Auto-trigger analysis on mount if no insight exists
   useEffect(() => {
@@ -83,6 +93,12 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
   }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAnalyze = useCallback(async () => {
+    // Clear any existing poll interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+
     setAnalyzing(true)
     setAnalyzeError(null)
     setFeedback(null)
@@ -90,21 +106,30 @@ function InsightPanel({ competitorId }: { competitorId: number }) {
       await api.analyzeCompetitor(competitorId)
       // Poll until done
       let attempts = 0
-      const poll = setInterval(async () => {
+      pollIntervalRef.current = setInterval(async () => {
         attempts++
         try {
           const result = await api.getAiInsights(competitorId)
           if (result?.processing_status === 'completed' || result?.processing_status === 'failed' || attempts > 30) {
-            clearInterval(poll)
+            clearInterval(pollIntervalRef.current!)
+            pollIntervalRef.current = null
             setInsight(result)
             setAnalyzing(false)
             refresh()
           }
         } catch {
-          if (attempts > 30) { clearInterval(poll); setAnalyzing(false) }
+          if (attempts > 30) {
+            clearInterval(pollIntervalRef.current!)
+            pollIntervalRef.current = null
+            setAnalyzing(false)
+          }
         }
       }, 2000)
     } catch (e: unknown) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
       setAnalyzeError(e instanceof Error ? e.message : 'Analysis failed')
       setAnalyzing(false)
     }

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useDashboard } from '../context/DashboardContext'
 import { usePolling } from '../hooks'
 import { api } from '../lib/api'
-import { formatDate, timeAgo } from '../lib/utils'
 import {
   Settings, Database, Server, Activity, Clock,
   CheckCircle, XCircle, RefreshCw, Cpu, FileJson

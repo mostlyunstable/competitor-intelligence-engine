@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import random
 from typing import Any
 
 import structlog
@@ -50,7 +51,7 @@ class CollectionWorker:
                 if processed:
                     self._processed += 1
                 else:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(1 + random.uniform(0, 0.1))
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -60,7 +61,7 @@ class CollectionWorker:
                     worker_id=self.worker_id,
                     error=str(e),
                 )
-                await asyncio.sleep(5)
+                await asyncio.sleep(5 + random.uniform(0, 0.5))
 
     @property
     def stats(self) -> dict[str, Any]:

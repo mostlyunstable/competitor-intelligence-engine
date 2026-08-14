@@ -50,6 +50,10 @@ _PRICE_RE = re.compile(
     (?:\b(?:\d+[.,]\d{1,2})\s*(?:per|month|year|hour|week|day|annually|yearly)?)
     |
     (?:[\d,]+(?:\.\d{1,2})?/-)
+    |
+    (?:from\s+₹?\s*[\d,]+(?:\.\d{1,2})?)
+    |
+    (?:starting\s+(?:at|from)\s+₹?\s*[\d,]+(?:\.\d{1,2})?)
     """,
     re.I | re.X,
 )

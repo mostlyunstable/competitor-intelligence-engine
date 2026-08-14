@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime
 
 import pytest
@@ -7,8 +8,12 @@ from app.database.models import Competitor
 from app.database.repositories.collection_log_repository import CollectionLogRepository
 from app.database.repositories.competitor_repository import CompetitorRepository
 
+TEST_DATABASE_URL = os.environ.get("CI_TEST_DATABASE_URL", "")
+requires_db = pytest.mark.skipif(not TEST_DATABASE_URL, reason="CI_TEST_DATABASE_URL not set")
+
 
 @pytest.mark.integration
+@requires_db
 class TestCollectionLogRepository:
     @pytest.fixture(autouse=True)
     def setup(self, session: AsyncSession) -> None:
