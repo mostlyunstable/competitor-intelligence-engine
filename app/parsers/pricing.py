@@ -2,6 +2,7 @@ import re
 from typing import Any
 
 from app.parsers.base import BaseParser
+from app.parsers.price_utils import parse_price
 
 
 class PricingParser(BaseParser):
@@ -160,29 +161,7 @@ class PricingParser(BaseParser):
         return pricing_items
 
     def _parse_price(self, price_text: str | None) -> float | None:
-        if not price_text:
-            return None
-        # Check for Rs. prefix
-        rs_match = re.search(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', price_text.lower())
-        if rs_match:
-            try:
-                return float(rs_match.group(1).replace(",", ""))
-            except ValueError:
-                pass
-        # Remove currency symbols and ISO codes before parsing
-        cleaned = re.sub(
-            r"[\u20B9$\u20AC\xA3\xA5]|\b(?:INR|USD|EUR|GBP|JPY)\b",
-            "",
-            price_text,
-            flags=re.IGNORECASE,
-        )
-        numbers = re.findall(r"[\d,]+\.?\d*", cleaned.replace(",", ""))
-        if numbers:
-            try:
-                return float(numbers[0])
-            except ValueError:
-                return None
-        return None
+        return parse_price(price_text)
 
     def _detect_currency(self, price_text: str | None) -> str:
         if not price_text:

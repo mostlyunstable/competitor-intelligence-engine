@@ -30,15 +30,27 @@ async def test_db_predictive_engine_generation_and_persistence(session):
 @pytest.mark.asyncio
 async def test_db_predictive_engine_horizon_sensitivity(session):
     """Verify that longer prediction horizons increase price uncertainty interval."""
+    # First generate predictions once to ensure defaults are populated
+    await db_predictive_engine.generate_and_persist_predictions(
+        session=session,
+        prediction_horizon_days=30,
+    )
+    from app.database.models import CanonicalService
+    from sqlalchemy import select
+    res = await session.execute(select(CanonicalService))
+    services = res.scalars().all()
+    assert len(services) > 0
+    service_id = services[0].id
+
     short_horizon = await db_predictive_engine.generate_and_persist_predictions(
         session=session,
         prediction_horizon_days=30,
-        canonical_service_id=1,
+        canonical_service_id=service_id,
     )
     long_horizon = await db_predictive_engine.generate_and_persist_predictions(
         session=session,
         prediction_horizon_days=180,
-        canonical_service_id=1,
+        canonical_service_id=service_id,
     )
 
     assert len(short_horizon) > 0

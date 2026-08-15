@@ -90,7 +90,14 @@ def parse_price(text: str | None) -> float | None:
     numbers = re.findall(r"[\d]+\.?\d*", clean)
     if numbers:
         try:
-            return float(numbers[0])
+            val = float(numbers[0])
+            # Filter out zip codes, phone numbers, etc. (values >= 30000 with no currency indicator)
+            if val >= 30000:
+                currency_indicators = ["₹", "rs", "inr", "$", "usd", "€", "eur", "£", "gbp", "/-"]
+                text_lower = text.lower()
+                if not any(indicator in text_lower for indicator in currency_indicators):
+                    return None
+            return val
         except ValueError:
             return None
     return None

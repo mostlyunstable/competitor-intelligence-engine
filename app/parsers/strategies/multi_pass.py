@@ -1085,6 +1085,9 @@ class _Pass6Regex:
                     amount_str = match.group("amount")
                     sym = match.group("sym") or ""
                     code = match.group("code") or ""
+                    # Require a currency indicator for global text fallback scan
+                    if not sym and not code:
+                        continue
                     currency = code.upper() if code else _CURRENCY_MAP.get(sym, "INR")
                     try:
                         amount = float(amount_str)

@@ -94,3 +94,34 @@ class TestPricingParser:
         """
         result = self.parser.parse(html, "https://example.com")
         assert result["pricing"][0]["membership_pricing"] is not None
+
+    def test_ignore_zip_codes_and_large_numbers_without_currency(self) -> None:
+        # A large number like 85000 without currency should be ignored
+        html1 = """
+        <html>
+        <body>
+            <div class="pricing-card">
+                <h3>Our Location Zip</h3>
+                <span class="price">85000</span>
+            </div>
+        </body>
+        </html>
+        """
+        result = self.parser.parse(html1, "https://example.com")
+        assert len(result["pricing"]) == 1
+        assert result["pricing"][0]["base_price"] is None
+
+        # But if it has a currency indicator like $, it should be parsed
+        html2 = """
+        <html>
+        <body>
+            <div class="pricing-card">
+                <h3>Super Premium Service</h3>
+                <span class="price">$35,000</span>
+            </div>
+        </body>
+        </html>
+        """
+        result = self.parser.parse(html2, "https://example.com")
+        assert len(result["pricing"]) == 1
+        assert result["pricing"][0]["base_price"] == 35000.0

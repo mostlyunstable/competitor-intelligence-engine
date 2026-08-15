@@ -1,0 +1,10 @@
+{
+  "categories": {
+    "cleaning": ["cleaning", "clean", "scrub", "washing", "vacuum", "sweep", "sofa", "carpet", "bathroom", "kitchen", "water tank", "maid", "housekeeping", "sanitization"],
+    "plumbing": ["plumbing", "plumber", "drain", "water heater", "leak", "pipe", "tap", "faucet", "toilet", "basin", "clog", "borewell", "pump", "valve"],
+    "electrical": ["electrical", "electrician", "wiring", "fan", "switchboard", "light", "fuse", "inverter", "mcb", "earthing", "generator"],
+    "appliance-repair": ["appliance", "repair", "ac", "air conditioner", "washing machine", "refrigerator", "fridge", "microwave", "geyser", "tv", "cooler", "chimney", "purifier", "hvac"],
+    "pest-control": ["pest", "termite", "cockroach", "bedbug", "mosquito", "rodent", "ant", "fumigation", "disinfection", "insect", "bug", "pestcontrol"]
+  },
+  "default_fallback": "other"
+}

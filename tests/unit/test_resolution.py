@@ -557,3 +557,44 @@ class TestPricingDedup:
         )
         _resolver().resolve(result)
         assert len(result.pricing) == 1
+
+
+# ======================================================================
+# Utservio Catalog Matching
+# ======================================================================
+
+
+class TestCatalogMatching:
+    def test_exact_and_fuzzy_catalog_matching(self) -> None:
+        result = _make_result(
+            services=[
+                {"name": "Kitchen Deep Cleaning", "category": "General"},
+                {"name": "Emergency Tap Leak Repair", "category": "Repair"},
+                {"name": "Ac Repair", "category": "Repair"},
+            ],
+            pricing=[
+                {"service_name": "Kitchen Deep Cleaning", "category": "General"},
+                {"service_name": "Emergency Tap Leak Repair", "category": "Repair"},
+            ]
+        )
+        _resolver().resolve(result)
+        # Verify services mapped to correct categories
+        assert result.services[0]["category"] == "cleaning"
+        assert result.services[1]["category"] == "plumbing"
+        assert result.services[2]["category"] == "appliance-repair"
+        # Verify pricing mapped
+        assert result.pricing[0]["category"] == "cleaning"
+        assert result.pricing[1]["category"] == "plumbing"
+
+    def test_catalog_matching_fallback(self) -> None:
+        result = _make_result(
+            services=[
+                {"name": "Unrelated Custom Painting", "category": "Painting Services"},
+                {"name": "Some Random Service Name", "category": "Unknown"},
+            ],
+        )
+        _resolver().resolve(result)
+        # "Painting Services" is not in catalog, but it's >= 3 characters, so it should fall back to itself (custom category)
+        assert result.services[0]["category"] == "Painting Services"
+        # "Unknown" / random name has no keyword match and category is not a catalog category, so it falls back to "other"
+        assert result.services[1]["category"] == "other"

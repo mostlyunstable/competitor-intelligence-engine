@@ -15,6 +15,8 @@ No company-specific rules. No hardcoded selectors. Fully generic.
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import string
 from dataclasses import dataclass, field
@@ -316,7 +318,113 @@ class EntityResolver:
             if items and keys:
                 self._deduplicate_list(items, keys)
 
+        # Phase 4 — Map services and pricing to Utservio catalog
+        self.map_to_catalog(result)
+
         return result
+
+    def _load_catalog(self) -> dict[str, list[str]]:
+        paths = [
+            "app/configuration/utservio_catalog.json",
+            "utservio_catalog.json",
+            "configuration/utservio_catalog.json"
+        ]
+        for p in paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if isinstance(data, dict) and "categories" in data:
+                            return data["categories"]
+                except Exception:
+                    pass
+        # Default fallback catalog
+        return {
+            "cleaning": ["cleaning", "clean", "scrub", "washing", "vacuum", "sweep", "sofa", "carpet", "bathroom", "kitchen", "water tank", "maid", "housekeeping", "sanitization"],
+            "plumbing": ["plumbing", "plumber", "drain", "water heater", "leak", "pipe", "tap", "faucet", "toilet", "basin", "clog", "borewell", "pump", "valve"],
+            "electrical": ["electrical", "electrician", "wiring", "fan", "switchboard", "light", "fuse", "inverter", "mcb", "earthing", "generator"],
+            "appliance-repair": ["appliance", "repair", "ac", "air conditioner", "washing machine", "refrigerator", "fridge", "microwave", "geyser", "tv", "cooler", "chimney", "purifier", "hvac"],
+            "pest-control": ["pest", "termite", "cockroach", "bedbug", "mosquito", "rodent", "ant", "fumigation", "disinfection", "insect", "bug", "pestcontrol"]
+        }
+
+    def map_to_catalog(self, result: ParsedResult) -> None:
+        """Map extracted competitor services and pricing to Utservio's standard catalog."""
+        catalog = self._load_catalog()
+
+        # Map services list
+        for item in getattr(result, "services", []):
+            name = (item.get("name") or "").lower()
+            current_cat = (item.get("category") or "").lower()
+
+            matched_cat = None
+
+            # 1. Try to match by service name keywords
+            for cat, keywords in catalog.items():
+                for kw in keywords:
+                    if kw in name:
+                        matched_cat = cat
+                        break
+                if matched_cat:
+                    break
+
+            # 2. Try to match by existing category keywords if name didn't match
+            if not matched_cat and current_cat:
+                for cat, keywords in catalog.items():
+                    for kw in keywords:
+                        if kw in current_cat:
+                            matched_cat = cat
+                            break
+                    if matched_cat:
+                        break
+
+            # 3. Fallback system
+            _PLACEHOLDER_CATEGORIES = {"unknown", "general", "other", "n/a", "services", "category", "uncategorized", "none", ""}
+            if matched_cat:
+                item["category"] = matched_cat
+            else:
+                orig_cat = item.get("category")
+                orig_cat_str = str(orig_cat).strip() if orig_cat else ""
+                if orig_cat_str and orig_cat_str.lower() not in _PLACEHOLDER_CATEGORIES and len(orig_cat_str) >= 3:
+                    item["category"] = orig_cat_str
+                else:
+                    item["category"] = "other"
+
+        # Map pricing list
+        for p in getattr(result, "pricing", []):
+            p_name = (p.get("service_name") or "").lower()
+            current_cat = (p.get("category") or "").lower()
+
+            matched_cat = None
+
+            # 1. Try to match by service name keywords
+            for cat, keywords in catalog.items():
+                for kw in keywords:
+                    if kw in p_name:
+                        matched_cat = cat
+                        break
+                if matched_cat:
+                    break
+
+            # 2. Try to match by existing category keywords if name didn't match
+            if not matched_cat and current_cat:
+                for cat, keywords in catalog.items():
+                    for kw in keywords:
+                        if kw in current_cat:
+                            matched_cat = cat
+                            break
+                    if matched_cat:
+                        break
+
+            # 3. Fallback system
+            if matched_cat:
+                p["category"] = matched_cat
+            else:
+                orig_cat = p.get("category")
+                orig_cat_str = str(orig_cat).strip() if orig_cat else ""
+                if orig_cat_str and orig_cat_str.lower() not in _PLACEHOLDER_CATEGORIES and len(orig_cat_str) >= 3:
+                    p["category"] = orig_cat_str
+                else:
+                    p["category"] = "other"
 
     # ------------------------------------------------------------------
     # Resolution logic

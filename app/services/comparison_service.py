@@ -14,6 +14,7 @@ from app.database.models import (
 
 
 class ComparisonService:
+    """Specific Competitor-vs-Competitor Comparison Service."""
     async def compare(
         self, session: AsyncSession, comp_a_id: int, comp_b_id: int
     ) -> dict[str, Any]:
