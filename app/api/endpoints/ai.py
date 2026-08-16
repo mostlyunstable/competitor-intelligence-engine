@@ -75,24 +75,24 @@ async def _gather_competitor_data(competitor_id: int, session: AsyncSession) -> 
     """Gather real scraped data and database observations for a competitor."""
     from app.database.models import (
         CompetitorService, CompetitorPricing, CompetitorContent,
-        CompetitorSocial, PriceObservation, MLPrediction, CanonicalService
+        CompetitorSocial, PriceObservation, MLPredictionRecord, CanonicalService
     )
 
     data: dict[str, Any] = {}
 
     # Scraped services
-    result = await session.execute(
+    svc_result = await session.execute(
         select(CompetitorService).where(CompetitorService.competitor_id == competitor_id)
     )
-    data["services"] = [{"name": s.service_name, "description": s.description} for s in result.scalars().all()]
+    data["services"] = [{"name": s.service_name, "description": s.description} for s in svc_result.scalars().all()]
 
     # Scraped pricing
-    result = await session.execute(
+    pricing_result = await session.execute(
         select(CompetitorPricing).where(CompetitorPricing.competitor_id == competitor_id)
     )
     data["pricing"] = [
         {"service": p.service_name, "price": float(p.base_price) if p.base_price else None, "currency": p.currency, "category": p.category}
-        for p in result.scalars().all()
+        for p in pricing_result.scalars().all()
     ]
 
     # Database Price Observations Count & Ground Truth Samples
@@ -102,23 +102,23 @@ async def _gather_competitor_data(competitor_id: int, session: AsyncSession) -> 
     obs_list = result_obs.scalars().all()
     data["db_price_observations_count"] = len(obs_list) if obs_list else 1248
     data["db_observed_prices_sample"] = [
-        {"service_id": o.canonical_service_id, "observed_price": float(o.observed_price)}
+        {"service_id": o.canonical_service_id, "observed_price": float(o.price)}
         for o in obs_list[:20]
     ]
 
     # Database ML Predictions vs Utservio Catalog Baseline Spreads
     result_preds = await session.execute(
-        select(MLPrediction, CanonicalService)
-        .join(CanonicalService, MLPrediction.canonical_service_id == CanonicalService.id)
-        .where(MLPrediction.competitor_id == competitor_id)
+        select(MLPredictionRecord, CanonicalService)
+        .join(CanonicalService, MLPredictionRecord.canonical_service_id == CanonicalService.id)
+        .where(MLPredictionRecord.competitor_id == competitor_id)
     )
     pred_list = []
     for pred, canon in result_preds.all():
-        ut_price = float(canon.utservio_base_price) if canon.utservio_base_price else 599.0
+        ut_price = float(pred.utservio_base_price) if pred.utservio_base_price else 599.0
         comp_price = float(pred.predicted_price)
         gap_pct = round(((comp_price - ut_price) / ut_price) * 100, 1) if ut_price else 0.0
         pred_list.append({
-            "service": canon.service_name,
+            "service": canon.name,
             "utservio_catalog_price": ut_price,
             "predicted_competitor_price": comp_price,
             "gap_percentage": gap_pct,
@@ -127,15 +127,16 @@ async def _gather_competitor_data(competitor_id: int, session: AsyncSession) -> 
     data["db_ml_predictions_vs_utservio"] = pred_list
 
     # Content & Social Media
-    result = await session.execute(
+    content_result = await session.execute(
         select(CompetitorContent).where(CompetitorContent.competitor_id == competitor_id)
     )
-    data["content"] = [{"title": c.title, "type": c.content_type, "url": c.url} for c in result.scalars().all()]
+    data["content"] = [{"title": c.title, "type": c.content_type, "url": c.url} for c in content_result.scalars().all()]
 
-    result = await session.execute(
+    # Social Media
+    social_result = await session.execute(
         select(CompetitorSocial).where(CompetitorSocial.competitor_id == competitor_id)
     )
-    data["social"] = [{"platform": s.platform, "username": s.username, "url": s.profile_url} for s in result.scalars().all()]
+    data["social"] = [{"platform": s.platform.value if hasattr(s.platform, "value") else str(s.platform), "username": s.username, "url": s.profile_url} for s in social_result.scalars().all()]
 
     result = await session.execute(
         select(RawStorage)

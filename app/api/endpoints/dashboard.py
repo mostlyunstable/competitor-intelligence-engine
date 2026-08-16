@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import secrets
 import time
 import structlog
@@ -1083,14 +1084,14 @@ async def compare_competitors(
     if not competitors:
         return []
 
-    competitor_ids = list(competitors.keys())
+    target_comp_ids = list(competitors.keys())
 
     counts_subquery = (
         select(
             CompetitorService.competitor_id.label("competitor_id"),
             func.count(CompetitorService.id).label("services_count"),
         )
-        .where(CompetitorService.competitor_id.in_(competitor_ids))
+        .where(CompetitorService.competitor_id.in_(target_comp_ids))
         .group_by(CompetitorService.competitor_id)
     )
 
@@ -1099,7 +1100,7 @@ async def compare_competitors(
             CompetitorPricing.competitor_id.label("competitor_id"),
             func.count(CompetitorPricing.id).label("pricing_count"),
         )
-        .where(CompetitorPricing.competitor_id.in_(competitor_ids))
+        .where(CompetitorPricing.competitor_id.in_(target_comp_ids))
         .group_by(CompetitorPricing.competitor_id)
     )
 
@@ -1108,7 +1109,7 @@ async def compare_competitors(
             CompetitorSocial.competitor_id.label("competitor_id"),
             func.count(CompetitorSocial.id).label("social_count"),
         )
-        .where(CompetitorSocial.competitor_id.in_(competitor_ids))
+        .where(CompetitorSocial.competitor_id.in_(target_comp_ids))
         .group_by(CompetitorSocial.competitor_id)
     )
 
@@ -1117,7 +1118,7 @@ async def compare_competitors(
             CompetitorContent.competitor_id.label("competitor_id"),
             func.count(CompetitorContent.id).label("content_count"),
         )
-        .where(CompetitorContent.competitor_id.in_(competitor_ids))
+        .where(CompetitorContent.competitor_id.in_(target_comp_ids))
         .group_by(CompetitorContent.competitor_id)
     )
 
@@ -1127,7 +1128,7 @@ async def compare_competitors(
     content_counts = {row.competitor_id: row.content_count for row in (await session.execute(content_subquery)).all()}
 
     results = []
-    for cid in competitor_ids:
+    for cid in target_comp_ids:
         comp = competitors[cid]
         results.append({
             "id": comp.id,

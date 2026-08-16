@@ -266,9 +266,9 @@ class PlaywrightRenderer:
         page = await context.new_page()
 
         if self._stealth_settings.enabled:
-            from playwright_stealth import Stealth
+            from playwright_stealth import stealth_async
 
-            await Stealth().apply_stealth_async(page)
+            await stealth_async(page)
 
         try:
             # For SPA: navigate to base URL first if this is a routed page
