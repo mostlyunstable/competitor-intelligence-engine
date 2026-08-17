@@ -65,6 +65,25 @@ class CityScore:
     coverage_level: str
     market_demand: str
 
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "city": self.city,
+            "state": self.state,
+            "lat": self.lat,
+            "lon": self.lon,
+            "population": self.population,
+            "tier": self.tier,
+            "competitor_count": self.competitor_count,
+            "market_saturation": self.market_saturation,
+            "saturation": self.market_saturation,
+            "opportunity_score": self.opportunity_score,
+            "opportunity": self.opportunity_score,
+            "coverage_level": self.coverage_level,
+            "coverage": self.coverage_level,
+            "market_demand": self.market_demand,
+            "demand": self.market_demand,
+        }
+
 
 @dataclass
 class HeatmapPoint:
@@ -74,6 +93,15 @@ class HeatmapPoint:
     label: str
     value: float
 
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "lat": self.lat,
+            "lon": self.lon,
+            "intensity": self.intensity,
+            "label": self.label,
+            "value": self.value,
+        }
+
 
 class GeographicIntelligence:
     """Spatial intelligence engine for competitive analysis."""
@@ -82,25 +110,41 @@ class GeographicIntelligence:
         self._competitor_cities: dict[int, list[str]] = {}
         self._city_competitors: dict[str, list[int]] = {}
 
-    async def analyze(self, session: AsyncSession) -> dict[str, Any]:
+    async def analyze(self, session: AsyncSession | None = None) -> dict[str, Any]:
         from sqlalchemy import select
-        from app.database.models import Competitor, CompetitorService
+        from app.database.models import Competitor
 
         # Build competitor-city mapping
         self._competitor_cities.clear()
         self._city_competitors.clear()
 
-        stmt = select(Competitor).where(Competitor.enabled.is_(True))
-        competitors = (await session.execute(stmt)).scalars().all()
+        if session is not None:
+            stmt = select(Competitor).where(Competitor.enabled.is_(True))
+            competitors = (await session.execute(stmt)).scalars().all()
 
-        for comp in competitors:
-            cities = []
-            for tag in (comp.tags or []):
-                tag_lower = tag.lower()
-                if tag_lower in CITY_DATA:
-                    cities.append(tag_lower)
-                    self._city_competitors.setdefault(tag_lower, []).append(comp.id)
-            self._competitor_cities[comp.id] = cities
+            for comp in competitors:
+                cities = []
+                comp_tags = [t.lower() for t in (comp.tags or [])]
+                comp_name = comp.name.lower()
+                comp_notes = (comp.notes or "").lower()
+                comp_url = comp.website_url.lower()
+
+                for city_key in CITY_DATA:
+                    if (
+                        city_key in comp_tags
+                        or city_key in comp_name
+                        or city_key in comp_notes
+                        or city_key in comp_url
+                    ):
+                        cities.append(city_key)
+                        self._city_competitors.setdefault(city_key, []).append(comp.id)
+
+                if not cities:
+                    for default_city in ["chennai", "bangalore", "mumbai", "delhi"]:
+                        cities.append(default_city)
+                        self._city_competitors.setdefault(default_city, []).append(comp.id)
+
+                self._competitor_cities[comp.id] = cities
 
         return {
             "city_analysis": self._analyze_cities(),
@@ -110,7 +154,7 @@ class GeographicIntelligence:
             "saturation_map": self._saturation_map(),
         }
 
-    def _analyze_cities(self) -> list[CityScore]:
+    def _analyze_cities(self) -> list[dict[str, Any]]:
         scores = []
         for city, data in CITY_DATA.items():
             comp_count = len(self._city_competitors.get(city, []))
@@ -131,9 +175,9 @@ class GeographicIntelligence:
             ))
 
         scores.sort(key=lambda x: x.opportunity_score, reverse=True)
-        return scores
+        return [s.as_dict() for s in scores]
 
-    def _generate_heatmap(self) -> list[HeatmapPoint]:
+    def _generate_heatmap(self) -> list[dict[str, Any]]:
         points = []
         for city, data in CITY_DATA.items():
             comp_count = len(self._city_competitors.get(city, []))
@@ -144,7 +188,7 @@ class GeographicIntelligence:
                 label=f"{city.title()} ({comp_count} competitors)",
                 value=comp_count,
             ))
-        return points
+        return [p.as_dict() for p in points]
 
     def _analyze_coverage(self) -> dict[str, Any]:
         covered = [c for c in CITY_DATA if self._city_competitors.get(c)]

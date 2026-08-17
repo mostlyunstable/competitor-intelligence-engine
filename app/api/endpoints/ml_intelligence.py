@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -487,14 +487,33 @@ async def geo_analyze(session: AsyncSession = Depends(get_session)) -> dict[str,
     return await geo_intelligence.analyze(session)
 
 
-@router.get("/api/geo/map-data")
-async def geo_map_data() -> dict[str, Any]:
+@router.get("/api/geo/cities")
+async def geo_cities(session: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
     from app.services.geo import geo_intelligence
+    analysis = await geo_intelligence.analyze(session)
+    return analysis.get("city_analysis", [])
+
+
+@router.get("/api/geo/heatmap")
+async def geo_heatmap(session: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
+    from app.services.geo import geo_intelligence
+    analysis = await geo_intelligence.analyze(session)
+    return analysis.get("heatmap", [])
+
+
+@router.get("/api/geo/map-data")
+async def geo_map_data(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    from app.services.geo import geo_intelligence
+    await geo_intelligence.analyze(session)
     return geo_intelligence.get_map_data()
 
 
 @router.get("/api/geo/compare")
-async def geo_compare(cities: str = Query(..., description="Comma-separated city names")) -> list[dict[str, Any]]:
+async def geo_compare(
+    cities: str = Query(..., description="Comma-separated city names"),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
     from app.services.geo import geo_intelligence
+    await geo_intelligence.analyze(session)
     city_list = [c.strip() for c in cities.split(",")]
     return geo_intelligence.city_comparison(city_list)

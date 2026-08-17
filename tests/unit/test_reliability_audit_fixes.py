@@ -63,3 +63,27 @@ def test_json_ld_offer_safe_extraction():
     result = strategy.parse(soup, "https://example.com")
     assert len(result.pricing) == 1
     assert result.pricing[0]["base_price"] == 59.99
+
+
+@pytest.mark.asyncio
+async def test_geo_intelligence_serialization():
+    """Verify geographic intelligence analysis, cities, and heatmap output dictionary contracts."""
+    from app.services.geo.intelligence import geo_intelligence
+
+    analysis = await geo_intelligence.analyze(session=None)
+    assert "city_analysis" in analysis
+    assert "heatmap" in analysis
+    assert "coverage" in analysis
+
+    cities = analysis["city_analysis"]
+    assert len(cities) > 0
+    first_city = cities[0]
+    assert "city" in first_city
+    assert "opportunity" in first_city
+    assert "saturation" in first_city
+    assert "coverage" in first_city
+
+    map_data = geo_intelligence.get_map_data()
+    assert "cities" in map_data
+    assert "states" in map_data
+
