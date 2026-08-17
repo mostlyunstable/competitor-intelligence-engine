@@ -181,8 +181,8 @@ class ReviewExtractionStrategy(ParsingStrategy):
                     "body": None,
                     "rating": rating_float,
                     "review_count": count,
-                    "best_rating": int(best) if best else 5,
-                    "worst_rating": int(worst) if worst else 1,
+                    "best_rating": int(float(str(best))) if best else 5,
+                    "worst_rating": int(float(str(worst))) if worst else 1,
                     "source_url": "",
                     "source": "json_ld_aggregate",
                 }

@@ -35,6 +35,18 @@ SCHEMA_ORG_TYPES = {
 }
 
 
+def _safe_float(val: Any) -> float | None:
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    try:
+        cleaned = re.sub(r"[^\d.]", "", str(val))
+        return float(cleaned) if cleaned else None
+    except (ValueError, TypeError):
+        return None
+
+
 class JsonLdStrategy(ParsingStrategy):
     @property
     def name(self) -> str:
@@ -285,10 +297,8 @@ class JsonLdStrategy(ParsingStrategy):
                 {
                     "service_name": name,
                     "category": category or item.get("category"),
-                    "base_price": float(str(low).replace(",", "")) if low is not None else None,
-                    "promotional_price": (
-                        float(str(high).replace(",", "")) if high is not None else None
-                    ),
+                    "base_price": _safe_float(low),
+                    "promotional_price": _safe_float(high),
                     "currency": currency,
                     "discount": None,
                     "subscription_plans": {},
@@ -301,7 +311,7 @@ class JsonLdStrategy(ParsingStrategy):
                 {
                     "service_name": name,
                     "category": category or item.get("category"),
-                    "base_price": float(str(price).replace(",", "")) if price is not None else None,
+                    "base_price": _safe_float(price),
                     "promotional_price": None,
                     "currency": currency,
                     "discount": None,

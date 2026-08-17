@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePolling, useDebounce } from '../hooks'
 import { api } from '../lib/api'
-import { formatDate, timeAgo } from '../lib/utils'
+import { formatDate, timeAgo, safeHostname } from '../lib/utils'
 import {
   Plus, Search, Filter, Trash2, Edit, Copy, Play,
   ChevronLeft, ChevronRight, ExternalLink, Globe,
@@ -183,7 +183,7 @@ export default function CompetitorsPage() {
                         </button>
                         <div className="flex items-center gap-1 text-xs text-surface-400">
                           <Globe size={10} />
-                          {new URL(c.website_url).hostname}
+                          {safeHostname(c.website_url)}
                         </div>
                       </div>
                     </div>

@@ -43,3 +43,14 @@ export function truncate(str: string, len: number): string {
   if (str.length <= len) return str
   return str.slice(0, len) + '...'
 }
+
+export function safeHostname(url: string | null | undefined): string {
+  if (!url) return ''
+  try {
+    const formatted = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`
+    return new URL(formatted).hostname
+  } catch {
+    return url
+  }
+}
+

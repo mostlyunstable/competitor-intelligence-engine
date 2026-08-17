@@ -113,7 +113,7 @@ class LLMFallbackService:
             "company_name": "Name",
             "description": "Description",
             "services": [{{"name": "Service Name", "description": "Desc"}}],
-            "pricing": [{{"plan_name": "Plan", "price": 99.0, "currency": "USD", "billing_period": "monthly"}}]
+            "pricing": [{{"service_name": "Plan or Service Name", "base_price": 99.0, "currency": "INR", "category": "Category"}}]
         }}
 
         Text:
@@ -148,8 +148,21 @@ class LLMFallbackService:
 
             if "pricing" in data and isinstance(data["pricing"], list):
                 for p in data["pricing"]:
-                    if isinstance(p, dict) and "plan_name" in p:
-                        partial.pricing.append(p)
+                    if isinstance(p, dict):
+                        service_name = p.get("service_name") or p.get("plan_name") or p.get("name")
+                        base_price = p.get("base_price") or p.get("price")
+                        if service_name:
+                            try:
+                                price_val = float(str(base_price).replace(",", "")) if base_price is not None else None
+                            except (ValueError, TypeError):
+                                price_val = None
+                            partial.pricing.append({
+                                "service_name": str(service_name),
+                                "base_price": price_val,
+                                "currency": p.get("currency", "INR"),
+                                "category": p.get("category"),
+                                "promotional_price": None,
+                            })
 
             # Merge the partial result with a moderate confidence weight
             combined_result.merge(partial, "llm_fallback", 0.40)

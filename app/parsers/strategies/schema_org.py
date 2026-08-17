@@ -37,6 +37,33 @@ SCHEMA_ORG_TYPES = {
 }
 
 
+import re
+
+
+def _safe_float(val: Any) -> float | None:
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    try:
+        match = re.search(r"[\d.]+", str(val))
+        return float(match.group(0)) if match else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _safe_int(val: Any) -> int | None:
+    if val is None:
+        return None
+    if isinstance(val, int):
+        return val
+    try:
+        match = re.search(r"\d+", str(val).replace(",", ""))
+        return int(match.group(0)) if match else None
+    except (ValueError, TypeError):
+        return None
+
+
 class SchemaOrgStrategy(ParsingStrategy):
     @property
     def name(self) -> str:
@@ -107,8 +134,8 @@ class SchemaOrgStrategy(ParsingStrategy):
                         else "USD"
                     ),
                     "estimated_duration": None,
-                    "rating": float(rating_value) if rating_value else None,
-                    "review_count": int(review_count) if review_count else None,
+                    "rating": _safe_float(rating_value),
+                    "review_count": _safe_int(review_count),
                 }
             )
         elif "AggregateOffer" in itemtype:

@@ -330,6 +330,18 @@ def _add_service(result: ParsedResult, name: str, **kwargs: Any) -> None:
     )
 
 
+def _safe_float(val: Any) -> float | None:
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    try:
+        cleaned = re.sub(r"[^\d.]", "", str(val))
+        return float(cleaned) if cleaned else None
+    except (ValueError, TypeError):
+        return None
+
+
 def _add_pricing(result: ParsedResult, service_name: str, **kwargs: Any) -> None:
     if not service_name:
         return
@@ -513,8 +525,8 @@ class _Pass1Structured:
             _add_pricing(
                 result,
                 name,
-                base_price=float(str(low).replace(",", "")) if low is not None else None,
-                promotional_price=float(str(high).replace(",", "")) if high is not None else None,
+                base_price=_safe_float(low),
+                promotional_price=_safe_float(high),
                 currency=currency,
             )
         else:
@@ -522,7 +534,7 @@ class _Pass1Structured:
             _add_pricing(
                 result,
                 name,
-                base_price=float(str(price).replace(",", "")) if price is not None else None,
+                base_price=_safe_float(price),
                 currency=currency,
             )
 

@@ -1031,7 +1031,7 @@ async def get_collection_trends(
         select(
             cast(CollectionLog.start_time, Date).label("date"),
             func.count().label("total"),
-            func.sum(func.cast(CollectionLog.success, Integer)).label("successful"),
+            func.sum(cast(CollectionLog.success, Integer)).label("successful"),
         )
         .where(CollectionLog.start_time >= since)
         .group_by(cast(CollectionLog.start_time, Date))

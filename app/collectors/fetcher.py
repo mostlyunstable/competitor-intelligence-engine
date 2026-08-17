@@ -648,7 +648,7 @@ class HybridFetcher:
             metrics.inc_counter("playwright_fallback_total")
 
             # For forced render, also detect SPA
-            static_result = await self._fetch_static({})
+            static_result = await self._fetch_static(url)
             analysis = self._analyzer.analyze(static_result.html) if static_result.html else {"has_indicators": False}
             is_spa = analysis.get("has_indicators", False)
             spa_base_url = None

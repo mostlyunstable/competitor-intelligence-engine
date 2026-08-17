@@ -392,11 +392,11 @@ async def get_feedback(insight_id: int, db: AsyncSession = Depends(get_session))
 async def get_feedback_summary(db: AsyncSession = Depends(get_session)) -> Any:
     """Get overall feedback summary across all insights."""
     from app.database.models import AIInsightFeedback
-    from sqlalchemy import func as sql_func
+    from sqlalchemy import case, func as sql_func
     stmt = select(
         sql_func.count(AIInsightFeedback.id).label("total"),
-        sql_func.count(sql_func.case((AIInsightFeedback.rating == 2, 1))).label("thumbs_up"),
-        sql_func.count(sql_func.case((AIInsightFeedback.rating == 1, 1))).label("thumbs_down"),
+        sql_func.count(case((AIInsightFeedback.rating == 2, 1))).label("thumbs_up"),
+        sql_func.count(case((AIInsightFeedback.rating == 1, 1))).label("thumbs_down"),
     )
     result = (await db.execute(stmt)).one()
     total = result.total or 0

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { api } from '../lib/api'
+import { safeHostname } from '../lib/utils'
 import { GitCompare, Check, Plus, X, RefreshCw, BarChart3, PieChart, Radar } from 'lucide-react'
 import type { Competitor } from '../types'
 import {
@@ -205,7 +206,7 @@ export default function CompetitorComparePage() {
                     {comparison.map(c => (
                       <td key={c.id} className="px-5 py-3 text-sm text-center">
                         <a href={c.website_url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">
-                          {new URL(c.website_url).hostname}
+                          {safeHostname(c.website_url)}
                         </a>
                       </td>
                     ))}
@@ -215,7 +216,7 @@ export default function CompetitorComparePage() {
                     {comparison.map(c => (
                       <td key={c.id} className="px-5 py-3 text-sm text-center">
                         <div className="flex flex-wrap justify-center gap-1">
-                          {c.modules.map((m: string) => (
+                          {(c.modules || []).map((m: string) => (
                             <span key={m} className="text-xs bg-surface-100 text-surface-600 px-1.5 py-0.5 rounded">{m}</span>
                           ))}
                         </div>
