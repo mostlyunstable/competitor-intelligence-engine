@@ -50,29 +50,26 @@ class RawStorageRepository(BaseRepository[RawStorage]):
         from sqlalchemy.exc import IntegrityError
 
         try:
-            # We attempt to insert normally to rely on the DB's native constraint rather than checking first.
-            record = await self.create(
-                competitor_id=competitor_id,
-                source_url=source_url,
-                content_hash=content_hash,
-                storage_uri=storage_uri,
-                mime_type=mime_type,
-                file_size_bytes=file_size_bytes,
-                metadata_=metadata,
-                extracted_data=extracted_data,
-                collection_status=collection_status,
-            )
-            return record
+            # We attempt to insert inside a savepoint to protect the outer session transaction
+            async with self._session.begin_nested():
+                record = await self.create(
+                    competitor_id=competitor_id,
+                    source_url=source_url,
+                    content_hash=content_hash,
+                    storage_uri=storage_uri,
+                    mime_type=mime_type,
+                    file_size_bytes=file_size_bytes,
+                    metadata_=metadata,
+                    extracted_data=extracted_data,
+                    collection_status=collection_status,
+                )
+                return record
         except IntegrityError:
-            # A unique violation occurred (competitor_id, source_url).
-            # Another concurrent transaction inserted the row first.
-            # Rollback the failed insert in this session.
-            await self._session.rollback()
-
-            # Now that it definitely exists, retrieve it and update it safely.
+            # Savepoint was automatically rolled back. Retrieve and update safely.
             existing = await self.get_by_url(competitor_id, source_url)
             if existing:
                 existing.storage_uri = storage_uri
+                existing.content_hash = content_hash
                 existing.mime_type = mime_type
                 existing.file_size_bytes = file_size_bytes
                 existing.metadata_ = metadata

@@ -16,6 +16,19 @@ import ActivityPage from './pages/ActivityPage'
 import AiInsightsPage from './pages/AiInsightsPage'
 import CopilotPage from './pages/CopilotPage'
 import PredictiveIntelligenceSuitePage from './pages/PredictiveIntelligenceSuitePage'
+import PricingIntelligencePage from './pages/PricingIntelligencePage'
+import PredictionsPage from './pages/PredictionsPage'
+import MLPerformancePage from './pages/MLPerformancePage'
+import KnowledgeGraphPage from './pages/KnowledgeGraphPage'
+import GeoIntelligencePage from './pages/GeoIntelligencePage'
+import RiskAnalysisPage from './pages/RiskAnalysisPage'
+import ForecastsPage from './pages/ForecastsPage'
+import ScenariosPage from './pages/ScenariosPage'
+import DataQualityPage from './pages/DataQualityPage'
+import RecommendationsPage from './pages/RecommendationsPage'
+import PredictiveBenchmarkPage from './pages/PredictiveBenchmarkPage'
+import ForecastReportPage from './pages/ForecastReportPage'
+import ConfidenceDashboardPage from './pages/ConfidenceDashboardPage'
 import { DashboardProvider } from './context/DashboardContext'
 
 const AuthContext = createContext<{
@@ -73,9 +86,19 @@ export default function App() {
                         <Route path="/activity" element={<ActivityPage />} />
                         <Route path="/ai" element={<AiInsightsPage />} />
                         <Route path="/predictive-intelligence" element={<PredictiveIntelligenceSuitePage />} />
-                        <Route path="/predictions" element={<PredictiveIntelligenceSuitePage />} />
-                        <Route path="/pricing-intelligence" element={<PredictiveIntelligenceSuitePage />} />
-                        <Route path="/ml-performance" element={<PredictiveIntelligenceSuitePage />} />
+                        <Route path="/predictions" element={<PredictionsPage />} />
+                        <Route path="/pricing-intelligence" element={<PricingIntelligencePage />} />
+                        <Route path="/ml-performance" element={<MLPerformancePage />} />
+                        <Route path="/knowledge-graph" element={<KnowledgeGraphPage />} />
+                        <Route path="/geo-intelligence" element={<GeoIntelligencePage />} />
+                        <Route path="/risk-analysis" element={<RiskAnalysisPage />} />
+                        <Route path="/forecasts" element={<ForecastsPage />} />
+                        <Route path="/scenarios" element={<ScenariosPage />} />
+                        <Route path="/data-quality" element={<DataQualityPage />} />
+                        <Route path="/recommendations" element={<RecommendationsPage />} />
+                        <Route path="/benchmarks" element={<PredictiveBenchmarkPage />} />
+                        <Route path="/forecast-reports" element={<ForecastReportPage />} />
+                        <Route path="/confidence" element={<ConfidenceDashboardPage />} />
                         <Route path="/copilot" element={<CopilotPage />} />
                         <Route path="/admin" element={<AdminPage />} />
                       </Routes>

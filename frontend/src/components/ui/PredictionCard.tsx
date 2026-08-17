@@ -44,19 +44,19 @@ export function PredictionCard({
         <div>
           <span className="text-[10px] text-surface-500 uppercase block font-semibold">Current Price</span>
           <span className="text-sm font-bold font-mono text-surface-700 dark:text-surface-300">
-            {currentPrice > 0 ? `₹${currentPrice.toLocaleString()}` : 'N/A'}
+            {currentPrice && currentPrice > 0 ? `₹${Number(currentPrice).toLocaleString()}` : 'N/A'}
           </span>
         </div>
         <div className="border-x border-surface-200 dark:border-surface-700">
           <span className="text-[10px] text-brand-600 dark:text-brand-400 uppercase block font-bold">Predicted Price</span>
           <span className="text-base font-extrabold font-mono text-brand-700 dark:text-brand-300">
-            ₹{predictedPrice.toLocaleString()}
+            {predictedPrice != null ? `₹${Number(predictedPrice).toLocaleString()}` : 'N/A'}
           </span>
         </div>
         <div>
           <span className="text-[10px] text-surface-500 uppercase block font-semibold">Utservio Baseline</span>
           <span className="text-sm font-bold font-mono text-surface-900 dark:text-white">
-            ₹{utservioPrice.toLocaleString()}
+            {utservioPrice != null ? `₹${Number(utservioPrice).toLocaleString()}` : 'N/A'}
           </span>
         </div>
       </div>

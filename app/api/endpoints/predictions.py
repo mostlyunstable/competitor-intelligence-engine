@@ -242,26 +242,33 @@ async def generate_and_save_predictions(
 
     benchmarks = await predictive_benchmarker.benchmark_all(session)
     for b in benchmarks:
-        from app.database.models import GrowthLevel
-
         overall = b.get("overall_prediction", "stable")
-        try:
-            growth_level = GrowthLevel(overall.replace("_growth", ""))
-        except ValueError:
-            growth_level = GrowthLevel.MEDIUM
-
-        bench = PredictiveBenchmark(
-            competitor_id=b["competitor_id"],
-            current_rank=b.get("current_rank", 0),
-            predicted_rank=b.get("predicted_rank", 0),
-            growth_score=b.get("growth_score", 0),
-            innovation_score=b.get("innovation_score", 0),
-            expansion_score=b.get("expansion_score", 0),
-            risk_score=b.get("risk_score", 0),
-            overall_prediction=overall,
-            benchmark_data=b.get("benchmark_data", {}),
+        existing_bench = await session.execute(
+            select(PredictiveBenchmark).where(PredictiveBenchmark.competitor_id == b["competitor_id"])
         )
-        session.add(bench)
+        existing = existing_bench.scalars().first()
+        if existing:
+            existing.current_rank = b.get("current_rank", 0)
+            existing.predicted_rank = b.get("predicted_rank", 0)
+            existing.growth_score = b.get("growth_score", 0)
+            existing.innovation_score = b.get("innovation_score", 0)
+            existing.expansion_score = b.get("expansion_score", 0)
+            existing.risk_score = b.get("risk_score", 0)
+            existing.overall_prediction = overall
+            existing.benchmark_data = b.get("benchmark_data", {})
+        else:
+            bench = PredictiveBenchmark(
+                competitor_id=b["competitor_id"],
+                current_rank=b.get("current_rank", 0),
+                predicted_rank=b.get("predicted_rank", 0),
+                growth_score=b.get("growth_score", 0),
+                innovation_score=b.get("innovation_score", 0),
+                expansion_score=b.get("expansion_score", 0),
+                risk_score=b.get("risk_score", 0),
+                overall_prediction=overall,
+                benchmark_data=b.get("benchmark_data", {}),
+            )
+            session.add(bench)
         saved_benchmarks += 1
 
     await session.commit()

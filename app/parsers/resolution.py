@@ -347,6 +347,13 @@ class EntityResolver:
             "pest-control": ["pest", "termite", "cockroach", "bedbug", "mosquito", "rodent", "ant", "fumigation", "disinfection", "insect", "bug", "pestcontrol"]
         }
 
+    def _matches_keyword(self, kw: str, text: str) -> bool:
+        if not kw or not text:
+            return False
+        if " " in kw:
+            return kw in text
+        return bool(re.search(rf"\b{re.escape(kw)}\b", text))
+
     def map_to_catalog(self, result: ParsedResult) -> None:
         """Map extracted competitor services and pricing to Utservio's standard catalog."""
         catalog = self._load_catalog()
@@ -361,7 +368,7 @@ class EntityResolver:
             # 1. Try to match by service name keywords
             for cat, keywords in catalog.items():
                 for kw in keywords:
-                    if kw in name:
+                    if self._matches_keyword(kw, name):
                         matched_cat = cat
                         break
                 if matched_cat:
@@ -371,7 +378,7 @@ class EntityResolver:
             if not matched_cat and current_cat:
                 for cat, keywords in catalog.items():
                     for kw in keywords:
-                        if kw in current_cat:
+                        if self._matches_keyword(kw, current_cat):
                             matched_cat = cat
                             break
                     if matched_cat:
@@ -399,7 +406,7 @@ class EntityResolver:
             # 1. Try to match by service name keywords
             for cat, keywords in catalog.items():
                 for kw in keywords:
-                    if kw in p_name:
+                    if self._matches_keyword(kw, p_name):
                         matched_cat = cat
                         break
                 if matched_cat:
@@ -409,7 +416,7 @@ class EntityResolver:
             if not matched_cat and current_cat:
                 for cat, keywords in catalog.items():
                     for kw in keywords:
-                        if kw in current_cat:
+                        if self._matches_keyword(kw, current_cat):
                             matched_cat = cat
                             break
                     if matched_cat:

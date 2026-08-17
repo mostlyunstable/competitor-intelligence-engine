@@ -115,9 +115,9 @@ export default function RiskAnalysisPage() {
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-bold text-surface-900 dark:text-white">{r.risk_score.toFixed(0)}</div>
+                  <div className="text-lg font-bold text-surface-900 dark:text-white">{r.risk_score != null ? Number(r.risk_score).toFixed(0) : '-'}</div>
                   <div className="text-xs text-surface-500">Risk Score</div>
-                  <div className="text-xs text-surface-500 mt-1">{(r.likelihood * 100).toFixed(0)}% likely</div>
+                  <div className="text-xs text-surface-500 mt-1">{r.likelihood != null ? (Number(r.likelihood) * 100).toFixed(0) : '0'}% likely</div>
                 </div>
               </div>
             </div>

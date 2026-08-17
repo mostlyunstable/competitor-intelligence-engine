@@ -18,7 +18,7 @@ export function StatusBadge({
 }: StatusBadgeProps) {
   // Infer variant from status string if not explicitly passed
   const resolvedVariant: StatusVariant = variant || (() => {
-    const s = status.toLowerCase()
+    const s = (status || '').toLowerCase()
     if (s.includes('high') || s.includes('success') || s.includes('healthy') || s.includes('active') || s.includes('valid')) return 'success'
     if (s.includes('medium') || s.includes('warn') || s.includes('degraded') || s.includes('moderate') || s.includes('pending')) return 'warning'
     if (s.includes('low') || s.includes('fail') || s.includes('risk') || s.includes('danger') || s.includes('stop') || s.includes('error')) return 'danger'

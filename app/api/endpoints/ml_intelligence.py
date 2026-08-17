@@ -132,7 +132,12 @@ async def graph_neighbors(
 ) -> list[dict[str, Any]]:
     from app.services.knowledge_graph import knowledge_graph, RelationshipType
     nid = f"competitor:{competitor_id}"
-    rel = RelationshipType(relationship) if relationship else None
+    rel = None
+    if relationship:
+        try:
+            rel = RelationshipType(relationship)
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"Invalid relationship type: {relationship}") from None
     neighbors = knowledge_graph.get_neighbors(nid, rel)
     return [{"node": {"id": n.id, "type": n.entity_type.value, "name": n.name}, "relationship": e.relationship.value, "weight": e.weight} for n, e in neighbors[:limit]]
 

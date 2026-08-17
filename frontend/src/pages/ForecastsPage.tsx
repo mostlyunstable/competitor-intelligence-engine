@@ -99,9 +99,9 @@ export default function ForecastsPage() {
                           {g.growth_level}
                         </span>
                       </td>
-                      <td className="py-3 text-surface-700 dark:text-surface-300">{g.growth_score.toFixed(1)}</td>
-                      <td className="py-3 text-surface-700 dark:text-surface-300">{g.growth_percentage}</td>
-                      <td className="py-3 text-surface-700 dark:text-surface-300">{(g.confidence_score * 100).toFixed(0)}%</td>
+                      <td className="py-3 text-surface-700 dark:text-surface-300">{g.growth_score != null ? Number(g.growth_score).toFixed(1) : '-'}</td>
+                      <td className="py-3 text-surface-700 dark:text-surface-300">{g.growth_percentage || '-'}</td>
+                      <td className="py-3 text-surface-700 dark:text-surface-300">{g.confidence_score != null ? (Number(g.confidence_score) * 100).toFixed(0) : '0'}%</td>
                       <td className="py-3">
                         <button
                           onClick={(e) => { e.stopPropagation(); setExpandedRow(expandedRow === g.competitor_id ? null : g.competitor_id) }}
@@ -125,9 +125,9 @@ export default function ForecastsPage() {
               <div className="mt-4 p-4 bg-surface-50 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                 <h3 className="text-sm font-medium text-surface-900 dark:text-white mb-3">Breakdown</h3>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {Object.entries(g.breakdown).map(([key, val]) => (
+                  {Object.entries(g.breakdown || {}).map(([key, val]) => (
                     <div key={key} className="text-center">
-                      <div className="text-lg font-bold text-brand-600">{val.toFixed(1)}</div>
+                      <div className="text-lg font-bold text-brand-600">{val != null ? Number(val).toFixed(1) : '-'}</div>
                       <div className="text-xs text-surface-500">{key.replace(/_/g, ' ')}</div>
                     </div>
                   ))}
@@ -168,11 +168,11 @@ export default function ForecastsPage() {
                   <div className="w-full h-2 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden mb-2">
                     <div
                       className="h-full bg-brand-500 rounded-full transition-all"
-                      style={{ width: `${e.expansion_probability * 100}%` }}
+                      style={{ width: `${(e.expansion_probability || 0) * 100}%` }}
                     />
                   </div>
                   <div className="flex items-center justify-between text-xs text-surface-500">
-                    <span>{(e.expansion_probability * 100).toFixed(0)}% probability</span>
+                    <span>{e.expansion_probability != null ? (Number(e.expansion_probability) * 100).toFixed(0) : '0'}% probability</span>
                     <span className="flex items-center gap-1">
                       <Clock size={10} />
                       {e.expected_timeline}
