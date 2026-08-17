@@ -359,7 +359,7 @@ class CompetitorChangeEvent(Base):
     detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB)
 
-    competitor = relationship("Competitor", back_populates="change_events")
+    competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="change_events")
 
 
 class CompetitorAIInsight(Base):
@@ -405,14 +405,17 @@ class CompetitorAIInsight(Base):
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     estimated_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now()
     )
 
     competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="ai_insight")
+    feedbacks: Mapped[list["AIInsightFeedback"]] = relationship(
+        "AIInsightFeedback", back_populates="insight", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_ai_insight_llm_provider", "llm_provider"),
@@ -431,7 +434,9 @@ class AIInsightFeedback(Base):
     )
     rating: Mapped[int] = mapped_column(Integer, nullable=False)  # 1=thumbs down, 2=thumbs up
     comment: Mapped[str] = mapped_column(Text, nullable=True, default="")
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    insight: Mapped["CompetitorAIInsight"] = relationship("CompetitorAIInsight", back_populates="feedbacks")
 
 
 # ─── Sprint 7: Predictive Intelligence Models ────────────────────────────────
